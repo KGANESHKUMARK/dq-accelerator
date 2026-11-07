@@ -1,0 +1,23 @@
+# SYNTHETIC DEMO pipeline manifest – represents an existing Databricks PySpark pipeline.
+pipeline:
+  pipeline_id: DATABRICKS_CUSTOMER_PIPELINE
+  pipeline_name: Customer Processing Pipeline
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE        # integrated directly inside the existing notebook / job
+  dq_mode: REMEDIATE
+  owner: data-engineering@bank.example
+  description: >
+    Synthetic demo of a Databricks customer master pipeline onboarded into the DQ Accelerator.
+    This manifest represents an existing pipeline that was minimally modified to add the engine.
+  source_code: ../../integrations/databricks/customer_pipeline_dq_integrated.py
+  policy: ../policies/default.yaml
+  datasets:
+    - dataset_id: customers
+      format: PARQUET
+      stages: [BRONZE, SILVER, GOLD]
+      rulesets:
+        SILVER: ../rulesets/customers_v1.yaml
+        GOLD:   ../rulesets/customer_summary_gold_v1.yaml
+      test_data: ../../sample_data/bronze/customers.csv
+      test_data_format: CSV

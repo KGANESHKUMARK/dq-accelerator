@@ -1,0 +1,21 @@
+# SYNTHETIC DEMO pipeline manifest - represents an existing Databricks PySpark pipeline.
+pipeline:
+  pipeline_id: HEALTHCARE_PATIENT_PIPELINE
+  pipeline_name: Patient Admissions Pipeline
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE        # integrated directly inside the existing notebook / job
+  dq_mode: REMEDIATE
+  owner: clinical-data-engineering@health.example
+  description: >
+    Synthetic demo of a Databricks patient-admissions pipeline onboarded into the
+    DQ Accelerator via the UI. PHI columns are governed by the healthcare policy.
+  policy: ../policies/healthcare.yaml
+  datasets:
+    - dataset_id: patients
+      format: PARQUET
+      stages: [BRONZE, SILVER]
+      rulesets:
+        SILVER: ../rulesets/patients_v1.yaml
+      test_data: ../../sample_data/bronze/patients.csv
+      test_data_format: CSV

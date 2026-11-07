@@ -1,0 +1,34 @@
+policy:
+  policy_id: BANKING_DEFAULT
+  version: "1.0"
+  description: >
+    Default remediation policy for the banking POC. AI corrections need >= 90% confidence AND a
+    rule-level auto_apply permission; sensitive banking data always requires human approval.
+
+  confidence:
+    threshold: 0.90            # decimal between 0 and 1 (0.90 = 90%)
+
+  ai:
+    enabled: true
+    allow_auto_apply: true
+    max_requests_per_run: 500  # distinct (rule, column, value) combinations sent per run (batched)
+    allow_sensitive_values_to_external_providers: false
+
+  sensitive_data:
+    categories:
+      customer_identity: [customer_id, customer_name, national_id, passport_number, date_of_birth]
+      account_identifiers: [account_id, account_number, iban, card_number]
+      transaction_amounts: [transaction_amount, amount]
+      regulatory: [kyc_status, tax_id, pan_number, risk_rating, sanctions_flag]
+    # Deterministic, reference-based or formatting-only actions explicitly permitted on sensitive
+    # columns. Anything else (e.g. NULL_REPLACEMENT, AI corrections) requires human approval.
+    permitted_deterministic_actions: [TRIM, UPPERCASE, LOOKUP_MAPPING, DATE_STANDARDIZATION, DEDUPLICATE]
+
+  quality_gate:
+    max_quarantine_rate: 0.40
+    fail_on_dataset_level_errors: true
+    fail_on_not_evaluated_rules: true
+    min_accepted_records: 1
+
+  approvals:
+    file: ../approvals/approved_corrections.yaml

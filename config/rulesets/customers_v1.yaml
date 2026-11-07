@@ -1,0 +1,191 @@
+# Customer RuleSet v1.0 - reviewed and approved by the data steward from the profiling candidates
+# (see docs/rule_management.md). Published versions are immutable: create v1.1 for changes.
+ruleset:
+  ruleset_id: customers_silver
+  dataset: customers
+  version: "1.0"
+  stage: SILVER
+  status: PUBLISHED
+  description: Silver-layer quality rules for the customer master (synthetic banking demo).
+  owner: customer-data-domain
+  record_key: [customer_id]
+  created_by: dq.engineer@bank.example
+  created_at: "2026-11-01T09:00:00Z"
+  approved_by: data.steward@bank.example
+  approved_at: "2026-11-01T15:30:00Z"
+  change_log:
+    - Initial approved rule set derived from profiling candidates and steward review.
+  lookups:
+    country_codes: ../rules/lookups/country_codes.yaml
+  rules:
+    - rule_id: CUST_001
+      name: customer_id_not_null
+      description: Every customer must have an identifier.
+      column: customer_id
+      rule_type: NOT_NULL
+      severity: ERROR
+
+    - rule_id: CUST_002
+      name: no_exact_duplicate_records
+      description: Exact duplicate customer records are removed (identical records - any survivor).
+      rule_type: DUPLICATE
+      severity: ERROR
+      config: {keys: ALL_COLUMNS}
+      remediation:
+        deterministic:
+          - action: DEDUPLICATE
+            survivor: {strategy: ANY_IDENTICAL}
+
+    - rule_id: CUST_003
+      name: customer_id_unique
+      description: A customer_id must identify exactly one customer (conflicts need human resolution).
+      column: customer_id
+      rule_type: UNIQUE
+      severity: ERROR
+
+    - rule_id: CUST_004
+      name: email_format
+      description: Email must be a syntactically valid address.
+      column: email
+      rule_type: REGEX
+      severity: ERROR
+      config: {pattern: '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: LOWERCASE
+        ai_assisted: {enabled: true, auto_apply: false}   # contact data: corrections need review
+
+    - rule_id: CUST_005
+      name: email_not_null
+      description: Email is mandatory for digital banking (cannot be invented).
+      column: email
+      rule_type: NOT_NULL
+      severity: ERROR
+
+    - rule_id: CUST_006
+      name: age_is_integer
+      description: Age must be a whole number.
+      column: age
+      rule_type: DATA_TYPE
+      severity: ERROR
+      config: {data_type: int}
+
+    - rule_id: CUST_007
+      name: age_range
+      description: Customer age must be between 18 and 120.
+      column: age
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 18, max: 120, data_type: int}
+
+    - rule_id: CUST_008
+      name: city_not_null
+      description: City is required; an approved placeholder may be used when unknown.
+      column: city
+      rule_type: NOT_NULL
+      severity: ERROR
+      remediation:
+        deterministic:
+          - action: NULL_REPLACEMENT
+            value: UNKNOWN
+            approved: true
+            approved_by: data.steward@bank.example
+
+    - rule_id: CUST_009
+      name: country_iso_code
+      description: Country must be an ISO-3166 alpha-2 code of a supported market.
+      column: country
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [IN, US, GB, SG, AE, DE, AU]}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: UPPERCASE
+          - action: LOOKUP_MAPPING
+            lookup: country_codes
+        ai_assisted: {enabled: true, auto_apply: true}
+
+    - rule_id: CUST_010
+      name: customer_status_allowed
+      description: Customer status must be a known lifecycle status.
+      column: customer_status
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [ACTIVE, INACTIVE, DORMANT, CLOSED]}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: UPPERCASE
+        ai_assisted: {enabled: true, auto_apply: true}
+
+    - rule_id: CUST_011
+      name: created_date_format
+      description: created_date must be an ISO date (yyyy-MM-dd).
+      column: created_date
+      rule_type: DATE_FORMAT
+      severity: ERROR
+      config: {format: yyyy-MM-dd}
+      remediation:
+        deterministic:
+          - action: DATE_STANDARDIZATION
+            input_formats: [dd/MM/yyyy, yyyy/MM/dd]   # configured source-system formats only
+            output_format: yyyy-MM-dd
+
+    - rule_id: CUST_012
+      name: created_after_programme_start
+      description: Informational - customer created before the digital programme start date.
+      column: created_date
+      rule_type: RANGE
+      severity: INFO
+      config: {min: "2023-01-01", data_type: date, format: yyyy-MM-dd}
+
+    - rule_id: CUST_013
+      name: name_no_edge_whitespace
+      description: Names should not have leading or trailing whitespace.
+      column: customer_name
+      rule_type: REGEX
+      severity: WARNING
+      config: {pattern: '^\S(.*\S)?$'}
+      remediation:
+        deterministic:
+          - action: TRIM
+
+    - rule_id: CUST_014
+      name: name_valid_characters
+      description: Names contain letters, spaces, apostrophes, dots and hyphens only.
+      column: customer_name
+      rule_type: REGEX
+      severity: ERROR
+      config: {pattern: "^\\s*[A-Za-z][A-Za-z .'-]*$"}
+      remediation:
+        ai_assisted: {enabled: true, auto_apply: true}   # sensitive column -> policy forces approval
+
+    - rule_id: CUST_015
+      name: customer_id_format
+      description: Customer identifiers follow the pattern C9999.
+      column: customer_id
+      rule_type: REGEX
+      severity: ERROR
+      config: {pattern: '^C[0-9]{4}$'}
+      remediation:
+        deterministic:
+          - action: TRIM
+
+    - rule_id: CUST_016
+      name: customer_schema
+      description: The customer feed must provide exactly the agreed columns.
+      rule_type: SCHEMA_VALIDATION
+      severity: ERROR
+      config:
+        allow_extra_columns: false
+        expected_columns:
+          - {name: customer_id, type: string}
+          - {name: customer_name, type: string}
+          - {name: email, type: string}
+          - {name: age, type: string}
+          - {name: city, type: string}
+          - {name: country, type: string}
+          - {name: customer_status, type: string}
+          - {name: created_date, type: string}

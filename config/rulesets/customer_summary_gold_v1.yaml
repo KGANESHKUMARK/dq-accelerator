@@ -1,0 +1,47 @@
+# Gold publication policy for the customer transaction summary aggregate.
+ruleset:
+  ruleset_id: customer_summary_gold
+  dataset: customer_transaction_summary
+  version: "1.0"
+  stage: GOLD
+  status: PUBLISHED
+  description: Checks applied to the Gold customer transaction summary before publication.
+  owner: analytics-data-domain
+  record_key: [customer_id]
+  approved_by: business.owner@bank.example
+  approved_at: "2026-11-01T16:05:00Z"
+  change_log:
+    - Initial approved publication checks.
+  rules:
+    - rule_id: SUM_001
+      name: summary_customer_not_null
+      column: customer_id
+      rule_type: NOT_NULL
+      severity: ERROR
+
+    - rule_id: SUM_002
+      name: one_row_per_customer
+      column: customer_id
+      rule_type: UNIQUE
+      severity: ERROR
+
+    - rule_id: SUM_003
+      name: totals_reconcile_with_transactions
+      description: Sum of customer totals must equal the sum of Gold-validated transaction amounts.
+      column: total_amount
+      rule_type: RECONCILIATION
+      severity: ERROR
+      config: {aggregate: SUM, reference_dataset: gold_transactions, reference_column: transaction_amount, tolerance: 0.01}
+
+    - rule_id: SUM_004
+      name: summary_not_empty
+      rule_type: ROW_COUNT
+      severity: ERROR
+      config: {min: 1}
+
+    - rule_id: SUM_005
+      name: transaction_count_positive
+      column: transaction_count
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 1, data_type: bigint}

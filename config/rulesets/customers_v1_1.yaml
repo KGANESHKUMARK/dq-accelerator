@@ -1,0 +1,208 @@
+# Customer RuleSet v1.1 - derived from v1.0 (v1.0 stays unchanged and can be re-activated).
+# Changes: add SUSPENDED status, tighten age max to 110, escalate name whitespace to ERROR,
+# add name length rule.
+ruleset:
+  ruleset_id: customers_silver
+  dataset: customers
+  version: "1.1"
+  parent_version: "1.0"
+  stage: SILVER
+  status: PUBLISHED
+  description: Silver-layer quality rules for the customer master (synthetic banking demo).
+  owner: customer-data-domain
+  record_key: [customer_id]
+  created_by: dq.engineer@bank.example
+  created_at: "2026-11-04T09:00:00Z"
+  approved_by: data.steward@bank.example
+  approved_at: "2026-11-04T16:00:00Z"
+  change_log:
+    - "CUST_010: add SUSPENDED to allowed customer statuses (new product lifecycle state)."
+    - "CUST_007: tighten maximum age from 120 to 110 (risk policy update)."
+    - "CUST_013: escalate edge-whitespace in names from WARNING to ERROR."
+    - "CUST_017: new rule - customer_name length between 2 and 60."
+  lookups:
+    country_codes: ../rules/lookups/country_codes.yaml
+  rules:
+    - rule_id: CUST_001
+      name: customer_id_not_null
+      description: Every customer must have an identifier.
+      column: customer_id
+      rule_type: NOT_NULL
+      severity: ERROR
+
+    - rule_id: CUST_002
+      name: no_exact_duplicate_records
+      description: Exact duplicate customer records are removed (identical records - any survivor).
+      rule_type: DUPLICATE
+      severity: ERROR
+      config: {keys: ALL_COLUMNS}
+      remediation:
+        deterministic:
+          - action: DEDUPLICATE
+            survivor: {strategy: ANY_IDENTICAL}
+
+    - rule_id: CUST_003
+      name: customer_id_unique
+      description: A customer_id must identify exactly one customer (conflicts need human resolution).
+      column: customer_id
+      rule_type: UNIQUE
+      severity: ERROR
+
+    - rule_id: CUST_004
+      name: email_format
+      description: Email must be a syntactically valid address.
+      column: email
+      rule_type: REGEX
+      severity: ERROR
+      config: {pattern: '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: LOWERCASE
+        ai_assisted: {enabled: true, auto_apply: false}
+
+    - rule_id: CUST_005
+      name: email_not_null
+      description: Email is mandatory for digital banking (cannot be invented).
+      column: email
+      rule_type: NOT_NULL
+      severity: ERROR
+
+    - rule_id: CUST_006
+      name: age_is_integer
+      description: Age must be a whole number.
+      column: age
+      rule_type: DATA_TYPE
+      severity: ERROR
+      config: {data_type: int}
+
+    - rule_id: CUST_007
+      name: age_range
+      description: Customer age must be between 18 and 110.
+      version: "1.1"
+      column: age
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 18, max: 110, data_type: int}
+
+    - rule_id: CUST_008
+      name: city_not_null
+      description: City is required; an approved placeholder may be used when unknown.
+      column: city
+      rule_type: NOT_NULL
+      severity: ERROR
+      remediation:
+        deterministic:
+          - action: NULL_REPLACEMENT
+            value: UNKNOWN
+            approved: true
+            approved_by: data.steward@bank.example
+
+    - rule_id: CUST_009
+      name: country_iso_code
+      description: Country must be an ISO-3166 alpha-2 code of a supported market.
+      column: country
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [IN, US, GB, SG, AE, DE, AU]}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: UPPERCASE
+          - action: LOOKUP_MAPPING
+            lookup: country_codes
+        ai_assisted: {enabled: true, auto_apply: true}
+
+    - rule_id: CUST_010
+      name: customer_status_allowed
+      description: Customer status must be a known lifecycle status.
+      version: "1.1"
+      column: customer_status
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [ACTIVE, INACTIVE, DORMANT, CLOSED, SUSPENDED]}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: UPPERCASE
+        ai_assisted: {enabled: true, auto_apply: true}
+
+    - rule_id: CUST_011
+      name: created_date_format
+      description: created_date must be an ISO date (yyyy-MM-dd).
+      column: created_date
+      rule_type: DATE_FORMAT
+      severity: ERROR
+      config: {format: yyyy-MM-dd}
+      remediation:
+        deterministic:
+          - action: DATE_STANDARDIZATION
+            input_formats: [dd/MM/yyyy, yyyy/MM/dd]
+            output_format: yyyy-MM-dd
+
+    - rule_id: CUST_012
+      name: created_after_programme_start
+      description: Informational - customer created before the digital programme start date.
+      column: created_date
+      rule_type: RANGE
+      severity: INFO
+      config: {min: "2023-01-01", data_type: date, format: yyyy-MM-dd}
+
+    - rule_id: CUST_013
+      name: name_no_edge_whitespace
+      description: Names must not have leading or trailing whitespace.
+      version: "1.1"
+      column: customer_name
+      rule_type: REGEX
+      severity: ERROR
+      config: {pattern: '^\S(.*\S)?$'}
+      remediation:
+        deterministic:
+          - action: TRIM
+
+    - rule_id: CUST_014
+      name: name_valid_characters
+      description: Names contain letters, spaces, apostrophes, dots and hyphens only.
+      column: customer_name
+      rule_type: REGEX
+      severity: ERROR
+      config: {pattern: "^\\s*[A-Za-z][A-Za-z .'-]*$"}
+      remediation:
+        ai_assisted: {enabled: true, auto_apply: true}
+
+    - rule_id: CUST_015
+      name: customer_id_format
+      description: Customer identifiers follow the pattern C9999.
+      column: customer_id
+      rule_type: REGEX
+      severity: ERROR
+      config: {pattern: '^C[0-9]{4}$'}
+      remediation:
+        deterministic:
+          - action: TRIM
+
+    - rule_id: CUST_016
+      name: customer_schema
+      description: The customer feed must provide exactly the agreed columns.
+      rule_type: SCHEMA_VALIDATION
+      severity: ERROR
+      config:
+        allow_extra_columns: false
+        expected_columns:
+          - {name: customer_id, type: string}
+          - {name: customer_name, type: string}
+          - {name: email, type: string}
+          - {name: age, type: string}
+          - {name: city, type: string}
+          - {name: country, type: string}
+          - {name: customer_status, type: string}
+          - {name: created_date, type: string}
+
+    - rule_id: CUST_017
+      name: customer_name_length
+      description: Customer names are between 2 and 60 characters.
+      version: "1.1"
+      column: customer_name
+      rule_type: STRING_LENGTH
+      severity: ERROR
+      config: {min: 2, max: 60}

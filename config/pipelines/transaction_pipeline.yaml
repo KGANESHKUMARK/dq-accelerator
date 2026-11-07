@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: DATABRICKS_TRANSACTION_PIPELINE
+  pipeline_name: Transaction Processing Pipeline
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: payments-engineering@bank.example
+  description: >
+    Synthetic demo of a Databricks transaction pipeline onboarded into the DQ Accelerator.
+  policy: ../policies/default.yaml
+  datasets:
+    - dataset_id: transactions
+      format: PARQUET
+      stages: [BRONZE, SILVER, GOLD]
+      rulesets:
+        SILVER: ../rulesets/transactions_v1.yaml
+        GOLD:   ../rulesets/transactions_gold_v1.yaml
+      test_data: ../../sample_data/bronze/transactions.csv
+      test_data_format: CSV

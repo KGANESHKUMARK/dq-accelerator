@@ -1,0 +1,128 @@
+# ---------------------------------------------------------------------------------------------
+#  SIMULATED AI OUTPUTS - FOR POC DEMONSTRATION ONLY. No model or external API is called.
+#  MockAIProvider looks up (column, value-after-deterministic-fixes) in this table. Values that
+#  are not listed get either a similarity-based proposal (confidence capped at 0.85) for
+#  ALLOWED_VALUES rules or no proposal at all.
+# ---------------------------------------------------------------------------------------------
+mock_ai:
+  model_version: mock-dq-remediator-0.1-SIMULATED
+  responses:
+    # High confidence, non-sensitive, rule allows auto-apply -> AUTO_APPLY -> revalidated -> accepted
+    - column: customer_status
+      original_value: ACTVE
+      proposed_value: ACTIVE
+      confidence: 0.97
+      reason: Single missing character; nearest allowed status.
+      evidence: {edit_distance: 1, nearest_allowed_value: ACTIVE}
+    - column: country
+      original_value: UNTIED KINGDOM
+      proposed_value: GB
+      confidence: 0.95
+      reason: Transposed letters in 'United Kingdom'; ISO-3166 alpha-2 code GB.
+      evidence: {normalised_name: UNITED KINGDOM, iso_alpha2: GB}
+    - column: transaction_status
+      original_value: COMPLETD
+      proposed_value: COMPLETED
+      confidence: 0.96
+      reason: Single missing character; nearest allowed status.
+      evidence: {edit_distance: 1}
+    # Exactly at the threshold -> eligible
+    - column: customer_status
+      original_value: CLSD
+      proposed_value: CLOSED
+      confidence: 0.90
+      reason: Common abbreviation of CLOSED.
+      evidence: {abbreviation: true}
+    # Just below the threshold -> quarantined
+    - column: customer_status
+      original_value: INACTV
+      proposed_value: INACTIVE
+      confidence: 0.8999
+      reason: Abbreviation of INACTIVE (ambiguous with ACTIVE).
+      evidence: {abbreviation: true, competing_candidates: [INACTIVE, ACTIVE]}
+    # Low confidence -> quarantined
+    - column: customer_status
+      original_value: ACT
+      proposed_value: ACTIVE
+      confidence: 0.62
+      reason: Prefix match; could be ACTIVE or an incomplete value.
+      evidence: {prefix_match: true}
+    - column: country
+      original_value: ATLANTIS
+      proposed_value: AT
+      confidence: 0.34
+      reason: No real country matches; weak phonetic similarity to Austria (AT).
+      evidence: {phonetic_similarity: 0.41}
+    - column: transaction_status
+      original_value: DONE
+      proposed_value: COMPLETED
+      confidence: 0.70
+      reason: Synonym guess.
+      evidence: {synonym_match: true}
+    # High confidence but INVALID correction -> applied, fails revalidation -> quarantined
+    - column: country
+      original_value: BHARAT
+      proposed_value: IND
+      confidence: 0.91
+      reason: Bharat is the official name of India (returned ISO-3166 alpha-3 code).
+      evidence: {iso_alpha3: IND}
+    # High confidence but rule policy requires review (contact data) -> PENDING_HUMAN_APPROVAL
+    - column: email
+      original_value: neha.gupta@yahoo
+      proposed_value: neha.gupta@yahoo.com
+      confidence: 0.93
+      reason: Missing top-level domain for a well-known provider.
+      evidence: {known_provider_domain: yahoo.com}
+    # High confidence on SENSITIVE columns -> PENDING_HUMAN_APPROVAL regardless of confidence
+    - column: customer_name
+      original_value: J0hn Doe
+      proposed_value: John Doe
+      confidence: 0.98
+      reason: Digit zero used instead of letter O.
+      evidence: {character_substitution: "0->o"}
+    - column: transaction_amount
+      original_value: 1O50.00
+      proposed_value: "1050.00"
+      confidence: 0.97
+      reason: Letter O used instead of digit zero.
+      evidence: {character_substitution: "O->0"}
+    # ------------------------------ HEALTHCARE (patients feed) ------------------------------
+    # High confidence, non-sensitive, auto_apply -> AUTO_APPLY -> revalidated -> accepted
+    - column: insurance_status
+      original_value: COVERD
+      proposed_value: COVERED
+      confidence: 0.96
+      reason: Single missing character; nearest allowed status.
+      evidence: {edit_distance: 1, nearest_allowed_value: COVERED}
+    - column: admission_status
+      original_value: ADMITED
+      proposed_value: ADMITTED
+      confidence: 0.95
+      reason: Single missing character; nearest allowed status.
+      evidence: {edit_distance: 1, nearest_allowed_value: ADMITTED}
+    - column: gender
+      original_value: MALE
+      proposed_value: M
+      confidence: 0.96
+      reason: Full-word form maps to the coded allowed value M.
+      evidence: {normalised_name: MALE, code: M}
+    # Below the 90% threshold -> quarantined
+    - column: insurance_status
+      original_value: SLFPAY
+      proposed_value: SELF_PAY
+      confidence: 0.70
+      reason: Merged-token guess; could also be an abbreviation of another state.
+      evidence: {competing_candidates: [SELF_PAY, PENDING]}
+    # High confidence on PHI/sensitive columns -> PENDING_HUMAN_APPROVAL regardless of confidence
+    - column: contact_email
+      original_value: r.khan@hospital-mail
+      proposed_value: r.khan@hospital-mail.com
+      confidence: 0.93
+      reason: Missing top-level domain for a plausible mail host.
+      evidence: {missing_tld: true}
+    - column: patient_name
+      original_value: J0hn Smith
+      proposed_value: John Smith
+      confidence: 0.98
+      reason: Digit zero used instead of letter O.
+      evidence: {character_substitution: "0->o"}

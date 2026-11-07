@@ -1,0 +1,23 @@
+lookup:
+  name: country_codes
+  version: "1.0"
+  description: Approved mapping of country names / aliases (upper-case) to ISO 3166-1 alpha-2 codes.
+  approved: true
+  approved_by: reference.data.owner@bank.example
+  approved_at: "2026-10-30T10:00:00Z"
+  mapping:
+    INDIA: IN
+    "UNITED STATES": US
+    "UNITED STATES OF AMERICA": US
+    USA: US
+    "U.S.A.": US
+    "UNITED KINGDOM": GB
+    UK: GB
+    "U.K.": GB
+    "GREAT BRITAIN": GB
+    SINGAPORE: SG
+    "UNITED ARAB EMIRATES": AE
+    UAE: AE
+    GERMANY: DE
+    DEUTSCHLAND: DE
+    AUSTRALIA: AU

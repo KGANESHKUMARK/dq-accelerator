@@ -1,0 +1,14 @@
+# Human approvals for corrections that policy routed to review (PENDING_HUMAN_APPROVAL).
+# A matching entry turns the next run's decision into APPROVED_BY_HUMAN; the corrected record is
+# still revalidated before acceptance. Empty by default for the demo.
+#
+# Example:
+# approvals:
+#   - dataset: customers
+#     column: email
+#     original_value: "neha.gupta@yahoo"
+#     approved_value: "neha.gupta@yahoo.com"
+#     approved_by: data.steward@bank.example
+#     approved_at: "2026-11-06T09:30:00Z"
+#     ticket: DQ-1042
+approvals: []

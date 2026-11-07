@@ -1,0 +1,30 @@
+# DQ Core Engine configuration for Databricks (NOT executed in this POC - no workspace access).
+# Paths use environment variables / widgets so no local filesystem path is assumed on the cluster.
+# Example: set DQ_ROOT=/Volumes/main/dq_accelerator/files in the job or notebook before loading.
+engine:
+  name: dq-accelerator-databricks
+  default_mode: OBSERVE_ONLY
+  include_dq_columns_in_accepted: false
+  registry:
+    rulesets_path: ${DQ_ROOT}/registry/rulesets
+    pipelines_path: ${DQ_ROOT}/registry/pipelines
+    enforce_published_immutability: true
+    require_published_for_enforcement: true
+    enforce_pipeline_lifecycle: true
+  profiling:
+    mode: APPROXIMATE          # large tables: HyperLogLog distinct counts, bounded frequency jobs
+    sample_fraction: 0.05
+  validation:
+    cache_intermediate: true   # set false on serverless compute (persist is not supported there)
+    collect_failure_examples: true
+  ai:
+    provider: mock
+    mock_responses_path: ${DQ_ROOT}/config/ai/mock_ai_responses.yaml
+  outputs:
+    base_path: ${DQ_ROOT}/outputs
+    reports_path: ${DQ_ROOT}/reports
+    format: parquet            # or delta when the platform provides it
+    write_mode: overwrite
+  logging:
+    level: INFO
+    json: true

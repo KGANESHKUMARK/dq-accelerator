@@ -1,0 +1,55 @@
+# Gold business constraints for transactions. The negative-amount rules are CONFIGURED DEMO
+# BUSINESS RULES - negative values are not treated as errors in general (refunds are negative).
+ruleset:
+  ruleset_id: transactions_gold
+  dataset: transactions
+  version: "1.0"
+  stage: GOLD
+  status: PUBLISHED
+  description: Gold-layer business rules applied before publishing transaction aggregates.
+  owner: payments-data-domain
+  record_key: [transaction_id]
+  approved_by: business.owner@bank.example
+  approved_at: "2026-11-01T16:00:00Z"
+  change_log:
+    - Initial approved business rule set.
+  rules:
+    - rule_id: TXG_001
+      name: customer_reference_exists
+      description: Every transaction must reference a customer accepted in Silver.
+      column: customer_id
+      rule_type: REFERENTIAL_INTEGRITY
+      severity: ERROR
+      config: {reference_dataset: customers, reference_column: customer_id}
+
+    - rule_id: TXG_002
+      name: non_refund_amount_positive
+      description: "Demo business rule: non-refund transactions must have a positive amount."
+      column: transaction_amount
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 0.01, data_type: "decimal(18,2)"}
+      condition: {column: transaction_type, operator: NOT_IN, values: [REFUND]}
+
+    - rule_id: TXG_003
+      name: refund_amount_negative
+      description: "Demo business rule: refunds are booked as negative amounts."
+      column: transaction_amount
+      rule_type: RANGE
+      severity: ERROR
+      config: {max: 0, data_type: "decimal(18,2)"}
+      condition: {column: transaction_type, operator: IN, values: [REFUND]}
+
+    - rule_id: TXG_004
+      name: large_transaction_review
+      description: Transactions above 1,000,000 are flagged for review (not blocked).
+      column: transaction_amount
+      rule_type: RANGE
+      severity: WARNING
+      config: {max: 1000000, data_type: "decimal(18,2)"}
+
+    - rule_id: TXG_005
+      name: transactions_present
+      rule_type: ROW_COUNT
+      severity: ERROR
+      config: {min: 1}

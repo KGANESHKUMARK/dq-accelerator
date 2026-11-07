@@ -1,0 +1,47 @@
+# DQ Core Engine configuration (local POC). Relative paths resolve against this file's folder.
+# On Databricks, point paths at a Unity Catalog Volume / workspace folder (or use ${ENV_VARS}),
+# e.g. base_path: /Volumes/main/dq/outputs  - see config/engine.databricks.yaml.
+engine:
+  name: dq-accelerator-poc
+  default_mode: OBSERVE_ONLY          # first integration always starts in OBSERVE_ONLY
+  include_dq_columns_in_accepted: false
+
+  registry:
+    backend: file              # file | sqlite  (sqlite = SQL store at db_path; PostgreSQL plugs in via same interface)
+    db_path: ../data/registry.db              # used when backend=sqlite
+    rulesets_path: ../registry/rulesets       # used when backend=file
+    pipelines_path: ../registry/pipelines     # used when backend=file
+    enforce_published_immutability: true      # file content must match the published checksum
+    require_published_for_enforcement: true   # ENFORCE / REMEDIATE only with published rule sets
+    enforce_pipeline_lifecycle: true          # PAUSED / OFFBOARDED pipelines pass data through untouched
+
+  profiling:
+    mode: FULL                 # FULL | SAMPLE | APPROXIMATE
+    sample_fraction: 0.10
+    sample_seed: 42
+    max_allowed_values: 20
+    top_values: 10
+    top_patterns: 5
+    high_null_rate: 0.20
+    dominant_value_rate: 0.90
+    outlier_stddevs: 3.0
+    semantic_match_rate: 0.80
+
+  validation:
+    cache_intermediate: true
+    collect_failure_examples: true
+
+  ai:
+    provider: mock             # MockAIProvider - SIMULATED outputs, no external calls
+    mock_responses_path: ai/mock_ai_responses.yaml
+    similarity_fallback: true
+
+  outputs:
+    base_path: ../data
+    reports_path: ../reports
+    format: parquet
+    write_mode: overwrite
+
+  logging:
+    level: INFO
+    json: true

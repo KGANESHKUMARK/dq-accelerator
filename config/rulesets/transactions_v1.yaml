@@ -1,0 +1,125 @@
+# Transaction RuleSet v1.0 (Silver). Business constraints (sign of amounts, customer references)
+# are validated at Gold - see transactions_gold_v1.yaml.
+ruleset:
+  ruleset_id: transactions_silver
+  dataset: transactions
+  version: "1.0"
+  stage: SILVER
+  status: PUBLISHED
+  description: Silver-layer technical quality rules for card / account transactions (synthetic).
+  owner: payments-data-domain
+  record_key: [transaction_id]
+  created_by: dq.engineer@bank.example
+  created_at: "2026-11-01T09:00:00Z"
+  approved_by: data.steward@bank.example
+  approved_at: "2026-11-01T15:45:00Z"
+  change_log:
+    - Initial approved rule set.
+  rules:
+    - rule_id: TXN_001
+      name: transaction_id_not_null
+      column: transaction_id
+      rule_type: NOT_NULL
+      severity: ERROR
+
+    - rule_id: TXN_002
+      name: no_exact_duplicate_transactions
+      description: Exact duplicate transaction records (replayed feed rows) are removed.
+      rule_type: DUPLICATE
+      severity: ERROR
+      config: {keys: ALL_COLUMNS}
+      remediation:
+        deterministic:
+          - action: DEDUPLICATE
+            survivor: {strategy: ANY_IDENTICAL}
+
+    - rule_id: TXN_003
+      name: transaction_id_unique
+      description: Conflicting records with the same transaction_id require investigation.
+      column: transaction_id
+      rule_type: UNIQUE
+      severity: ERROR
+
+    - rule_id: TXN_004
+      name: customer_id_not_null
+      column: customer_id
+      rule_type: NOT_NULL
+      severity: ERROR
+
+    - rule_id: TXN_005
+      name: amount_is_decimal
+      description: transaction_amount must be numeric (decimal(18,2)).
+      column: transaction_amount
+      rule_type: DATA_TYPE
+      severity: ERROR
+      config: {data_type: "decimal(18,2)"}
+      remediation:
+        ai_assisted: {enabled: true, auto_apply: true}   # amounts are sensitive -> always human approval
+
+    - rule_id: TXN_006
+      name: currency_allowed
+      column: currency
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [INR, USD, GBP, EUR, SGD, AED, AUD]}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: UPPERCASE
+
+    - rule_id: TXN_007
+      name: transaction_date_format
+      column: transaction_date
+      rule_type: DATE_FORMAT
+      severity: ERROR
+      config: {format: yyyy-MM-dd}
+      remediation:
+        deterministic:
+          - action: DATE_STANDARDIZATION
+            input_formats: [dd/MM/yyyy]
+            output_format: yyyy-MM-dd
+
+    - rule_id: TXN_008
+      name: transaction_type_allowed
+      column: transaction_type
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [PURCHASE, TRANSFER, WITHDRAWAL, DEPOSIT, REFUND, FEE]}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: UPPERCASE
+
+    - rule_id: TXN_009
+      name: transaction_status_allowed
+      column: transaction_status
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [COMPLETED, PENDING, FAILED, REVERSED]}
+      remediation:
+        deterministic:
+          - action: TRIM
+          - action: UPPERCASE
+        ai_assisted: {enabled: true, auto_apply: true}
+
+    - rule_id: TXN_010
+      name: transaction_id_format
+      column: transaction_id
+      rule_type: REGEX
+      severity: ERROR
+      config: {pattern: '^T[0-9]{4}$'}
+
+    - rule_id: TXN_011
+      name: transaction_schema
+      rule_type: SCHEMA_VALIDATION
+      severity: ERROR
+      config:
+        allow_extra_columns: false
+        expected_columns:
+          - {name: transaction_id, type: string}
+          - {name: customer_id, type: string}
+          - {name: transaction_amount, type: string}
+          - {name: currency, type: string}
+          - {name: transaction_date, type: string}
+          - {name: transaction_type, type: string}
+          - {name: transaction_status, type: string}

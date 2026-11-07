@@ -1,0 +1,33 @@
+policy:
+  policy_id: HEALTHCARE_DEFAULT
+  version: "1.0"
+  description: >
+    Remediation policy for the synthetic healthcare POC. AI corrections need >= 90% confidence
+    AND a rule-level auto_apply permission; PHI / patient-identifying data always requires
+    human approval regardless of confidence.
+
+  confidence:
+    threshold: 0.90            # decimal between 0 and 1 (0.90 = 90%)
+
+  ai:
+    enabled: true
+    allow_auto_apply: true
+    max_requests_per_run: 500  # distinct (rule, column, value) combinations sent per run (batched)
+    allow_sensitive_values_to_external_providers: false
+
+  sensitive_data:
+    categories:
+      patient_identity: [patient_id, patient_name, mrn, dob, contact_email]
+      clinical_identifiers: [diagnosis_code]
+    # Deterministic, reference-based or formatting-only actions explicitly permitted on sensitive
+    # columns. Anything else (e.g. NULL_REPLACEMENT, AI corrections) requires human approval.
+    permitted_deterministic_actions: [TRIM, UPPERCASE, LOWERCASE, LOOKUP_MAPPING, DATE_STANDARDIZATION, DEDUPLICATE]
+
+  quality_gate:
+    max_quarantine_rate: 0.40
+    fail_on_dataset_level_errors: true
+    fail_on_not_evaluated_rules: true
+    min_accepted_records: 1
+
+  approvals:
+    file: ../approvals/approved_corrections.yaml
