@@ -1,0 +1,1307 @@
+ruleset:
+  ruleset_id: cdr_records_silver
+  dataset: cdr_records
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates cdr_records_silver@1.0
+  owner: ''
+  record_key:
+  - imsi
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_CDR_RECORDS_001
+    name: record_id_not_null
+    description: record_id is populated in 99.7% of rows
+    dataset: cdr_records
+    column: record_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 197
+        null_percentage: 0.31
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_002
+    name: record_id_unique
+    description: record_id looks like an identifier (100.0% unique)
+    dataset: cdr_records
+    column: record_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 1.0
+        duplicate_value_count: 0
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_003
+    name: record_id_regex
+    description: record_id follows the structural pattern A999999999
+    dataset: cdr_records
+    column: record_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z][0-9]{9}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: A999999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_004
+    name: record_id_string_length
+    description: record_id length observed between 10 and 10
+    dataset: cdr_records
+    column: record_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 10
+      max: 10
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 10
+        max_length: 10
+        avg_length: 10.0
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_005
+    name: msisdn_not_null
+    description: msisdn is populated in 100.0% of rows
+    dataset: cdr_records
+    column: msisdn
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_006
+    name: msisdn_range
+    description: msisdn typically between 917000182321.0 and 919999991171.0
+    dataset: cdr_records
+    column: msisdn
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 917000182321.0
+      max: 919999991171.0
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 917000182321.0
+        observed_max: 919999991171.0
+        p25: 917756717741.0
+        p75: 919247489113.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_007
+    name: imsi_not_null
+    description: imsi is populated in 100.0% of rows
+    dataset: cdr_records
+    column: imsi
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_008
+    name: imsi_unique
+    description: imsi is unique in the profiled data (primary key candidate)
+    dataset: cdr_records
+    column: imsi
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 62903
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_009
+    name: imsi_range
+    description: imsi typically between 40410100494486 and 40499996743820
+    dataset: cdr_records
+    column: imsi
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 40410100494486
+      max: 40499996743820
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 40410100494486.0
+        observed_max: 40499996743820.0
+        p25: 40432576616653.0
+        p75: 40477511378763.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_010
+    name: customer_id_not_null
+    description: customer_id is populated in 99.8% of rows
+    dataset: cdr_records
+    column: customer_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 116
+        null_percentage: 0.18
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_011
+    name: customer_id_unique
+    description: customer_id looks like an identifier (96.5% unique)
+    dataset: cdr_records
+    column: customer_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 0.9651
+        duplicate_value_count: 2190
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_012
+    name: customer_id_regex
+    description: customer_id follows the structural pattern A999999
+    dataset: cdr_records
+    column: customer_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z][0-9]{6}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: A999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_013
+    name: customer_id_string_length
+    description: customer_id length observed between 7 and 7
+    dataset: cdr_records
+    column: customer_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 7
+      max: 7
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 7
+        max_length: 7
+        avg_length: 7.0
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_014
+    name: plan_type_not_null
+    description: plan_type is populated in 100.0% of rows
+    dataset: cdr_records
+    column: plan_type
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_015
+    name: plan_type_allowed_values
+    description: plan_type has 8 frequent categorical values
+    dataset: cdr_records
+    column: plan_type
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - POSTPAID
+      - IOT
+      - PREPAID
+      - CORPORATE
+      - iot
+      - prepaid
+      - corporate
+      - postpaid
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          POSTPAID: 15836
+          IOT: 15689
+          PREPAID: 15601
+          CORPORATE: 15586
+          iot: 63
+          prepaid: 47
+          corporate: 44
+          postpaid: 37
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_016
+    name: event_type_not_null
+    description: event_type is populated in 100.0% of rows
+    dataset: cdr_records
+    column: event_type
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_017
+    name: event_type_allowed_values
+    description: event_type has 8 frequent categorical values
+    dataset: cdr_records
+    column: event_type
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - ROAM_VOICE
+      - VOICE
+      - ROAM_DATA
+      - DATA
+      - SMS
+      - DAT
+      - VOIC
+      - SMSs
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          ROAM_VOICE: 12742
+          VOICE: 12669
+          ROAM_DATA: 12638
+          DATA: 12431
+          SMS: 12345
+          DAT: 28
+          VOIC: 27
+          SMSs: 23
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_018
+    name: event_ts_not_null
+    description: event_ts is populated in 100.0% of rows
+    dataset: cdr_records
+    column: event_ts
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_019
+    name: event_ts_regex
+    description: event_ts follows the structural pattern 9999-99-99 99:99:99
+    dataset: cdr_records
+    column: event_ts
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[0-9]{4}\-[0-9]{2}\-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9973
+      evidence:
+        dominant_pattern: '9999-99-99 99:99:99'
+        share: 0.9973
+        other_patterns:
+        - pattern: 9999/99/99 99:99:99
+          count: 112
+          percentage: 0.18
+        - pattern: 99/99/9999 99:99:99
+          count: 60
+          percentage: 0.1
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_020
+    name: event_ts_string_length
+    description: event_ts length observed between 19 and 19
+    dataset: cdr_records
+    column: event_ts
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 19
+      max: 19
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 19
+        max_length: 19
+        avg_length: 19.0
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_021
+    name: duration_sec_not_null
+    description: duration_sec is populated in 100.0% of rows
+    dataset: cdr_records
+    column: duration_sec
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_022
+    name: duration_sec_range
+    description: duration_sec typically between 0 and 3408
+    dataset: cdr_records
+    column: duration_sec
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 0
+      max: 3408
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 0.0
+        observed_max: 3600.0
+        p25: 0.0
+        p75: 1363.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_023
+    name: bytes_mb_not_null
+    description: bytes_mb is populated in 100.0% of rows
+    dataset: cdr_records
+    column: bytes_mb
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_024
+    name: bytes_mb_range
+    description: bytes_mb typically between 0.0 and 1921.5
+    dataset: cdr_records
+    column: bytes_mb
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 0.0
+      max: 1921.5
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 0.0
+        observed_max: 2048.0
+        p25: 0.0
+        p75: 768.6
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_025
+    name: cell_tower_id_not_null
+    description: cell_tower_id is populated in 100.0% of rows
+    dataset: cdr_records
+    column: cell_tower_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_026
+    name: cell_tower_id_regex
+    description: cell_tower_id follows the structural pattern AA-AA999
+    dataset: cdr_records
+    column: cell_tower_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{2}\-[A-Z]{2}[0-9]{3}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AA-AA999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_027
+    name: cell_tower_id_string_length
+    description: cell_tower_id length observed between 8 and 8
+    dataset: cdr_records
+    column: cell_tower_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 8
+      max: 8
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 8
+        max_length: 8
+        avg_length: 8.0
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_028
+    name: region_not_null
+    description: region is populated in 100.0% of rows
+    dataset: cdr_records
+    column: region
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_029
+    name: region_allowed_values
+    description: region has 10 frequent categorical values
+    dataset: cdr_records
+    column: region
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - NORTH
+      - CENTRAL
+      - WEST
+      - EAST
+      - SOUTH
+      - central
+      - west
+      - north
+      - east
+      - south
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          NORTH: 12716
+          CENTRAL: 12560
+          WEST: 12493
+          EAST: 12482
+          SOUTH: 12469
+          central: 45
+          west: 39
+          north: 37
+          east: 33
+          south: 29
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_030
+    name: country_code_not_null
+    description: country_code is populated in 100.0% of rows
+    dataset: cdr_records
+    column: country_code
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_031
+    name: country_code_allowed_values
+    description: country_code has 8 frequent categorical values
+    dataset: cdr_records
+    column: country_code
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - AU
+      - AE
+      - IN
+      - SG
+      - US
+      - DE
+      - GB
+      - XX
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          AU: 9133
+          AE: 9010
+          IN: 8978
+          SG: 8948
+          US: 8922
+          DE: 8908
+          GB: 8890
+          XX: 114
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_032
+    name: roaming_flag_not_null
+    description: roaming_flag is populated in 100.0% of rows
+    dataset: cdr_records
+    column: roaming_flag
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_033
+    name: roaming_flag_allowed_values
+    description: roaming_flag has 2 frequent categorical values
+    dataset: cdr_records
+    column: roaming_flag
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - N
+      - Y
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          N: 37523
+          Y: 25380
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_034
+    name: charge_amount_not_null
+    description: charge_amount is populated in 100.0% of rows
+    dataset: cdr_records
+    column: charge_amount
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_035
+    name: charge_amount_range
+    description: charge_amount typically between -22.83 and 45.0
+    dataset: cdr_records
+    column: charge_amount
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: -22.83
+      max: 45.0
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -44.76
+        observed_max: 45.0
+        p25: 11.04
+        p75: 33.62
+        outliers: 74
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_036
+    name: billing_status_not_null
+    description: billing_status is populated in 100.0% of rows
+    dataset: cdr_records
+    column: billing_status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_037
+    name: billing_status_allowed_values
+    description: billing_status has 4 frequent categorical values
+    dataset: cdr_records
+    column: billing_status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - SETTLED
+      - DISPUTED
+      - BILLED
+      - UNBILLED
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          SETTLED: 15885
+          DISPUTED: 15825
+          BILLED: 15621
+          UNBILLED: 15572
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_038
+    name: network_type_not_null
+    description: network_type is populated in 100.0% of rows
+    dataset: cdr_records
+    column: network_type
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_039
+    name: network_type_allowed_values
+    description: network_type has 8 frequent categorical values
+    dataset: cdr_records
+    column: network_type
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - 3G
+      - VOLTE
+      - 4G
+      - 5G
+      - volte
+      - 3g
+      - 5g
+      - 4g
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          3G: 15784
+          VOLTE: 15728
+          4G: 15669
+          5G: 15602
+          volte: 40
+          3g: 31
+          5g: 25
+          4g: 24
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_040
+    name: device_model_not_null
+    description: device_model is populated in 100.0% of rows
+    dataset: cdr_records
+    column: device_model
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_041
+    name: device_model_allowed_values
+    description: device_model has 7 frequent categorical values
+    dataset: cdr_records
+    column: device_model
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - OnePlus 12
+      - Moto G84
+      - iPhone 15
+      - Galaxy S23
+      - Redmi Note 13
+      - Nokia G42
+      - Pixel 8
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          OnePlus 12: 9064
+          Moto G84: 9034
+          iPhone 15: 9003
+          Galaxy S23: 8978
+          Redmi Note 13: 8971
+          Nokia G42: 8931
+          Pixel 8: 8922
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_042
+    name: sim_activation_date_not_null
+    description: sim_activation_date is populated in 100.0% of rows
+    dataset: cdr_records
+    column: sim_activation_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_043
+    name: sim_activation_date_date_format
+    description: sim_activation_date is a date in yyyy-MM-dd
+    dataset: cdr_records
+    column: sim_activation_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9989
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 99.89
+          dd/MM/yyyy: 0.11
+          MM/dd/yyyy: 0.04
+        date_min: '2021-01-01'
+        date_max: '2024-07-24'
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_044
+    name: drop_reason_not_null
+    description: drop_reason is populated in 100.0% of rows
+    dataset: cdr_records
+    column: drop_reason
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_045
+    name: drop_reason_allowed_values
+    description: drop_reason has 4 frequent categorical values
+    dataset: cdr_records
+    column: drop_reason
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - NONE
+      - WEAK_SIGNAL
+      - CONGESTION
+      - HANDOVER_FAIL
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          NONE: 35966
+          WEAK_SIGNAL: 9068
+          CONGESTION: 8967
+          HANDOVER_FAIL: 8902
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_046
+    name: dealer_code_not_null
+    description: dealer_code is populated in 100.0% of rows
+    dataset: cdr_records
+    column: dealer_code
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 62903
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_047
+    name: dealer_code_regex
+    description: dealer_code follows the structural pattern AAA9999
+    dataset: cdr_records
+    column: dealer_code
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{3}[0-9]{4}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA9999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_048
+    name: dealer_code_string_length
+    description: dealer_code length observed between 7 and 7
+    dataset: cdr_records
+    column: dealer_code
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 7
+      max: 7
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 7
+        max_length: 7
+        avg_length: 7.0
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_CDR_RECORDS_049
+    name: cdr_records_schema_validation
+    description: schema observed at profiling time
+    dataset: cdr_records
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: record_id
+        type: string
+      - name: msisdn
+        type: double
+      - name: imsi
+        type: bigint
+      - name: customer_id
+        type: string
+      - name: plan_type
+        type: string
+      - name: event_type
+        type: string
+      - name: event_ts
+        type: string
+      - name: duration_sec
+        type: int
+      - name: bytes_mb
+        type: double
+      - name: cell_tower_id
+        type: string
+      - name: region
+        type: string
+      - name: country_code
+        type: string
+      - name: roaming_flag
+        type: string
+      - name: charge_amount
+        type: double
+      - name: billing_status
+        type: string
+      - name: network_type
+        type: string
+      - name: device_model
+        type: string
+      - name: sim_activation_date
+        type: string
+      - name: drop_reason
+        type: string
+      - name: dealer_code
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 20
+      profiled_at: '2026-11-07T07:30:15Z'
+      profile_mode: SAMPLE
+  status: DRAFT
+  created_by: dq-core-generator-0.1.0
+  created_at: ''
+  approved_by: dqctl-bootstrap
+  approved_at: '2026-11-07T07:33:11Z'
+  change_log:
+  - approved 49 of 49 candidate rules

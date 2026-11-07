@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: TELECOM_CDR_PIPELINE
+  pipeline_name: Telecom Cdr Pipeline
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: OBSERVE_ONLY
+  owner: synthetic-telecom-demo@example.com
+  description: SYNTHETIC telecom CDR pipeline - 100MB onboarding/load-test sample
+  policy: ../policies/default.yaml
+  datasets:
+  - dataset_id: cdr_records
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    rulesets:
+      SILVER: ../rulesets/cdr_records_v1.yaml
+    test_data: ../../sample_data/bronze/cdr_records.csv
+    test_data_format: CSV
