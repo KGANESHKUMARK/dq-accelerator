@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: EMR_LOANS_PIPELINE
+  pipeline_name: Emr Loans Pipeline
+  platform: STANDALONE_SPARK
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: OBSERVE_ONLY
+  owner: synthetic-demo@example.com
+  description: SYNTHETIC AWS EMR loans pipeline (s3a parquet in real deployment) - onboarding sample
+  policy: ../policies/default.yaml
+  datasets:
+  - dataset_id: loans
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    rulesets:
+      SILVER: ../rulesets/loans_v1.yaml
+    test_data: ../../sample_data/bronze/loans.csv
+    test_data_format: CSV

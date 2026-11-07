@@ -1,0 +1,724 @@
+ruleset:
+  ruleset_id: loans_silver
+  dataset: loans
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates loans_silver@1.0
+  owner: ''
+  record_key:
+  - loan_id
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_LOANS_001
+    name: loan_id_not_null
+    description: loan_id is populated in 100.0% of rows
+    dataset: loans
+    column: loan_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_002
+    name: loan_id_unique
+    description: loan_id is unique in the profiled data (primary key candidate)
+    dataset: loans
+    column: loan_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 31
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_003
+    name: loan_id_regex
+    description: loan_id follows the structural pattern A99999
+    dataset: loans
+    column: loan_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z][0-9]{5}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: A99999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_004
+    name: loan_id_string_length
+    description: loan_id length observed between 6 and 6
+    dataset: loans
+    column: loan_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 6
+      max: 6
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 6
+        max_length: 6
+        avg_length: 6.0
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_005
+    name: borrower_id_not_null
+    description: borrower_id is populated in 96.8% of rows
+    dataset: loans
+    column: borrower_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 1
+        null_percentage: 3.23
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_006
+    name: borrower_id_unique
+    description: borrower_id looks like an identifier (96.7% unique)
+    dataset: loans
+    column: borrower_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 0.9667
+        duplicate_value_count: 1
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_007
+    name: borrower_id_regex
+    description: borrower_id follows the structural pattern A9999
+    dataset: loans
+    column: borrower_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z][0-9]{4}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: A9999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_008
+    name: borrower_id_string_length
+    description: borrower_id length observed between 5 and 5
+    dataset: loans
+    column: borrower_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 5
+      max: 5
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 5
+        max_length: 5
+        avg_length: 5.0
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_009
+    name: product_not_null
+    description: product is populated in 100.0% of rows
+    dataset: loans
+    column: product
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_010
+    name: product_allowed_values
+    description: product has 3 frequent categorical values
+    dataset: loans
+    column: product
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - PERSONAL
+      - AUTO
+      - HOME
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          PERSONAL: 12
+          AUTO: 10
+          HOME: 9
+        excluded_rare_values: []
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_011
+    name: principal_not_null
+    description: principal is populated in 100.0% of rows
+    dataset: loans
+    column: principal
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_012
+    name: principal_range
+    description: principal typically between 5100.0 and 410000.0
+    dataset: loans
+    column: principal
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 5100.0
+      max: 410000.0
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 5100.0
+        observed_max: 410000.0
+        p25: 12000.0
+        p75: 262000.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_013
+    name: apr_not_null
+    description: apr is populated in 100.0% of rows
+    dataset: loans
+    column: apr
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_014
+    name: apr_range
+    description: apr typically between 4.6 and 15.9
+    dataset: loans
+    column: apr
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 4.6
+      max: 15.9
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 4.6
+        observed_max: 15.9
+        p25: 5.15
+        p75: 12.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_015
+    name: term_months_not_null
+    description: term_months is populated in 100.0% of rows
+    dataset: loans
+    column: term_months
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_016
+    name: term_months_range
+    description: term_months typically between 12 and 360
+    dataset: loans
+    column: term_months
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 12
+      max: 360
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 12.0
+        observed_max: 360.0
+        p25: 36.0
+        p75: 360.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_017
+    name: origination_date_not_null
+    description: origination_date is populated in 100.0% of rows
+    dataset: loans
+    column: origination_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_018
+    name: origination_date_date_format
+    description: origination_date is a date in yyyy-MM-dd
+    dataset: loans
+    column: origination_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9677
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 96.77
+          yyyy/MM/dd: 3.23
+        date_min: '2024-01-05'
+        date_max: '2024-03-17'
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_019
+    name: credit_score_not_null
+    description: credit_score is populated in 100.0% of rows
+    dataset: loans
+    column: credit_score
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_020
+    name: credit_score_data_type
+    description: credit_score holds whole numbers stored as text
+    dataset: loans
+    column: credit_score
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9677
+      evidence:
+        integer_castable_percentage: 96.77
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_021
+    name: credit_score_range
+    description: credit_score typically between 561 and 817
+    dataset: loans
+    column: credit_score
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 561
+      max: 817
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 542.0
+        observed_max: 817.0
+        p25: 690.0
+        p75: 776.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_022
+    name: state_not_null
+    description: state is populated in 100.0% of rows
+    dataset: loans
+    column: state
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_023
+    name: state_string_length
+    description: state length observed between 2 and 2
+    dataset: loans
+    column: state
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 2
+      max: 2
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 2
+        max_length: 2
+        avg_length: 2.0
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_024
+    name: status_not_null
+    description: status is populated in 100.0% of rows
+    dataset: loans
+    column: status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_025
+    name: status_allowed_values
+    description: status has 2 frequent categorical values
+    dataset: loans
+    column: status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - ACTIVE
+      - DEFAULTED
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.7
+      evidence:
+        value_counts:
+          ACTIVE: 28
+          DEFAULTED: 2
+          CLOSED: 1
+        excluded_rare_values:
+        - CLOSED
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_026
+    name: officer_email_not_null
+    description: officer_email is populated in 100.0% of rows
+    dataset: loans
+    column: officer_email
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_027
+    name: officer_email_regex
+    description: officer_email contains e-mail addresses
+    dataset: loans
+    column: officer_email
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9677
+      evidence:
+        email_match_percentage: 96.77
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_028
+    name: disbursement_date_not_null
+    description: disbursement_date is populated in 100.0% of rows
+    dataset: loans
+    column: disbursement_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 31
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_029
+    name: loans_schema_validation
+    description: schema observed at profiling time
+    dataset: loans
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: loan_id
+        type: string
+      - name: borrower_id
+        type: string
+      - name: product
+        type: string
+      - name: principal
+        type: double
+      - name: apr
+        type: double
+      - name: term_months
+        type: int
+      - name: origination_date
+        type: string
+      - name: credit_score
+        type: string
+      - name: state
+        type: string
+      - name: status
+        type: string
+      - name: officer_email
+        type: string
+      - name: disbursement_date
+        type: date
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 12
+      profiled_at: '2026-11-07T06:45:07Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: dq-core-generator-0.1.0
+  created_at: ''
+  approved_by: dqctl-bootstrap
+  approved_at: '2026-11-07T06:45:38Z'
+  change_log:
+  - approved 29 of 29 candidate rules

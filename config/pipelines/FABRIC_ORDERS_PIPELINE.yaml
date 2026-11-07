@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: FABRIC_ORDERS_PIPELINE
+  pipeline_name: Fabric Orders Pipeline
+  platform: FABRIC
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: OBSERVE_ONLY
+  owner: synthetic-demo@example.com
+  description: SYNTHETIC Microsoft Fabric orders lakehouse pipeline - onboarding sample (no real workspace)
+  policy: ../policies/default.yaml
+  datasets:
+  - dataset_id: orders
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    rulesets:
+      SILVER: ../rulesets/orders_v1.yaml
+    test_data: ../../sample_data/bronze/orders.csv
+    test_data_format: CSV
