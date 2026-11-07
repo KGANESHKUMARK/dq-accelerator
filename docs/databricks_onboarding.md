@@ -35,6 +35,29 @@ Everything else — profiling, validation, remediation, policies — is identica
 
 ## 3. Onboard the pipeline (manifest)
 
+### 3.0 Fast path — `dqctl bootstrap`
+
+If you have a representative Bronze file (CSV/Parquet extract of the table),
+one command produces the manifest **and** a draft ruleset:
+
+```bash
+dqctl bootstrap /dbfs/bronze/orders.csv --dataset orders \
+    --pipeline-id ORDERS_PIPELINE --policy ../policies/default.yaml \
+    --copy --publish --onboard
+```
+
+It profiles the file, generates candidate rules with confidence/evidence,
+writes `config/rulesets/orders_v1.yaml` + `config/pipelines/ORDERS_PIPELINE.yaml`,
+validates the manifest, and (with `--publish --onboard`) registers both assets.
+Review the generated rules before promoting past `OBSERVE_ONLY`. Full flag
+reference: `docs/PROJECT_GUIDE.md` §6.3.1.
+
+For a UC/Hive table (no file), profile the DataFrame in a notebook via
+`engine.profile(df, "orders")` + `CandidateRuleGenerator`, or export a Bronze
+sample to CSV first and bootstrap from that.
+
+### 3.1 Manual manifest
+
 Create `config/pipelines/<name>.yaml`:
 
 ```yaml

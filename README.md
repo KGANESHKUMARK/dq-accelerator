@@ -87,6 +87,10 @@ Microsoft Fabric Spark, or a standalone local Spark app.
 ## CLI (`dqctl`)
 
 ```powershell
+# one-command onboarding: profile a source file -> approved ruleset + manifest
+dqctl bootstrap data/new_source.csv --dataset orders --pipeline-id ORDERS_PIPELINE \
+    --copy --publish --onboard          # see docs/PROJECT_GUIDE.md §6.3.1 for all flags
+
 dqctl pipeline onboard --manifest config/pipelines/customer_pipeline.yaml
 dqctl pipeline list
 dqctl pipeline test|activate|pause|offboard <PIPELINE_ID>

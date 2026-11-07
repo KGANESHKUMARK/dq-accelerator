@@ -223,7 +223,7 @@ from dq_core import DataQualityEngine, PipelineContext
 
 Double-click **`start.bat`** in the project root — it sets up the D:-only
 environment and shows an interactive menu: standalone demo, full/unit test
-suites, a `dqctl` submenu (profile / run / ruleset / pipeline), regenerate
+suites, a `dqctl` submenu (profile / run / ruleset / pipeline / bootstrap), regenerate
 sample data, runtime check, and open docs. If `.venv` is missing it runs
 `scripts\setup.ps1` automatically first.
 
@@ -256,9 +256,14 @@ quarantine by status: {PENDING_HUMAN_APPROVAL:2, BELOW_CONFIDENCE_THRESHOLD:3,
                        UNRESOLVED_NO_SAFE_REMEDIATION:7, CORRECTION_FAILED_REVALIDATION:1}
 ```
 
-### 6.3 CLI — `dqctl` (four command groups)
+### 6.3 CLI — `dqctl` (five command groups)
 
 ```powershell
+# --- bootstrap: source file -> approved rule set + onboarding manifest ---
+& $VenvPython -m dq_core.cli.main bootstrap sample_data\bronze\patients.csv `
+    --dataset patients --pipeline-id HEALTHCARE_PATIENT_PIPELINE `
+    --policy ../policies/healthcare.yaml --copy --publish --onboard
+
 # --- pipeline lifecycle ---
 & $VenvPython -m dq_core.cli.main pipeline onboard  --manifest config\pipelines\customer_pipeline.yaml
 & $VenvPython -m dq_core.cli.main pipeline list
@@ -289,6 +294,65 @@ quarantine by status: {PENDING_HUMAN_APPROVAL:2, BELOW_CONFIDENCE_THRESHOLD:3,
 
 `--mode` accepts `OBSERVE_ONLY` (default) / `ENFORCE` / `REMEDIATE`.
 `run` exits `0` when the quality gate passes, `1` otherwise.
+
+#### 6.3.1 `bootstrap` — the fast path for new pipelines
+
+`dqctl bootstrap` turns any CSV/Parquet source file into a complete onboarding
+package in one command, so a new pipeline never starts from a hand-written YAML:
+
+1. **Profiles** the source with the Spark profiler (FULL mode).
+2. **Generates candidate rules** from the profile evidence
+   (NOT_NULL, UNIQUE, REGEX, DATE_FORMAT, RANGE, ALLOWED_VALUES,
+   STRING_LENGTH, DUPLICATE, SCHEMA_VALIDATION — referential-integrity
+   rules are added when related profiles are supplied via the engine API).
+3. **Auto-approves** all candidates into a DRAFT rule set — each rule keeps its
+   `generation.confidence` + `evidence` so a steward can still audit what was
+   generated (printed per-rule in the command output).
+4. **Writes** `config/rulesets/<dataset>_v1.yaml` and
+   `config/pipelines/<PIPELINE_ID>.yaml` with correct relative paths, then
+   **validates** the manifest via `PipelineManifest.load`.
+5. **Prints** the manifest ready to paste into **UI → Pipelines → Onboard**.
+
+```powershell
+dqctl bootstrap <source.csv|source.parquet> [options]
+```
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--dataset` | source file stem | Dataset id used in ruleset/manifest |
+| `--pipeline-id` | `<DATASET>_PIPELINE` | Pipeline id (validated against the manifest schema) |
+| `--pipeline-name` | title-cased id | Display name |
+| `--platform` | `DATABRICKS` | `DATABRICKS`, `STANDALONE_SPARK`, `DATAPROC`, `FABRIC`, `AIRFLOW`, `ADF`, `PYTHON`, `OTHER` |
+| `--runtime` | `PYSPARK` | `PYSPARK`, `SQL`, `PYTHON`, `STREAMING` |
+| `--stage` | `SILVER` | Stage the generated rule set applies to |
+| `--dq-mode` | `OBSERVE_ONLY` | Initial enforcement mode — promote to `ENFORCE`/`REMEDIATE` after review |
+| `--policy` | `../policies/default.yaml` | Policy reference written into the manifest (e.g. `../policies/healthcare.yaml` for PHI gating) |
+| `--owner` / `--description` | empty / auto | Manifest metadata |
+| `--approved-by` | `dqctl-bootstrap` | Steward identity recorded on the generated rules |
+| `--copy` | off | Copy the source into `sample_data/bronze/` and reference it there (portable manifest) |
+| `--out-dir` | `config` | Config root that receives `rulesets/` + `pipelines/` |
+| `--profile-out` | off | Also write the JSON profile to a file |
+| `--publish` | off | Publish + activate the generated rule set into the registry |
+| `--onboard` | off | Register the pipeline in the registry (no UI paste needed) |
+| `--force` | off | Overwrite previously generated files |
+
+Generated rule sets are **DRAFT** — they must be published before
+`ENFORCE`/`REMEDIATE` (`--publish` does this in the same run, or
+`dqctl ruleset publish <yaml> --activate` later). Review the printed
+confidence column: rules generated from weak evidence land at 0.6 and deserve a
+human eye before production use.
+
+Full example — generate, publish, onboard, then run:
+
+```powershell
+& $VenvPython -m dq_core.cli.main bootstrap data\orders.csv --dataset orders `
+    --pipeline-id ORDERS_PIPELINE --owner "orders-team@example.com" `
+    --copy --publish --onboard
+& $VenvPython -m dq_core.cli.main pipeline test     ORDERS_PIPELINE
+& $VenvPython -m dq_core.cli.main pipeline activate ORDERS_PIPELINE
+& $VenvPython -m dq_core.cli.main run sample_data\bronze\orders.csv `
+    --ruleset config\rulesets\orders_v1.yaml --mode OBSERVE_ONLY --dataset orders
+```
 
 ### 6.4 Engine API from Python (the real integration pattern)
 

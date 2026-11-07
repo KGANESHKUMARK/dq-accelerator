@@ -171,6 +171,15 @@ to quarantine — a bad AI guess can never leak into Silver.
 ## 12. CLI (`cli/main.py` → `dqctl`)
 
 Groups: `pipeline` (onboard/list/test/activate/pause/offboard),
-`ruleset` (list/publish/activate/rollback/diff/verify), `run`, `profile`.
+`ruleset` (list/publish/activate/rollback/diff/verify), `bootstrap`, `run`,
+`profile`.
+
+`bootstrap <source>` is the new-pipeline fast path: it profiles a CSV/Parquet
+file, runs `CandidateRuleGenerator` + `approve_candidates`, writes a DRAFT
+ruleset (`config/rulesets/<dataset>_v1.yaml`) and a validated manifest
+(`config/pipelines/<ID>.yaml`), and can `--publish` the ruleset and `--onboard`
+the pipeline in the same run. Full flag reference: `docs/PROJECT_GUIDE.md`
+§6.3.1.
+
 Verified commands and outputs are in `docs/poc_demo_script.md` and
 `docs/testing_report.md`.
