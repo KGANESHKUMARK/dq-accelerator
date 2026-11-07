@@ -1,0 +1,556 @@
+{
+  "note": "SYNTHETIC data. Expected outcomes for customers_v1.0 / transactions_v1.0 with the default policy (threshold 0.90).",
+  "customers": {
+    "input_records": 38,
+    "remediate_v1_0": {
+      "accepted": 24,
+      "accepted_remediated": 8,
+      "quarantined": 13,
+      "removed_duplicates": 1
+    },
+    "enforce_v1_0": {
+      "accepted": 16,
+      "quarantined": 22
+    },
+    "observe_only_v1_0": {
+      "accepted": 38,
+      "flagged_records": 22
+    },
+    "remediate_v1_1": {
+      "accepted": 23,
+      "quarantined": 14
+    },
+    "records": [
+      {
+        "row": 1,
+        "customer_id": "C0001",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 2,
+        "customer_id": "C0002",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 3,
+        "customer_id": "C0003",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 4,
+        "customer_id": "C0004",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 5,
+        "customer_id": "C0005",
+        "defect": "exact duplicate (survivor)",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 6,
+        "customer_id": "C0006",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 7,
+        "customer_id": "C0007",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 8,
+        "customer_id": "C0008",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 9,
+        "customer_id": "C0009",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 10,
+        "customer_id": "C0010",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 11,
+        "customer_id": "C0011",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 12,
+        "customer_id": "C0012",
+        "defect": "conflicting duplicate customer_id",
+        "expected": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION"
+      },
+      {
+        "row": 13,
+        "customer_id": "C0013",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 14,
+        "customer_id": "C0014",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 15,
+        "customer_id": "C0015",
+        "defect": "clean",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 16,
+        "customer_id": "C0016",
+        "defect": "INFO: created before programme start",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 17,
+        "customer_id": "C0005",
+        "defect": "exact duplicate (removed)",
+        "expected": "REMOVED_DUPLICATE"
+      },
+      {
+        "row": 18,
+        "customer_id": "C0017",
+        "defect": "name whitespace -> TRIM",
+        "expected": "ACCEPTED_REMEDIATED"
+      },
+      {
+        "row": 19,
+        "customer_id": "C0018",
+        "defect": "email whitespace/case -> TRIM+LOWERCASE",
+        "expected": "ACCEPTED_REMEDIATED"
+      },
+      {
+        "row": 20,
+        "customer_id": " C0019",
+        "defect": "customer_id whitespace -> TRIM",
+        "expected": "ACCEPTED_REMEDIATED"
+      },
+      {
+        "row": 21,
+        "customer_id": "C0020",
+        "defect": "country lookup + status uppercase",
+        "expected": "ACCEPTED_REMEDIATED"
+      },
+      {
+        "row": 22,
+        "customer_id": "C0021",
+        "defect": "country lookup + AI status 0.97 + date standardisation",
+        "expected": "ACCEPTED_REMEDIATED"
+      },
+      {
+        "row": 23,
+        "customer_id": "C0022",
+        "defect": "AI country 0.95 (high confidence)",
+        "expected": "ACCEPTED_REMEDIATED"
+      },
+      {
+        "row": 24,
+        "customer_id": "C0023",
+        "defect": "missing email (cannot be invented)",
+        "expected": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION"
+      },
+      {
+        "row": 25,
+        "customer_id": "C0024",
+        "defect": "age not numeric",
+        "expected": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION"
+      },
+      {
+        "row": 26,
+        "customer_id": "C0025",
+        "defect": "age out of range",
+        "expected": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION"
+      },
+      {
+        "row": 27,
+        "customer_id": "C0026",
+        "defect": "valid in v1.0, fails v1.1 age max 110",
+        "expected": "ACCEPTED"
+      },
+      {
+        "row": 28,
+        "customer_id": "C0027",
+        "defect": "missing city -> approved NULL_REPLACEMENT",
+        "expected": "ACCEPTED_REMEDIATED"
+      },
+      {
+        "row": 29,
+        "customer_id": "C0028",
+        "defect": "AI proposes invalid ISO-3 'IND' (0.91) -> fails revalidation",
+        "expected": "QUARANTINED:CORRECTION_FAILED_REVALIDATION"
+      },
+      {
+        "row": 30,
+        "customer_id": "C0029",
+        "defect": "AI low confidence 0.34",
+        "expected": "QUARANTINED:BELOW_CONFIDENCE_THRESHOLD"
+      },
+      {
+        "row": 31,
+        "customer_id": "C0030",
+        "defect": "AI low confidence 0.62",
+        "expected": "QUARANTINED:BELOW_CONFIDENCE_THRESHOLD"
+      },
+      {
+        "row": 32,
+        "customer_id": "C0031",
+        "defect": "AI email 0.93 but rule requires review",
+        "expected": "QUARANTINED:PENDING_HUMAN_APPROVAL"
+      },
+      {
+        "row": 33,
+        "customer_id": "C0032",
+        "defect": "AI name 0.98 on sensitive identity column",
+        "expected": "QUARANTINED:PENDING_HUMAN_APPROVAL"
+      },
+      {
+        "row": 34,
+        "customer_id": "C0033",
+        "defect": "invalid calendar date",
+        "expected": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION"
+      },
+      {
+        "row": 35,
+        "customer_id": "C0034",
+        "defect": "AI status exactly 0.90 (threshold)",
+        "expected": "ACCEPTED_REMEDIATED"
+      },
+      {
+        "row": 36,
+        "customer_id": "C0035",
+        "defect": "AI status 0.8999 (just below threshold)",
+        "expected": "QUARANTINED:BELOW_CONFIDENCE_THRESHOLD"
+      },
+      {
+        "row": 37,
+        "customer_id": "C0012",
+        "defect": "conflicting duplicate customer_id",
+        "expected": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION"
+      },
+      {
+        "row": 38,
+        "customer_id": "",
+        "defect": "missing customer_id",
+        "expected": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION"
+      }
+    ]
+  },
+  "transactions": {
+    "input_records": 40,
+    "remediate_v1_0": {
+      "accepted": 30,
+      "accepted_remediated": 4,
+      "quarantined": 9,
+      "removed_duplicates": 1
+    },
+    "enforce_v1_0": {
+      "accepted": 25,
+      "quarantined": 15
+    },
+    "gold": {
+      "accepted": 26,
+      "quarantined": 4,
+      "warnings": 1,
+      "summary_customers": 18,
+      "summary_total_amount": 2519147.89
+    },
+    "records": [
+      {
+        "row": 1,
+        "transaction_id": "T0001",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 2,
+        "transaction_id": "T0002",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 3,
+        "transaction_id": "T0003",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 4,
+        "transaction_id": "T0004",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 5,
+        "transaction_id": "T0005",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 6,
+        "transaction_id": "T0006",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 7,
+        "transaction_id": "T0007",
+        "defect": "exact duplicate (survivor)",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 8,
+        "transaction_id": "T0008",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 9,
+        "transaction_id": "T0009",
+        "defect": "negative REFUND (valid by business rule)",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 10,
+        "transaction_id": "T0010",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 11,
+        "transaction_id": "T0011",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 12,
+        "transaction_id": "T0012",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 13,
+        "transaction_id": "T0013",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 14,
+        "transaction_id": "T0014",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 15,
+        "transaction_id": "T0015",
+        "defect": "conflicting duplicate transaction_id",
+        "expected_silver": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION",
+        "expected_gold": "-"
+      },
+      {
+        "row": 16,
+        "transaction_id": "T0016",
+        "defect": "large amount (Gold WARNING)",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD_WITH_WARNING"
+      },
+      {
+        "row": 17,
+        "transaction_id": "T0017",
+        "defect": "negative REFUND (valid)",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 18,
+        "transaction_id": "T0018",
+        "defect": "clean",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 19,
+        "transaction_id": "T0019",
+        "defect": "customer remediated in Silver",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 20,
+        "transaction_id": "T0020",
+        "defect": "customer remediated in Silver",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 21,
+        "transaction_id": "T0007",
+        "defect": "exact duplicate (removed)",
+        "expected_silver": "REMOVED_DUPLICATE",
+        "expected_gold": "-"
+      },
+      {
+        "row": 22,
+        "transaction_id": "T0015",
+        "defect": "conflicting duplicate transaction_id",
+        "expected_silver": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION",
+        "expected_gold": "-"
+      },
+      {
+        "row": 23,
+        "transaction_id": "T0022",
+        "defect": "missing customer_id",
+        "expected_silver": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION",
+        "expected_gold": "-"
+      },
+      {
+        "row": 24,
+        "transaction_id": "T0023",
+        "defect": "unknown customer reference",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD_QUARANTINE:REFERENTIAL_INTEGRITY"
+      },
+      {
+        "row": 25,
+        "transaction_id": "T0024",
+        "defect": "customer quarantined in Silver",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD_QUARANTINE:REFERENTIAL_INTEGRITY"
+      },
+      {
+        "row": 26,
+        "transaction_id": "T0025",
+        "defect": "AI amount 0.97 on sensitive amount column",
+        "expected_silver": "QUARANTINED:PENDING_HUMAN_APPROVAL",
+        "expected_gold": "-"
+      },
+      {
+        "row": 27,
+        "transaction_id": "T0026",
+        "defect": "non-numeric amount, no proposal",
+        "expected_silver": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION",
+        "expected_gold": "-"
+      },
+      {
+        "row": 28,
+        "transaction_id": "T0027",
+        "defect": "negative PURCHASE (business rule)",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD_QUARANTINE:BUSINESS_RULE"
+      },
+      {
+        "row": 29,
+        "transaction_id": "T0028",
+        "defect": "currency whitespace/case",
+        "expected_silver": "ACCEPTED_REMEDIATED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 30,
+        "transaction_id": "T0029",
+        "defect": "date dd/MM/yyyy -> standardised",
+        "expected_silver": "ACCEPTED_REMEDIATED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 31,
+        "transaction_id": "T0030",
+        "defect": "invalid calendar date",
+        "expected_silver": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION",
+        "expected_gold": "-"
+      },
+      {
+        "row": 32,
+        "transaction_id": "T0031",
+        "defect": "type whitespace/case",
+        "expected_silver": "ACCEPTED_REMEDIATED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 33,
+        "transaction_id": "T0032",
+        "defect": "AI status 0.96",
+        "expected_silver": "ACCEPTED_REMEDIATED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 34,
+        "transaction_id": "T0033",
+        "defect": "AI status 0.70 (low confidence)",
+        "expected_silver": "QUARANTINED:BELOW_CONFIDENCE_THRESHOLD",
+        "expected_gold": "-"
+      },
+      {
+        "row": 35,
+        "transaction_id": "T0034",
+        "defect": "invalid currency",
+        "expected_silver": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION",
+        "expected_gold": "-"
+      },
+      {
+        "row": 36,
+        "transaction_id": "T0035",
+        "defect": "customer quarantined in Silver",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD_QUARANTINE:REFERENTIAL_INTEGRITY"
+      },
+      {
+        "row": 37,
+        "transaction_id": "",
+        "defect": "missing transaction_id",
+        "expected_silver": "QUARANTINED:UNRESOLVED_NO_SAFE_REMEDIATION",
+        "expected_gold": "-"
+      },
+      {
+        "row": 38,
+        "transaction_id": "T0037",
+        "defect": "customer remediated by AI",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 39,
+        "transaction_id": "T0038",
+        "defect": "customer remediated by AI",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      },
+      {
+        "row": 40,
+        "transaction_id": "T0039",
+        "defect": "deduplicated customer",
+        "expected_silver": "ACCEPTED",
+        "expected_gold": "GOLD"
+      }
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+customer_id,customer_name,email,age,city,country,customer_status,created_date
+C0001,Aarav Sharma,aarav.sharma@example.com,34,Mumbai,IN,ACTIVE,2023-01-15
+C0002,Emma Johnson,emma.johnson@example.co.uk,41,London,GB,ACTIVE,2023-02-20
+C0003,Liam Smith,liam.smith@example.com,29,New York,US,INACTIVE,2023-03-05
+C0004,Priya Nair,priya.nair@example.in,52,Kochi,IN,ACTIVE,2023-03-18
+C0005,Wei Chen,wei.chen@example.sg,38,Singapore,SG,ACTIVE,2023-04-02
+C0006,Fatima Al Mansoori,fatima.almansoori@example.ae,45,Dubai,AE,ACTIVE,2023-04-22
+C0007,Lukas Weber,lukas.weber@example.de,31,Berlin,DE,DORMANT,2023-05-10
+C0008,Olivia Brown,olivia.brown@example.com.au,27,Sydney,AU,ACTIVE,2023-05-28
+C0009,Rohan Mehta,rohan.mehta@example.com,60,Pune,IN,CLOSED,2023-06-14
+C0010,Sophie Martin,sophie.martin@example.com,36,Manchester,GB,ACTIVE,2023-07-01
+C0011,Noah Williams,noah.williams@example.com,48,Chicago,US,ACTIVE,2023-07-19
+C0012,Ananya Iyer,ananya.iyer@example.in,25,Chennai,IN,ACTIVE,2023-08-03
+C0013,James Taylor,james.taylor@example.com,55,Boston,US,INACTIVE,2023-08-21
+C0014,Mei Lin Tan,meilin.tan@example.sg,33,Singapore,SG,ACTIVE,2023-09-09
+C0015,Omar Haddad,omar.haddad@example.ae,39,Abu Dhabi,AE,ACTIVE,2023-09-30
+C0016,Hannah Fischer,hannah.fischer@example.de,44,Munich,DE,ACTIVE,2022-11-30
+C0005,Wei Chen,wei.chen@example.sg,38,Singapore,SG,ACTIVE,2023-04-02
+C0017,"  Isabella Rossi  ",isabella.rossi@example.com,30,London,GB,ACTIVE,2023-10-05
+C0018,Arjun Reddy," ARJUN.REDDY@EXAMPLE.COM ",42,Hyderabad,IN,ACTIVE,2023-11-02
+" C0019",Chloe Dubois,chloe.dubois@example.com,37,London,GB,ACTIVE,2023-11-15
+C0020,Daniel Kim,daniel.kim@example.com,46,Seattle,usa,active,2023-12-01
+C0021,Kavya Menon,kavya.menon@example.in,28,Bengaluru,India,ACTVE,15/01/2024
+C0022,Ethan Clarke,ethan.clarke@example.com,51,Leeds,Untied Kingdom,ACTIVE,2024-01-20
+C0023,Grace Lee,,33,Perth,AU,ACTIVE,2024-02-05
+C0024,Vikram Singh,vikram.singh@example.com,thirty-five,Delhi,IN,ACTIVE,2024-02-12
+C0025,Sara Ali,sara.ali@example.ae,150,Dubai,AE,ACTIVE,2024-02-28
+C0026,Robert Miller,robert.miller@example.com,115,Denver,US,ACTIVE,2024-03-10
+C0027,Ayesha Khan,ayesha.khan@example.com,29,,IN,ACTIVE,2024-03-22
+C0028,Mohammed Rafi,mohammed.rafi@example.com,63,Chennai,Bharat,ACTIVE,2024-04-01
+C0029,Lucas Silva,lucas.silva@example.com,35,Atlantis City,Atlantis,ACTIVE,2024-04-12
+C0030,Meera Pillai,meera.pillai@example.in,31,Kochi,IN,ACT,2024-04-25
+C0031,Neha Gupta,neha.gupta@yahoo,26,Delhi,IN,ACTIVE,2024-05-03
+C0032,J0hn Doe,john.doe@example.com,40,Austin,US,ACTIVE,2024-05-15
+C0033,Arthur Pendleton,arthur.pendleton@example.com,58,Bristol,GB,ACTIVE,2024-02-30
+C0034,Zara Ahmed,zara.ahmed@example.com,38,Dubai,AE,CLSD,2024-06-01
+C0035,Ivan Petrov,ivan.petrov@example.com,50,Berlin,DE,INACTV,2024-06-10
+C0012,Ananya Iyer,ananya.i@example.in,25,Chennai,IN,ACTIVE,2023-08-03
+,Unknown Person,unknown.person@example.com,45,Pune,IN,ACTIVE,2024-06-20
