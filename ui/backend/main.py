@@ -269,13 +269,26 @@ class ProfileIn(BaseModel):
     mode: str = "FULL"
 
 
+_BIG_FILE = 50 * 1024 * 1024      # FULL profile above this risks OOM on the 2g local driver
+
+
+def _profile_mode_for(src: Path, requested: str) -> str:
+    try:
+        if requested.upper() == "FULL" and src.stat().st_size > _BIG_FILE:
+            return "SAMPLE"
+    except OSError:
+        pass
+    return requested.upper()
+
+
 def _do_profile(body: ProfileIn) -> dict[str, Any]:
     from dq_core.io.sources import CsvSource, ParquetSource
     spark, engine = J.get_spark(), J.get_engine()
     src = ROOT / body.source
     df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
           else CsvSource(str(src)).read(spark))
-    rep = engine.profile(df, body.dataset or src.stem, mode=body.mode)
+    mode = _profile_mode_for(src, body.mode)
+    rep = engine.profile(df, body.dataset or src.stem, mode=mode)
     out = ROOT / "reports"
     out.mkdir(exist_ok=True)
     p = out / f"ui_profile_{src.stem}.json"
@@ -290,7 +303,7 @@ def _do_profile(body: ProfileIn) -> dict[str, Any]:
              "date_min": c.date_min, "date_max": c.date_max,
              "top_values": c.top_values[:5]} for c in rep.columns.values()]
     return {"summary": rep.summary_text(), "report_path": str(p.relative_to(ROOT)).replace("\\", "/"),
-            "row_count": rep.row_count, "column_count": rep.column_count,
+            "row_count": rep.row_count, "column_count": rep.column_count, "profile_mode": mode,
             "anomalies": rep.anomalies[:20], "schema_anomalies": rep.schema_anomalies[:20],
             "pk_candidates": rep.primary_key_candidates, "columns": cols}
 
@@ -382,8 +395,9 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
           else CsvSource(str(src)).read(spark))
     ds = body.dataset or src.stem
-    J.progress_cb(_jid, f"profiling {ds}")
-    rep = engine.profile(df, ds)
+    mode = _profile_mode_for(src, "FULL")
+    J.progress_cb(_jid, f"profiling {ds} ({mode})")
+    rep = engine.profile(df, ds, mode=mode)
     J.progress_cb(_jid, "generating candidate rules")
     ruleset_id = f"{ds}_{body.stage.lower()}"
     candidates = CandidateRuleGenerator().generate(rep, ruleset_id=ruleset_id,
@@ -397,7 +411,7 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
                      "confidence": gen.get("confidence"), "evidence": gen.get("evidence"),
                      "description": r.description, "raw": d})
     return {"dataset": ds, "ruleset_id": ruleset_id, "stage": body.stage.upper(),
-            "row_count": rep.row_count, "column_count": rep.column_count,
+            "row_count": rep.row_count, "column_count": rep.column_count, "profile_mode": mode,
             "anomalies": rep.anomalies[:20], "schema_anomalies": rep.schema_anomalies[:20],
             "pk_candidates": rep.primary_key_candidates,
             "candidates": cand, "candidate_count": len(cand)}

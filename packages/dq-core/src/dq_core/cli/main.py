@@ -27,9 +27,10 @@ def _engine(config: str) -> "DataQualityEngine":        # noqa: F821 – lazy im
     return DataQualityEngine.from_config(config)
 
 
-def _spark(config_path: str) -> "Any":                  # noqa: F821
+def _spark(config_path: str, master: str = "local[4]", driver_memory: str = "1g") -> "Any":  # noqa: F821
     from dq_core.runtime.local_spark import LocalSparkSettings, create_local_spark_session
     return create_local_spark_session(LocalSparkSettings(
+        master=master, driver_memory=driver_memory,
         scratch_dir=os.environ.get("DQ_SCRATCH_DIR", str(ROOT / ".tmp"))))
 
 
@@ -284,6 +285,11 @@ def ruleset_verify(ruleset_yaml: str, config: str) -> None:
               help="Actor recorded as approving all generated candidate rules")
 @click.option("--copy", "copy_source", is_flag=True,
               help="Copy the source file into sample_data/bronze/ and reference it there")
+@click.option("--master", default="local[4]", show_default=True, help="Spark master for the local harness")
+@click.option("--driver-memory", default="2g", show_default=True, help="Driver heap for the local harness")
+@click.option("--profile-mode", default="FULL", show_default=True,
+              type=click.Choice(["FULL", "SAMPLE", "APPROXIMATE"], case_sensitive=False),
+              help="FULL scans every row; SAMPLE is the right choice for large files")
 @click.option("--out-dir", default="config", show_default=True, help="Config root to write rulesets/ + pipelines/ into")
 @click.option("--profile-out", default=None, help="Also write the JSON profile here")
 @click.option("--publish", is_flag=True, help="Publish the generated rule set into the registry")
@@ -292,7 +298,8 @@ def ruleset_verify(ruleset_yaml: str, config: str) -> None:
 @click.option("--config", "-c", default="config/engine.yaml")
 def bootstrap(source: str, dataset: str | None, pipeline_id: str | None, pipeline_name: str | None,
               platform: str, runtime: str, stage: str, dq_mode: str, policy: str, owner: str,
-              description: str, approved_by: str, copy_source: bool, out_dir: str, profile_out: str | None,
+              description: str, approved_by: str, copy_source: bool, master: str, driver_memory: str,
+              profile_mode: str, out_dir: str, profile_out: str | None,
               publish: bool, onboard: bool, force: bool, config: str) -> None:
     """Export a pipeline from a source file: profile it, generate an approved rule set
     and a ready-to-paste onboarding manifest.
@@ -323,11 +330,11 @@ def bootstrap(source: str, dataset: str | None, pipeline_id: str | None, pipelin
             _err(f"{p} already exists - pass --force to overwrite"); sys.exit(1)
 
     # 1) profile ----------------------------------------------------------------------------------
-    spark = _spark(config)
+    spark = _spark(config, master=master, driver_memory=driver_memory)
     engine = _engine(config)
     df = spark.read.option("header", "true").option("inferSchema", "true").csv(str(src)) \
         if src.suffix.lower() == ".csv" else spark.read.parquet(str(src))
-    report = engine.profile(df, ds)
+    report = engine.profile(df, ds, mode=profile_mode)
     _ok(f"Profiled {src.name}: {report.row_count} rows x {report.column_count} cols, "
         f"{len(report.anomalies)} anomalies")
     if profile_out:
