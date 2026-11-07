@@ -1,10 +1,11 @@
 """dqctl – command line interface for the DQ Accelerator.
 
 Sub-commands:
-  pipeline onboard|list|test|activate|pause|offboard
-  ruleset  list|publish|activate|rollback|diff|verify
-  run      OBSERVE_ONLY|ENFORCE|REMEDIATE on a CSV/Parquet file
-  profile  profile a CSV/Parquet file and show the report
+  pipeline  onboard|list|test|activate|pause|offboard
+  ruleset   list|publish|activate|rollback|diff|verify
+  bootstrap profile a source file and export an approved rule set + onboarding manifest
+  run       OBSERVE_ONLY|ENFORCE|REMEDIATE on a CSV/Parquet file
+  profile   profile a CSV/Parquet file and show the report
 """
 
 from __future__ import annotations
@@ -260,6 +261,155 @@ def ruleset_verify(ruleset_yaml: str, config: str) -> None:
         _ok(f"{rs.ref} is published and unchanged (checksum {rs.checksum()[:12]})")
     else:
         _warn(f"{rs.ref} is NOT published in the registry")
+
+
+# ===========================================================================  bootstrap
+@main.command("bootstrap")
+@click.argument("source", type=click.Path(exists=True))
+@click.option("--dataset", default=None, help="Dataset id (default: source file stem)")
+@click.option("--pipeline-id", default=None, help="Pipeline id (default: <DATASET>_PIPELINE)")
+@click.option("--pipeline-name", default=None)
+@click.option("--platform", default="DATABRICKS", show_default=True,
+              type=click.Choice(["DATABRICKS", "STANDALONE_SPARK", "DATAPROC", "FABRIC", "AIRFLOW", "ADF", "PYTHON", "OTHER"],
+                                case_sensitive=False))
+@click.option("--runtime", default="PYSPARK", show_default=True)
+@click.option("--stage", default="SILVER", show_default=True)
+@click.option("--dq-mode", default="OBSERVE_ONLY", show_default=True,
+              type=click.Choice(["OBSERVE_ONLY", "ENFORCE", "REMEDIATE"], case_sensitive=False))
+@click.option("--policy", default="../policies/default.yaml", show_default=True,
+              help="Policy reference written into the manifest (relative to the manifest file)")
+@click.option("--owner", default="")
+@click.option("--description", default="")
+@click.option("--approved-by", default="dqctl-bootstrap", show_default=True,
+              help="Actor recorded as approving all generated candidate rules")
+@click.option("--copy", "copy_source", is_flag=True,
+              help="Copy the source file into sample_data/bronze/ and reference it there")
+@click.option("--out-dir", default="config", show_default=True, help="Config root to write rulesets/ + pipelines/ into")
+@click.option("--profile-out", default=None, help="Also write the JSON profile here")
+@click.option("--publish", is_flag=True, help="Publish the generated rule set into the registry")
+@click.option("--onboard", is_flag=True, help="Register the pipeline in the registry after writing the manifest")
+@click.option("--force", is_flag=True, help="Overwrite existing generated files")
+@click.option("--config", "-c", default="config/engine.yaml")
+def bootstrap(source: str, dataset: str | None, pipeline_id: str | None, pipeline_name: str | None,
+              platform: str, runtime: str, stage: str, dq_mode: str, policy: str, owner: str,
+              description: str, approved_by: str, copy_source: bool, out_dir: str, profile_out: str | None,
+              publish: bool, onboard: bool, force: bool, config: str) -> None:
+    """Export a pipeline from a source file: profile it, generate an approved rule set
+    and a ready-to-paste onboarding manifest.
+
+    Fast path for new pipelines - review the generated rules before ENFORCE/REMEDIATE:
+    every auto-approved rule carries its confidence and profiling evidence.
+    """
+    import re
+    import shutil
+
+    from dq_core.generation.generator import CandidateRuleGenerator, approve_candidates
+    from dq_core.metadata.serialization import dump_yaml, save_ruleset
+    from dq_core.pipelines.manifest import PipelineManifest
+    from dq_core.runtime.logging import configure_logging
+
+    configure_logging("INFO", json_format=False)
+    src = Path(source).resolve()
+    ds = (dataset or src.stem).lower()
+    pid = (pipeline_id or f"{ds.upper()}_PIPELINE").upper()
+    stage_up = stage.upper()
+    ruleset_id = f"{ds}_{stage_up.lower()}"
+    out_root = Path(out_dir).resolve()
+    ruleset_path = out_root / "rulesets" / f"{ds}_v1.yaml"
+    manifest_path = out_root / "pipelines" / f"{pid}.yaml"
+
+    for p in (ruleset_path, manifest_path):
+        if p.exists() and not force:
+            _err(f"{p} already exists - pass --force to overwrite"); sys.exit(1)
+
+    # 1) profile ----------------------------------------------------------------------------------
+    spark = _spark(config)
+    engine = _engine(config)
+    df = spark.read.option("header", "true").option("inferSchema", "true").csv(str(src)) \
+        if src.suffix.lower() == ".csv" else spark.read.parquet(str(src))
+    report = engine.profile(df, ds)
+    _ok(f"Profiled {src.name}: {report.row_count} rows x {report.column_count} cols, "
+        f"{len(report.anomalies)} anomalies")
+    if profile_out:
+        report.write_json(profile_out)
+        _ok(f"Profile written to {profile_out}")
+
+    # 2) generate + approve candidates ------------------------------------------------------------
+    candidates = CandidateRuleGenerator().generate(report, ruleset_id=ruleset_id, version="1.0",
+                                                   stage=stage_up)
+    rs = approve_candidates(candidates, [r.rule_id for r in candidates.rules],
+                            ruleset_id=ruleset_id, version="1.0", approved_by=approved_by)
+    save_ruleset(rs, ruleset_path)
+    _ok(f"Rule set {ruleset_id}@1.0 written to {ruleset_path} ({len(rs.rules)} rules, auto-approved)")
+    for r in rs.rules:
+        conf = (r.generation or {}).get("confidence")
+        click.echo(f"      {r.rule_id:<22} {r.rule_type.value:<22} {str(r.column or '-'):<18} "
+                   f"{r.severity.value:<8} confidence={conf}")
+
+    # 3) manifest ----------------------------------------------------------------------------------
+    if copy_source:
+        sample_dir = ROOT / "sample_data" / "bronze"
+        sample_dir.mkdir(parents=True, exist_ok=True)
+        dest = sample_dir / src.name
+        if src != dest:
+            shutil.copy2(src, dest)
+        test_data = os.path.relpath(dest, manifest_path.parent)
+    else:
+        test_data = os.path.relpath(src, manifest_path.parent) \
+            if str(src).startswith(str(out_root.parent)) else str(src)
+    test_data = test_data.replace("\\", "/")
+    manifest = {
+        "pipeline": {
+            "pipeline_id": pid,
+            "pipeline_name": pipeline_name or re.sub(r"[_-]+", " ", pid).title(),
+            "platform": platform.upper(),
+            "runtime": runtime.upper(),
+            "integration_mode": "INLINE",
+            "dq_mode": dq_mode.upper(),
+            "owner": owner,
+            "description": description or f"Auto-bootstrapped from {src.name} "
+                                        f"({report.row_count} rows profiled)",
+            "policy": policy,
+            "datasets": [{
+                "dataset_id": ds,
+                "format": "CSV" if src.suffix.lower() == ".csv" else "PARQUET",
+                "stages": ["BRONZE", stage_up],
+                "rulesets": {stage_up: os.path.relpath(ruleset_path, manifest_path.parent).replace("\\", "/")},
+                "test_data": test_data,
+                "test_data_format": "CSV" if src.suffix.lower() == ".csv" else "PARQUET",
+            }],
+        }
+    }
+    dump_yaml(manifest, manifest_path)
+    PipelineManifest.load(manifest_path)   # self-check: generated manifest must validate
+    _ok(f"Manifest written to {manifest_path}")
+
+    # 4) optional publish + onboard ---------------------------------------------------------------
+    if publish:
+        from dq_core.registries.factory import build_ruleset_registry
+        from dq_core.runtime.config import EngineConfig
+        cfg = EngineConfig.from_yaml(config)
+        entry = build_ruleset_registry(cfg.registry).publish(rs, published_by=approved_by, activate=True)
+        _ok(f"Published {rs.ref}  checksum={entry['checksum'][:12]}  ACTIVE")
+    if onboard:
+        from dq_core.registries.factory import build_pipeline_registry
+        from dq_core.runtime.config import EngineConfig
+        cfg = EngineConfig.from_yaml(config)
+        entry = build_pipeline_registry(cfg.registry).onboard(PipelineManifest.load(manifest_path),
+                                                              actor=approved_by)
+        _ok(f"Onboarded {pid}  state={entry['state']}")
+
+    spark.stop()
+    click.echo("\nNext steps:")
+    click.echo(f"  1. Review rules:      {ruleset_path}")
+    if not publish:
+        click.echo(f"  2. Publish rule set:  dqctl ruleset publish {ruleset_path}")
+    if not onboard:
+        click.echo(f"  3. Onboard pipeline:  dqctl pipeline onboard -m {manifest_path}")
+        click.echo( "     or paste the manifest below into UI > Pipelines > Onboard")
+    click.echo(f"  4. Then test -> activate -> run DQ")
+    click.echo("\n--- manifest (paste into UI) ---")
+    click.echo(manifest_path.read_text(encoding="utf-8"))
 
 
 # ===========================================================================  run
