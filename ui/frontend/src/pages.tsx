@@ -224,8 +224,32 @@ export function Pipelines() {
 }
 
 /* ------------------------------------------------------------ Run DQ */
+/* resolve a manifest-relative path (../../sample_data/x, ../rulesets/x) to repo-relative */
+const resolveRel = (rel: string) => {
+  const out: string[] = []
+  for (const s of `config/pipelines/${rel}`.split('/')) {
+    if (s === '..') out.pop(); else if (s && s !== '.') out.push(s)
+  }
+  return out.join('/')
+}
+
+const ADHOC_RULESETS = [
+  ['customers_v1', 'config/rulesets/customers_v1.yaml'],
+  ['customers_v1_1', 'config/rulesets/customers_v1_1.yaml'],
+  ['transactions_v1', 'config/rulesets/transactions_v1.yaml'],
+  ['customer_summary_gold_v1', 'config/rulesets/customer_summary_gold_v1.yaml'],
+  ['patients_v1', 'config/rulesets/patients_v1.yaml'],
+  ['orders_v1', 'config/rulesets/orders_v1.yaml'],
+  ['loans_v1', 'config/rulesets/loans_v1.yaml'],
+  ['employees_v1', 'config/rulesets/employees_v1.yaml'],
+]
+
 export function RunDQ() {
-  const [datasets, setDatasets] = useState<any[]>([]); const [rulesets, setRulesets] = useState<any[]>([])
+  const [datasets, setDatasets] = useState<any[]>([])
+  const [pipes, setPipes] = useState<any[]>([])
+  const [pipeSel, setPipeSel] = useState('ADHOC')
+  const [govDs, setGovDs] = useState<any[]>([])            // manifest datasets when governed
+  const [rsOpts, setRsOpts] = useState<{ label: string; value: string }[]>([])
   const [src, setSrc] = useState(''); const [rs, setRs] = useState('config/rulesets/customers_v1.yaml')
   const [mode, setMode] = useState('OBSERVE_ONLY'); const [ds, setDs] = useState('customers')
   const [pid, setPid] = useState('UI_RUN'); const [jobId, setJobId] = useState<string | null>(null)
@@ -233,27 +257,65 @@ export function RunDQ() {
   const [pjob, setPjob] = useState<string | null>(null)
   const [past, setPast] = useState<Job[]>([])
   const job = usePoll(jobId); const prof = usePoll(pjob)
-  useEffect(() => { api.datasets().then(d => { setDatasets(d); setSrc(d[0]?.path ?? '') }); api.rulesets().then(setRulesets) }, [])
+  const governed = pipeSel !== 'ADHOC'
+
+  useEffect(() => {
+    api.datasets().then(d => { setDatasets(d); setSrc(d[0]?.path ?? '') })
+    api.pipelines().then(setPipes)
+  }, [])
   useEffect(() => { api.jobs().then(setPast) }, [job?.status, prof?.status])
+
+  const applyDataset = (e: any) => {           // e = manifest dataset entry
+    setDs(e.dataset_id)
+    const opts = Object.entries(e.rulesets ?? {}).map(([st, p]: any) => ({
+      label: `${st}: ${String(p).split('/').pop()?.replace('.yaml', '')}`,
+      value: resolveRel(String(p)),
+    }))
+    setRsOpts(opts)
+    if (opts[0]) setRs(opts[0].value)
+    if (e.test_data) setSrc(resolveRel(e.test_data))
+  }
+
+  const onPipeline = async (id: string) => {
+    setPipeSel(id)
+    if (id === 'ADHOC') { setGovDs([]); setPid('UI_RUN'); return }
+    const d = await api.pipeline(id)
+    const dss = d.manifest?.datasets ?? []
+    setGovDs(dss)
+    setPid(id)
+    if (d.manifest?.dq_mode) setMode(d.manifest.dq_mode)
+    if (d.manifest?.policy) setPol(resolveRel(d.manifest.policy))
+    if (dss.length) applyDataset(dss[0])
+  }
+
   const submit = async () => { const r = await api.run({ source: src, ruleset: rs, mode, dataset: ds, pipeline_id: pid, policy: pol }); setJobId(r.job_id) }
   const submitProfile = async () => { const r = await api.profile({ source: src, dataset: ds, mode: 'FULL' }); setPjob(r.job_id) }
+  const rulesetOptions = governed ? rsOpts : ADHOC_RULESETS.map(([l, v]) => ({ label: l, value: v }))
+
   return <>
     <div className="card"><h3>Run data quality</h3>
       <div className="row">
-        <div><label>Source file</label><select value={src} onChange={e => setSrc(e.target.value)}>
-          {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}</option>)}</select></div>
+        <div><label>Pipeline</label><select value={pipeSel} onChange={e => onPipeline(e.target.value)}>
+          <option value="ADHOC">— ad-hoc run (unregistered) —</option>
+          {pipes.map(p => <option key={p.pipeline_id} value={p.pipeline_id}>{p.pipeline_id} ({p.state})</option>)}
+        </select></div>
+        <div><label>{governed ? 'Dataset (manifest)' : 'Source file'}</label>
+          {governed
+            ? <select value={ds} onChange={e => applyDataset(govDs.find(x => x.dataset_id === e.target.value))}>
+                {govDs.map((d: any) => <option key={d.dataset_id} value={d.dataset_id}>{d.dataset_id}</option>)}
+              </select>
+            : <select value={src} onChange={e => { setSrc(e.target.value); setDs(e.target.selectedOptions[0].text.split(' — ')[0]) }}>
+                {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}</option>)}</select>}
+        </div>
+        {governed && <div><label>Source (test_data)</label><input value={src} readOnly /></div>}
         <div><label>Rule set</label><select value={rs} onChange={e => setRs(e.target.value)}>
-          <option value="config/rulesets/customers_v1.yaml">customers_v1</option>
-          <option value="config/rulesets/customers_v1_1.yaml">customers_v1_1</option>
-          <option value="config/rulesets/transactions_v1.yaml">transactions_v1</option>
-          <option value="config/rulesets/patients_v1.yaml">patients_v1</option></select></div>
-        <div><label>Policy</label><select value={pol} onChange={e => setPol(e.target.value)}>
+          {rulesetOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+        <div><label>Policy{governed ? ' (manifest)' : ''}</label><select value={pol} onChange={e => setPol(e.target.value)} disabled={governed}>
           <option value="config/policies/default.yaml">default (banking)</option>
           <option value="config/policies/healthcare.yaml">healthcare (PHI)</option></select></div>
         <div><label>Mode</label><select value={mode} onChange={e => setMode(e.target.value)}>
           {['OBSERVE_ONLY', 'ENFORCE', 'REMEDIATE'].map(m => <option key={m}>{m}</option>)}</select></div>
-        <div><label>Dataset</label><input value={ds} onChange={e => setDs(e.target.value)} /></div>
-        <div><label>Pipeline ID</label><input value={pid} onChange={e => setPid(e.target.value)} /></div>
+        <div><label>Pipeline ID</label><input value={pid} readOnly={governed} onChange={e => setPid(e.target.value)} /></div>
         <div><label>View past result</label><select value="" onChange={e => {
           const id = e.target.value
           if (!id) return
@@ -264,6 +326,10 @@ export function RunDQ() {
           {past.filter(x => x.status === 'COMPLETED').map(x => <option key={x.job_id} value={x.job_id}>{x.job_id} · {x.kind}</option>)}
         </select></div>
       </div>
+      {governed && <p className="muted" style={{ fontSize: 12 }}>
+        Governed run — dataset, source, ruleset and policy come from the manifest binding;
+        only the mode is adjustable. Pick "ad-hoc" for an ungoverned run.
+      </p>}
       <button className="btn" onClick={submit}>Run DQ</button>
       <button className="btn sec" onClick={submitProfile}>Profile only</button>
       <span className="muted"> Spark runs take 10–70 s — status polls automatically.</span>
