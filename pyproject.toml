@@ -1,0 +1,18 @@
+[project]
+name = "dq-accelerator-poc"
+version = "0.1.0"
+description = "Enterprise Data Quality Accelerator - Databricks-first, portable Apache Spark POC workspace"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["packages/dq-core/tests", "tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "spark: test requires a running local Apache Spark session",
+    "integration: integration test (engine + Spark + sample data)",
+    "e2e: end-to-end test of the full demo flow",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:pyspark.*",
+    "ignore::ResourceWarning",
+]

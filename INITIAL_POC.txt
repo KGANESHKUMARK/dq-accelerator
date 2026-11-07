@@ -1,0 +1,711 @@
+INITIAL POC DEVELOPMENT
+DQ ACCELERATOR – DATABRICKS-FIRST, PORTABLE APACHE SPARK CORE ENGINE
+PROJECT OBJECTIVE
+Build a working, demonstrable initial Proof of Concept for an Enterprise Data Quality Accelerator.
+The POC must demonstrate:
+A reusable Apache Spark Data Quality Core Engine.
+Onboarding of existing Databricks PySpark pipelines.
+Integration with existing Spark DataFrames with minimal modifications.
+Automatic data profiling.
+Automatic candidate quality rule generation.
+Metadata-driven rule execution.
+Rule configuration and version management.
+Deterministic remediation.
+Mock AI-assisted remediation.
+Configurable confidence thresholds.
+Quarantine for uncertain or unresolved records.
+Revalidation after correction.
+Bronze, Silver and Gold processing.
+Execution metrics and audit reports.
+A generic integration architecture capable of supporting additional pipeline technologies.
+This is the FIRST DEMONSTRABLE POC, not the final enterprise product.
+The immediate priority is to deliver functional code, test it and provide a repeatable demonstration.
+1. YOUR ROLE
+Act as a Principal Apache Spark Architect, Senior PySpark Engineer, Data Quality Framework Developer, Python Package Engineer, AI Engineer, Integration Architect and QA Engineer.
+You must design, implement, execute, debug, test and verify the complete POC.
+Do not produce only architecture diagrams or code snippets.
+Develop a working implementation in the current repository.
+Use the available terminal to install compatible dependencies, run Spark, execute examples, run automated tests and fix defects.
+Do not claim success without actual execution evidence.
+2. FIRST PRIORITY – INSPECT THE INPUT PIPELINES
+Initially, we will receive existing Databricks sample pipeline code from other developers/users.
+These may include:
+- Python files.
+- PySpark scripts.
+- Databricks notebook exports.
+- Jupyter notebooks.
+- Pipeline configuration files.
+- Sample CSV/Parquet data.
+- Existing transformation scripts.
+First inspect all relevant files available in the workspace.
+For every supplied pipeline:
+Understand its existing processing flow.
+Identify the source datasets.
+Identify Spark DataFrames.
+Identify the transformation stages.
+Identify Bronze, Silver and Gold boundaries where applicable.
+Identify existing data storage.
+Identify current data validation, if any.
+Identify the safest integration points.
+Determine the minimum code changes needed to connect DQ Core Engine.
+Create:
+docs/databricks_pipeline_assessment.md
+This document must describe:
+- Existing pipeline architecture.
+- Existing data flow.
+- Identified datasets.
+- DataFrame names and transformation stages.
+- Proposed DQ integration points.
+- Required code changes.
+- Compatibility issues.
+- Assumptions.
+Do not rewrite or destroy the supplied original pipeline.
+Create separate integration examples or copies.
+If actual sample pipelines are not yet available, create a representative Databricks-style PySpark example and clearly mark it as synthetic. Do not invent that a user's actual pipeline has been integrated.
+3. INITIAL POC ARCHITECTURE
+Build these independent components:
+A. Apache Spark DQ Core Engine.
+B. Pipeline Integration Layer.
+C. Databricks PySpark Integration.
+D. Local Apache Spark Execution Harness.
+E. Rule Configuration and Version Management.
+F. Profiling and Validation.
+G. Deterministic and AI Remediation.
+H. Quarantine and Revalidation.
+I. Bronze/Silver/Gold Execution.
+J. Metrics and Reporting.
+Do not develop React, FastAPI or a customer-facing dashboard during this POC.
+A small Python CLI and Databricks notebook demonstration are sufficient.
+Keep the core package independent of Databricks services.
+4. TECHNOLOGY STACK AND VERSION MANAGEMENT
+Inspect the environment before selecting dependencies.
+Inspect:
+- Operating system.
+- Python.
+- Java/JDK.
+- Spark.
+- PySpark.
+- Available memory and CPU.
+- Existing project structure.
+Select a compatible, tested combination of:
+- Python.
+- Apache Spark / PySpark.
+- Java/JDK.
+- PyYAML.
+- Pydantic if useful.
+- Pytest.
+Prefer mature stable versions, generally latest stable minus one where compatibility justifies it.
+Pin all dependencies.
+Do not blindly install the latest releases.
+The engine must use standard PySpark APIs and remain independent of Databricks-specific features.
+5. APACHE SPARK DQ CORE ENGINE
+Build an installable, reusable Python package named:
+dq-core
+Suggested public import:
+from dq_core import DataQualityEngine
+The engine must accept existing Spark DataFrames.
+It must not create or stop the SparkSession when executing inline against an existing DataFrame.
+Use the SparkSession associated with the input DataFrame.
+For standalone local tests, provide a separate example that creates and manages its own SparkSession.
+Implement these modules.
+5.1 Runtime
+- Spark configuration.
+- Runtime inspection.
+- Schema utilities.
+- Structured logging.
+- Error handling.
+- Execution context.
+- Common result models.
+5.2 Profiling
+Implement PySpark profiling for:
+- Row count.
+- Column count.
+- Schema.
+- Data types.
+- Null count.
+- Null percentage.
+- Distinct count.
+- Unique count.
+- Duplicate statistics.
+- Minimum and maximum.
+- Numeric mean and standard deviation.
+- String length statistics.
+- Date ranges.
+- Common patterns.
+- Candidate allowed values.
+- Potential primary keys.
+- Suspicious distributions.
+- Schema anomalies.
+Support:
+- Full profiling.
+- Sampling-based profiling.
+- Approximate statistics.
+Avoid collecting large datasets to the driver.
+Generate a structured JSON ProfileReport.
+5.3 Automatic candidate rule generation
+Generate candidate rules based on profiling evidence.
+First POC rule types:
+NOT_NULL.
+UNIQUE.
+DUPLICATE.
+REGEX.
+RANGE.
+ALLOWED_VALUES.
+DATA_TYPE.
+DATE_FORMAT.
+STRING_LENGTH.
+REFERENTIAL_INTEGRITY.
+SCHEMA_VALIDATION.
+Generate candidates as proposals.
+Never automatically activate every inferred rule.
+Business rules must be reviewed and explicitly approved.
+5.4 Metadata-driven rule engine
+Create RuleDefinition and RuleSet models.
+Rule metadata must include:
+- Rule ID.
+- Rule name.
+- Description.
+- Dataset.
+- Column.
+- Rule type.
+- Scope.
+- Severity.
+- Stage.
+- Configuration.
+- Remediation policy.
+- Version.
+- Status.
+Support rule scopes:
+- ROW_LEVEL.
+- DATASET_LEVEL.
+- CROSS_DATASET.
+Implement a local JSON/YAML rule registry.
+Create example rule versions:
+- Customer RuleSet Version 1.0.
+- Customer RuleSet Version 1.1.
+Published configurations must be immutable.
+Provide version comparison, rollback through active-version selection, and execution traceability.
+An execution must identify the exact RuleSet version.
+5.5 Validation engine
+Execute rules using native PySpark functions.
+Each result must include:
+- Rule ID.
+- Dataset.
+- Rule version.
+- Total records.
+- Passed records.
+- Failed records.
+- Pass percentage.
+- Failure percentage.
+- Failure reasons.
+- Execution duration.
+Preserve multiple violations per record.
+Distinguish row-level errors from dataset-level quality failures.
+Support:
+- ERROR.
+- WARNING.
+- INFO.
+Return actual Spark DataFrames for accepted and failed records.
+Use safe, controlled rule execution. Never execute unrestricted eval() or generated code.
+5.6 Deterministic remediation
+First implement:
+- TRIM.
+- UPPERCASE.
+- LOWERCASE.
+- Approved lookup mapping.
+- Configured date standardization.
+- Explicitly approved null replacement.
+- Configured duplicate removal.
+Do not invent critical customer or banking information.
+For duplicate handling, require explicit business keys and a survivor-selection policy.
+Capture the original value/reference and correction information.
+Revalidate every corrected record.
+5.7 AI-assisted remediation
+Implement MockAIProvider.
+Do not require an external LLM API key.
+Create controlled demonstration proposals with:
+- Record ID.
+- Rule ID.
+- Column.
+- Original value.
+- Proposed value.
+- Confidence.
+- Reason.
+- Evidence.
+- Provider.
+- Model version.
+For demonstration, include:
+- At least one high-confidence correction.
+- At least one low-confidence correction.
+- At least one invalid correction that fails validation.
+Clearly label these as simulated AI outputs.
+Create an interface for future real AI providers.
+Do not make external LLM calls row by row on large datasets.
+Do not execute AI-generated Python or SQL.
+5.8 Confidence policy engine
+Default confidence threshold: 90%.
+Configurable as a decimal between 0 and 1.
+Test:
+- 89%.
+- 89.99%.
+- 90%.
+- 95%.
+- 100%.
+Policy:
+Below threshold:
+- Quarantine.
+At or above threshold:
+- Eligible for automatic correction when the remediation policy allows it.
+Sensitive columns:
+- Customer identity.
+- Account identifiers.
+- Transaction amounts.
+- Regulatory information.
+Require human approval for high-impact corrections unless an approved deterministic reference-based policy explicitly permits them.
+A high AI confidence alone is not proof of correctness.
+5.9 Quarantine and revalidation
+Create a quarantine DataFrame containing:
+- Original record.
+- Record reference.
+- Pipeline ID.
+- Dataset ID.
+- Run ID.
+- Failed rule IDs.
+- Failure reasons.
+- Proposed correction.
+- Confidence.
+- Remediation status.
+Corrected records must be revalidated.
+A correction that fails post-validation must also be quarantined.
+Provide:
+- accepted_dataframe.
+- quarantine_dataframe.
+- validation_results.
+- remediation_results.
+- execution_metrics.
+6. DATABRICKS PIPELINE ONBOARDING – PRIMARY DEMO
+This is the most important integration requirement for the initial POC.
+Create a thin Databricks PySpark integration adapter.
+It should work with an existing Databricks SparkSession and existing DataFrames.
+Do not require:
+- A new SparkSession.
+- A different Spark application.
+- Mandatory Databricks Workspace REST APIs.
+- Mandatory Unity Catalog.
+- A replacement pipeline.
+The integration must use compatible standard PySpark operations.
+Provide a sample integration.
+Example:
+from dq_core import DataQualityEngine
+from dq_core.context import PipelineContext
+Existing Databricks Spark session
+Existing DataFrame from the user's pipeline
+engine = DataQualityEngine.from_config(
+"config/engine.yaml"
+)
+context = PipelineContext(
+pipeline_id="DATABRICKS_CUSTOMER_PIPELINE",
+pipeline_run_id="DEMO_RUN_001",
+platform="DATABRICKS",
+runtime="PYSPARK",
+dataset="customers",
+stage="SILVER",
+ruleset_version="1.0"
+)
+result = engine.run(
+dataframe=customers_df,
+ruleset="config/rulesets/customers_v1.yaml",
+policy="config/policies/default.yaml",
+context=context
+)
+accepted_df = result.accepted_dataframe
+quarantine_df = result.quarantine_dataframe
+Continue the existing pipeline using accepted_df.
+Implement this example so it runs rather than merely displaying illustrative code.
+Integration modes
+Support:
+OBSERVE_ONLY:
+- Execute profiling and validation.
+- Produce metrics and failure outputs.
+- Do not modify the original pipeline output.
+ENFORCE:
+- Apply configured validation and quarantine policies.
+REMEDIATE:
+- Apply approved deterministic and eligible AI-assisted corrections.
+- Revalidate corrected records.
+- Produce accepted and quarantined DataFrames.
+Start the first integration in OBSERVE_ONLY.
+Then demonstrate ENFORCE and REMEDIATE.
+Add example notebooks/scripts under:
+examples/databricks/
+The same public engine API must also work with compatible standalone PySpark DataFrames.
+7. PORTABILITY AND OTHER PIPELINES
+We need future support beyond Databricks.
+Design from the beginning for:
+Apache Spark:
+- Standalone.
+- Databricks.
+- Google Dataproc.
+- Microsoft Fabric.
+Orchestration:
+- Airflow.
+- Azure Data Factory.
+- Fabric Data Factory.
+- Dagster.
+- Prefect.
+Other processing systems:
+- Python ETL.
+- SQL/dbt.
+- Snowflake.
+- BigQuery.
+- Redshift.
+- Kafka.
+- Flink.
+- Informatica.
+- Talend.
+Important distinction:
+Airflow and ADF are orchestration systems, not common Spark execution runtimes.
+dbt and warehouse SQL require SQL execution adapters.
+Flink requires its own runtime integration.
+Do not claim all these technologies can directly execute PySpark.
+Initial POC support matrix
+FULLY IMPLEMENT:
+Standalone Apache Spark.
+Generic PySpark DataFrame integration.
+Databricks inline PySpark integration.
+CSV source adapter.
+Parquet source adapter.
+Local storage sink adapter.
+Generic pipeline context and result contracts.
+DESIGN AND CONTRACT-TEST:
+Google Dataproc adapter.
+Microsoft Fabric Spark adapter.
+Airflow integration contract.
+Azure Data Factory integration contract.
+Generic REST/CLI integration.
+SQL and streaming execution extension interfaces.
+Do not implement fake production connectors.
+Document actual integration coverage and remaining limitations.
+8. PIPELINE ONBOARDING AND OFFBOARDING
+Implement lightweight local pipeline registration.
+Use a YAML manifest.
+Example:
+pipeline:
+pipeline_id: CUSTOMER_PIPELINE_001
+pipeline_name: Customer Processing Pipeline
+platform: DATABRICKS
+runtime: PYSPARK
+integration_mode: INLINE
+datasets:
+- dataset_id: customers
+format: PARQUET
+stages:
+  - BRONZE
+  - SILVER
+  - GOLD
+- dataset_id: transactions
+format: PARQUET
+stages:
+  - BRONZE
+  - SILVER
+  - GOLD
+Implement lifecycle states:
+DRAFT
+REGISTERED
+TESTED
+ACTIVE
+PAUSED
+DEACTIVATING
+OFFBOARDED
+Provide basic CLI commands:
+dqctl onboard --manifest config/pipelines/customer.yaml
+dqctl pipeline list
+dqctl pipeline test CUSTOMER_PIPELINE_001
+dqctl pipeline activate CUSTOMER_PIPELINE_001
+dqctl pipeline pause CUSTOMER_PIPELINE_001
+dqctl pipeline offboard CUSTOMER_PIPELINE_001
+Offboarding must disable the integration without deleting customer data or historical execution information.
+Keep the registry implementation lightweight for the first POC.
+9. BANKING SAMPLE DEMONSTRATION
+Use supplied sample pipeline data where available.
+If unavailable, generate synthetic banking datasets.
+CUSTOMER:
+customer_id
+customer_name
+email
+age
+city
+country
+customer_status
+created_date
+TRANSACTION:
+transaction_id
+customer_id
+transaction_amount
+currency
+transaction_date
+transaction_type
+transaction_status
+Introduce:
+- Null values.
+- Duplicates.
+- Invalid email.
+- Whitespace.
+- Invalid dates.
+- Invalid country values.
+- Missing customer references.
+- Invalid status.
+- High-confidence simulated AI proposal.
+- Low-confidence simulated AI proposal.
+- Invalid correction.
+Do not automatically treat every negative transaction as incorrect; make it a configured demo business rule.
+All synthetic records must have deterministic identifiers and expected test results.
+10. BRONZE / SILVER / GOLD DATA FLOW
+BRONZE:
+- Preserve original input.
+- Read the existing dataset.
+- Capture metadata.
+- Profile dataset.
+- Generate candidate rules.
+SILVER:
+- Load approved rules.
+- Run validation.
+- Apply deterministic fixes.
+- Evaluate AI proposals.
+- Apply eligible corrections.
+- Revalidate.
+- Separate accepted records from quarantine.
+GOLD:
+- Validate business constraints.
+- Check transaction-to-customer relationships.
+- Execute configured business-level checks.
+- Publish only data that passes the Gold quality policy.
+Use local POC paths:
+data/bronze/
+data/silver/
+data/gold/
+data/quarantine/
+For Databricks integration, use configurable output paths. Do not assume local filesystem paths inside a Databricks cluster.
+Bronze must remain unchanged.
+11. PROJECT STRUCTURE
+Create:
+dq-accelerator/
+packages/
+    dq-core/
+        src/
+            dq_core/
+                runtime/
+                context/
+                metadata/
+                profiling/
+                rules/
+                generation/
+                validation/
+                remediation/
+                ai/
+                policies/
+                quarantine/
+                revalidation/
+                orchestration/
+                adapters/
+                reporting/
+                io/
+        tests/
+
+integrations/
+    databricks/
+    standalone_spark/
+    contracts/
+
+examples/
+    local/
+    databricks/
+
+config/
+    engine.yaml
+    pipelines/
+    rules/
+    rulesets/
+    policies/
+
+sample_data/
+    bronze/
+    silver/
+    gold/
+    quarantine/
+
+scripts/
+docs/
+tests/
+    unit/
+    integration/
+    end_to_end/
+
+pyproject.toml
+requirements.txt
+README.md
+Adapt the layout as necessary but preserve modularity.
+Do not build unnecessary frameworks.
+12. TESTING AND VERIFICATION
+Use Pytest and actual Spark execution.
+Test all primary functionality.
+Mandatory scenarios:
+Spark session starts.
+DataFrame profiling works.
+Candidate rules are generated.
+RuleSet V1.0 loads correctly.
+RuleSet V1.1 can be created.
+Published versions remain unchanged.
+Validation identifies correct failed records.
+Multiple failure reasons are preserved.
+Deterministic remediation works.
+Mock AI produces structured proposals.
+The 90% threshold works correctly.
+Low-confidence records are quarantined.
+Sensitive fields require approval.
+Post-validation works.
+Accepted records are written to Silver.
+Gold business checks execute.
+Bronze remains unchanged.
+Execution metrics are generated.
+Local standalone Spark example works.
+Generic PySpark API works against an existing DataFrame.
+Test boundary values at 89%, 89.99%, 90%, 95% and 100%.
+Run actual integration tests.
+Do not substitute fabricated results.
+Fix failures and rerun.
+13. POC DEMONSTRATION SCRIPT
+Prepare a repeatable demo.
+The demonstration should follow this sequence:
+STEP 1:
+Show an existing Databricks sample pipeline and identify its processing stages.
+STEP 2:
+Register its pipeline manifest.
+STEP 3:
+Show the few lines required to integrate the DQ engine.
+STEP 4:
+Execute profiling using its existing Spark DataFrame.
+STEP 5:
+Show schema, nulls, duplicates, distributions and anomalies.
+STEP 6:
+Generate candidate quality rules.
+STEP 7:
+Review the rules and approve RuleSet V1.0.
+STEP 8:
+Execute validation.
+STEP 9:
+Show passed and failed record counts and reasons.
+STEP 10:
+Demonstrate OBSERVE_ONLY mode.
+STEP 11:
+Demonstrate deterministic remediation.
+STEP 12:
+Demonstrate MockAIProvider correction proposals.
+STEP 13:
+Set confidence threshold to 90%.
+STEP 14:
+Show an eligible high-confidence correction.
+STEP 15:
+Show a low-confidence correction entering quarantine.
+STEP 16:
+Demonstrate post-remediation validation.
+STEP 17:
+Write accepted records to Silver and run Gold-level checks.
+STEP 18:
+Create RuleSet V1.1 and compare it with V1.0.
+STEP 19:
+Display execution metrics and JSON report.
+STEP 20:
+Demonstrate that the same core engine API can process a standalone local PySpark DataFrame.
+STEP 21:
+Demonstrate pipeline pause and offboarding without deleting original data.
+Provide a demo script with narration, commands and expected outputs.
+14. DOCUMENTATION
+Create:
+README.md.
+docs/architecture.md.
+docs/databricks_pipeline_assessment.md.
+docs/databricks_onboarding.md.
+docs/spark_core_engine.md.
+docs/profiling.md.
+docs/rule_management.md.
+docs/remediation.md.
+docs/confidence_policy.md.
+docs/quarantine.md.
+docs/medallion_data_flow.md.
+docs/pipeline_adapters.md.
+docs/testing_report.md.
+docs/poc_demo_script.md.
+Include HLD, LLD, Mermaid architecture and data flow diagrams.
+Provide clear installation and execution instructions.
+15. WHAT NOT TO BUILD IN THIS POC
+Do not build:
+- React UI.
+- FastAPI management application.
+- PostgreSQL governance platform.
+- Full enterprise authentication.
+- Full multi-tenant control plane.
+- Full Databricks Workspace automation.
+- Full Google Cloud connector.
+- Full Fabric connector.
+- Airflow production integration.
+- SQL-native engine.
+- Flink execution engine.
+- Real external LLM dependency.
+Design extension points, but prioritize working functionality.
+The actual UI is a later phase after the core engine is verified.
+16. DEVELOPMENT APPROACH
+Work in checkpoints.
+CHECKPOINT 1:
+Inspect user-provided Databricks pipeline assets and local environment.
+CHECKPOINT 2:
+Create Spark runtime foundation and package.
+CHECKPOINT 3:
+Implement profiling.
+CHECKPOINT 4:
+Implement candidate rules and RuleSet versioning.
+CHECKPOINT 5:
+Implement validation.
+CHECKPOINT 6:
+Implement deterministic remediation.
+CHECKPOINT 7:
+Implement MockAIProvider and confidence policies.
+CHECKPOINT 8:
+Implement quarantine and revalidation.
+CHECKPOINT 9:
+Implement medallion execution and metrics.
+CHECKPOINT 10:
+Integrate one real supplied Databricks pipeline with minimal code changes.
+CHECKPOINT 11:
+Run local Spark compatibility tests.
+CHECKPOINT 12:
+Run end-to-end verification and prepare the client demo.
+After each checkpoint:
+- List implemented files.
+- Explain functionality.
+- Run tests.
+- Report actual outputs.
+- Fix failures.
+- Continue.
+Do not ask me to approve every small change.
+If Databricks credentials or a workspace are not accessible, build and test locally, provide the runnable Databricks notebook integration and clearly identify what requires execution in the actual workspace.
+Never request that production secrets or sensitive customer data be embedded in source files.
+17. FINAL ACCEPTANCE CRITERIA
+The initial POC must deliver:
+A. A reusable Apache Spark DQ Core Engine.
+B. A working integration with an existing Databricks PySpark sample pipeline when supplied.
+C. A minimal-code integration experience.
+D. Automatic profiling and candidate quality rules.
+E. Metadata-driven validation and versioned rule sets.
+F. Deterministic remediation.
+G. Mock AI-assisted remediation with configurable 90% confidence policy.
+H. Quarantine and post-validation.
+I. Bronze, Silver and Gold output demonstration.
+J. Local Apache Spark execution of the same engine.
+K. Pipeline onboarding/offboarding demonstration.
+L. Tests, reports, documentation and reproducible demo instructions.
+Clearly identify which capabilities were actually executed on Databricks and which were verified only in local Spark.
+The POC must be good enough to demonstrate to stakeholders that an existing Databricks pipeline can adopt our accelerator without a major rewrite, and that the core engine is designed for additional compatible Spark and non-Spark integrations.
+START DEVELOPMENT NOW.
+Inspect the workspace, build the core engine, integrate the sample pipeline, execute the POC, fix issues and provide verified evidence.
+Our objective is a working, portable Apache Spark DQ Accelerator POC, not a collection of sample notebooks or a UI mockup.
