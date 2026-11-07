@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dq-core"
+version = "0.1.0"
+description = "Portable Apache Spark Data Quality Core Engine (DQ Accelerator POC)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary - Siddharitha Technologies POC" }
+# Runtime dependencies are deliberately minimal so the wheel installs cleanly on managed Spark
+# runtimes (Databricks, Dataproc, Fabric) without replacing pre-installed libraries.
+dependencies = ["PyYAML>=6.0,<7"]
+
+[project.optional-dependencies]
+# PySpark is PROVIDED by Databricks / Dataproc / Fabric runtimes - only install it for local use.
+spark = ["pyspark>=3.5,<5"]
+
+[project.scripts]
+dqctl = "dq_core.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dq_core = ["runtime/resources/*.java", "runtime/resources/*.properties", "py.typed"]
