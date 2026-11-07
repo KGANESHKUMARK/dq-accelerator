@@ -327,3 +327,172 @@ export function Reports() {
       <pre>{JSON.stringify(sel, null, 1).slice(0, 20000)}</pre></div>}
   </>
 }
+
+/* ------------------------------------------------------------ Onboard wizard */
+const WIZ_STEPS = ['Source', 'Options', 'Profile', 'Review rules', 'Finalize']
+
+export function Onboard() {
+  const [step, setStep] = useState(0)
+  const [datasets, setDatasets] = useState<any[]>([])
+  const [source, setSource] = useState('')
+  const [dataset, setDataset] = useState('')
+  const [pipelineId, setPipelineId] = useState('')
+  const [platform, setPlatform] = useState('DATABRICKS')
+  const [stage, setStage] = useState('SILVER')
+  const [dqMode, setDqMode] = useState('OBSERVE_ONLY')
+  const [policy, setPolicy] = useState('../policies/default.yaml')
+  const [owner, setOwner] = useState('')
+  const [pub, setPub] = useState(true)
+  const [onb, setOnb] = useState(true)
+  const [force, setForce] = useState(false)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [approved, setApproved] = useState<Set<string>>(new Set())
+  const [result, setResult] = useState<any>(null)
+  const [err, setErr] = useState('')
+  const job = usePoll(jobId)
+  const preview = job?.status === 'COMPLETED' ? job.result : null
+
+  useEffect(() => { api.datasets().then(setDatasets) }, [])
+  useEffect(() => {           // preview done -> pre-approve all candidates
+    if (preview?.candidates) setApproved(new Set(preview.candidates.map((c: any) => c.rule_id)))
+  }, [job?.status])
+
+  const pickDataset = (path: string, name: string) => {
+    setSource(path); setDataset(name)
+    if (!pipelineId) setPipelineId(`${name.toUpperCase()}_PIPELINE`)
+  }
+  const upload = async (f: File) => {
+    setErr('')
+    try {
+      const r = await api.upload(f)
+      pickDataset(r.path, r.filename.replace(/\.[^.]+$/, '').toLowerCase())
+    } catch (e: any) { setErr(e.message) }
+  }
+  const runPreview = async () => {
+    setErr(''); setResult(null)
+    try { setJobId((await api.onboardPreview({ source, dataset, stage })).job_id); setStep(2) }
+    catch (e: any) { setErr(e.message) }
+  }
+  const finalize = async () => {
+    setErr('')
+    try {
+      setResult(await api.onboardFinalize({
+        preview_job_id: jobId, approved_rule_ids: [...approved], dataset,
+        ruleset_id: preview.ruleset_id, pipeline_id: pipelineId, platform, stage,
+        dq_mode: dqMode, policy, owner, source, publish: pub, onboard: onb, force,
+      }))
+      setStep(4)
+    } catch (e: any) { setErr(e.message) }
+  }
+  const confColor = (c: number) => c >= 0.9 ? '#22c55e' : c >= 0.7 ? '#f59e0b' : '#ef4444'
+
+  return <>
+    <div className="card">
+      <h3>Onboard a new pipeline — bootstrap wizard</h3>
+      <div className="steps" style={{ marginBottom: 8 }}>
+        {WIZ_STEPS.map((s, i) => <React.Fragment key={s}>
+          {i > 0 && <div className={`conn ${i <= step ? 'done' : ''}`} />}
+          <div className={`step ${i < step ? 'done' : i === step ? 'current' : ''}`}>
+            <span className="dot">{i < step ? '✓' : i + 1}</span><span className="lbl">{s}</span>
+          </div>
+        </React.Fragment>)}
+      </div>
+      <p className="muted" style={{ fontSize: 12 }}>
+        Profile the source → auto-generate candidate rules → review &amp; approve →
+        ruleset + manifest written under <code>config/</code> → optional publish &amp; onboard.
+        Same path as <code>dqctl bootstrap</code>.
+      </p>
+    </div>
+    {err && <div className="card"><pre className="err">{err}</pre></div>}
+
+    {step === 0 && <div className="card">
+      <h3>1 · Source data</h3>
+      <p className="muted">Pick a Bronze sample, or upload a CSV/Parquet extract of your source.</p>
+      <select value={source} onChange={e => pickDataset(e.target.value, e.target.selectedOptions[0].dataset.n ?? '')}>
+        <option value="">— choose sample_data/bronze file —</option>
+        {datasets.map(d => <option key={d.id} value={d.path} data-n={d.id}>{d.id} — {d.path}</option>)}
+      </select>
+      <span className="muted" style={{ margin: '0 10px' }}>or</span>
+      <input type="file" accept=".csv,.parquet" onChange={e => e.target.files?.[0] && upload(e.target.files[0])} />
+      {source && <p className="ok" style={{ marginTop: 8 }}>source: {source}</p>}
+      <div style={{ marginTop: 10 }}><button className="btn" disabled={!source} onClick={() => setStep(1)}>Next →</button></div>
+    </div>}
+
+    {step === 1 && <div className="card">
+      <h3>2 · Pipeline options</h3>
+      <div className="grid2">
+        <label>Dataset id<input value={dataset} onChange={e => setDataset(e.target.value)} /></label>
+        <label>Pipeline id<input value={pipelineId} onChange={e => setPipelineId(e.target.value)} /></label>
+        <label>Platform<select value={platform} onChange={e => setPlatform(e.target.value)}>
+          <option>DATABRICKS</option><option>FABRIC</option><option>STANDALONE_SPARK</option>
+          <option>DATAPROC</option><option>AIRFLOW</option><option>PYTHON</option><option>OTHER</option>
+        </select></label>
+        <label>Stage<select value={stage} onChange={e => setStage(e.target.value)}>
+          <option>SILVER</option><option>GOLD</option><option>BRONZE</option>
+        </select></label>
+        <label>DQ mode<select value={dqMode} onChange={e => setDqMode(e.target.value)}>
+          <option>OBSERVE_ONLY</option><option>ENFORCE</option><option>REMEDIATE</option>
+        </select></label>
+        <label>Policy<input value={policy} onChange={e => setPolicy(e.target.value)} /></label>
+        <label>Owner<input value={owner} onChange={e => setOwner(e.target.value)} placeholder="team@example.com" /></label>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <label className="chk"><input type="checkbox" checked={pub} onChange={e => setPub(e.target.checked)} /> publish + activate ruleset</label>
+        <label className="chk"><input type="checkbox" checked={onb} onChange={e => setOnb(e.target.checked)} /> onboard pipeline</label>
+        <label className="chk"><input type="checkbox" checked={force} onChange={e => setForce(e.target.checked)} /> overwrite existing files</label>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <button className="btn sec" onClick={() => setStep(0)}>← Back</button>
+        <button className="btn" onClick={runPreview} disabled={!dataset || !pipelineId}>Profile + generate rules →</button>
+      </div>
+    </div>}
+
+    {step === 2 && <div className="card">
+      <h3>3 · Profile + candidate rules</h3>
+      <JobStatus job={job} />
+      {preview && <>
+        <p className="ok">{preview.row_count} rows × {preview.column_count} cols · {preview.candidate_count} candidate rules generated</p>
+        {(preview.anomalies?.length > 0 || preview.schema_anomalies?.length > 0) && <>
+          <h4 style={{ margin: '8px 0 4px' }}>Anomalies found ({(preview.anomalies?.length || 0) + (preview.schema_anomalies?.length || 0)})</h4>
+          {[...(preview.anomalies || []), ...(preview.schema_anomalies || [])].map((a: any, i: number) => <Anomaly a={a} i={i} key={i} />)}
+        </>}
+        <button className="btn" style={{ marginTop: 10 }} onClick={() => setStep(3)}>Review rules →</button>
+      </>}
+    </div>}
+
+    {step === 3 && preview && <div className="card">
+      <h3>4 · Review generated rules — <span className="muted">{approved.size} of {preview.candidate_count} approved</span></h3>
+      <p className="muted" style={{ fontSize: 12 }}>Unchecked rules are excluded from the ruleset. Confidence comes from profiling evidence — review anything below 0.9 carefully.</p>
+      <div>
+        {preview.candidates.map((c: any) => <label className="rule-row" key={c.rule_id} style={{ cursor: 'pointer' }}>
+          <input type="checkbox" checked={approved.has(c.rule_id)}
+            onChange={e => { const s = new Set(approved); e.target.checked ? s.add(c.rule_id) : s.delete(c.rule_id); setApproved(s) }} />
+          <span style={{ minWidth: 170 }}>{c.rule_id}</span>
+          <span className={`badge ${c.severity === 'ERROR' ? 'OFFBOARDED' : 'PAUSED'}`}>{c.severity}</span>
+          <span style={{ minWidth: 150 }}>{c.rule_type}</span>
+          <span className="muted" style={{ minWidth: 110 }}>{c.column ?? '-'}</span>
+          <span style={{ color: confColor(c.confidence), fontWeight: 600, minWidth: 48 }}>{c.confidence}</span>
+          <span className="muted" style={{ flex: 1 }}>{c.description}</span>
+        </label>)}
+      </div>
+      <div style={{ marginTop: 10 }}>
+        <button className="btn sec" onClick={() => setStep(1)}>← Options</button>
+        <button className="btn" onClick={finalize} disabled={!approved.size}>Write ruleset + manifest{onb ? ' + onboard' : ''} →</button>
+      </div>
+    </div>}
+
+    {step === 4 && result && <div className="card">
+      <h3>5 · Done</h3>
+      <p className="ok">ruleset <b>{result.ruleset}</b> — {result.rules_approved} approved / {result.rules_rejected} rejected</p>
+      <div className="muted">written: {result.ruleset_path} · {result.manifest_path}
+        {result.published && <> · published checksum {result.published.checksum}</>}
+        {result.onboarded && <> · <b>{result.onboarded.pipeline_id}</b> → <span className="badge ACTIVE">{result.onboarded.state}</span></>}
+      </div>
+      {result.onboarded && <p className="muted" style={{ marginTop: 6 }}>Next: Pipelines tab → test → activate → Run DQ.</p>}
+      <h4 style={{ margin: '10px 0 4px' }}>Manifest</h4>
+      <pre style={{ maxHeight: 300, overflow: 'auto' }}>{result.manifest_yaml}</pre>
+      <button className="btn sec" style={{ marginTop: 8 }}
+        onClick={() => { setStep(0); setSource(''); setJobId(null); setResult(null); setPipelineId('') }}>Onboard another</button>
+    </div>}
+  </>
+}

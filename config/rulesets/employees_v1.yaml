@@ -1,0 +1,247 @@
+ruleset:
+  ruleset_id: employees_silver
+  dataset: employees
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates employees_silver@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_EMPLOYEES_001
+    name: emp_id_not_null
+    description: emp_id is populated in 100.0% of rows
+    dataset: employees
+    column: emp_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 5
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_002
+    name: emp_id_unique
+    description: emp_id is unique in the profiled data (primary key candidate)
+    dataset: employees
+    column: emp_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 5
+        rows: 5
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_003
+    name: emp_id_regex
+    description: emp_id follows the structural pattern A999
+    dataset: employees
+    column: emp_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z][0-9]{3}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: A999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_006
+    name: dept_not_null
+    description: dept is populated in 100.0% of rows
+    dataset: employees
+    column: dept
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 5
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_008
+    name: salary_data_type
+    description: salary holds whole numbers stored as text
+    dataset: employees
+    column: salary
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_010
+    name: work_email_not_null
+    description: work_email is populated in 100.0% of rows
+    dataset: employees
+    column: work_email
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 5
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_011
+    name: work_email_unique
+    description: work_email is unique in the profiled data (primary key candidate)
+    dataset: employees
+    column: work_email
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 5
+        rows: 5
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_012
+    name: work_email_regex
+    description: work_email contains e-mail addresses
+    dataset: employees
+    column: work_email
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        email_match_percentage: 80.0
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_013
+    name: start_date_not_null
+    description: start_date is populated in 100.0% of rows
+    dataset: employees
+    column: start_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 5
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  - rule_id: GEN_EMPLOYEES_015
+    name: employees_schema_validation
+    description: schema observed at profiling time
+    dataset: employees
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: emp_id
+        type: string
+      - name: emp_name
+        type: string
+      - name: dept
+        type: string
+      - name: salary
+        type: string
+      - name: work_email
+        type: string
+      - name: start_date
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 6
+      profiled_at: '2026-11-07T07:01:24Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-07T07:03:54Z'
+  change_log:
+  - approved 10 of 15 candidate rules

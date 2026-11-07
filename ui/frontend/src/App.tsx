@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { api } from './api'
-import { Dashboard, Pipelines, RunDQ, RuleSets, Reports } from './pages'
+import { Dashboard, Pipelines, Onboard, RunDQ, RuleSets, Reports } from './pages'
 
 const PAGES: [string, React.FC][] = [
-  ['Dashboard', Dashboard], ['Pipelines', Pipelines], ['Run DQ', RunDQ],
-  ['Rule Sets', RuleSets], ['Reports', Reports],
+  ['Dashboard', Dashboard], ['Pipelines', Pipelines], ['Onboard', Onboard],
+  ['Run DQ', RunDQ], ['Rule Sets', RuleSets], ['Reports', Reports],
 ]
 
 export default function App() {

@@ -1,0 +1,20 @@
+﻿pipeline:
+  pipeline_id: EMPLOYEES_UI_DEMO
+  pipeline_name: Employees Ui Demo
+  platform: STANDALONE_SPARK
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: OBSERVE_ONLY
+  owner: ui-wizard-demo
+  description: Onboarded via UI wizard from employees.csv (5 rows profiled)
+  policy: ../policies/default.yaml
+  datasets:
+  - dataset_id: employees
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    rulesets:
+      SILVER: ../rulesets/employees_v1.yaml
+    test_data: ../../sample_data/bronze/employees.csv
+    test_data_format: CSV

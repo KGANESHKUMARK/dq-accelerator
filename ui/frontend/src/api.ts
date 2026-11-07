@@ -21,5 +21,8 @@ export const api = {
   jobs: () => fetch(`${B}/jobs`).then(j),
   reports: () => fetch(`${B}/reports`).then(j),
   report: (name: string) => fetch(`${B}/reports/${name}`).then(j),
+  upload: (file: File) => { const fd = new FormData(); fd.append('file', file); return fetch(`${B}/onboard/upload`, { method: 'POST', body: fd }).then(j) },
+  onboardPreview: (body: any) => fetch(`${B}/onboard/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
+  onboardFinalize: (body: any) => fetch(`${B}/onboard/finalize`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
 }
 export type Job = { job_id: string; kind: string; status: string; progress?: string; result?: any; error?: string; submitted_at: string }

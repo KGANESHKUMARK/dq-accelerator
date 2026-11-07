@@ -26,7 +26,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -339,3 +339,171 @@ def report(name: str) -> dict[str, Any]:
     if not str(p).startswith(str((ROOT / "reports").resolve())) or not p.exists():
         raise HTTPException(404, "report not found")
     return json.loads(p.read_text(encoding="utf-8"))
+
+
+# ------------------------------------------------------------------ onboarding wizard
+@app.post("/api/onboard/upload")
+async def onboard_upload(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Accept a CSV/Parquet upload for bootstrap preview (stored under data/uploads/)."""
+    import re
+    if not file.filename:
+        raise HTTPException(400, "no file")
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", Path(file.filename).name)
+    if not safe.lower().endswith((".csv", ".parquet")):
+        raise HTTPException(400, "only .csv or .parquet accepted")
+    dest_dir = ROOT / "data" / "uploads"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / safe
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "empty file")
+    dest.write_bytes(content)
+    return {"ok": True, "path": str(dest.relative_to(ROOT)).replace("\\", "/"),
+            "filename": safe, "size": len(content)}
+
+
+class PreviewIn(BaseModel):
+    source: str                  # path relative to repo root (upload or sample_data)
+    dataset: str | None = None
+    stage: str = "SILVER"
+
+
+def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
+    """Profile + candidate rules for the wizard — same path as `dqctl bootstrap`."""
+    from dq_core.generation.generator import CandidateRuleGenerator
+    from dq_core.io.sources import CsvSource, ParquetSource
+    spark, engine = J.get_spark(), J.get_engine()
+    src = (ROOT / body.source).resolve()
+    if not str(src).startswith(str(ROOT.resolve())) or not src.exists():
+        raise HTTPException(400, f"source not found under repo: {body.source}")
+    import threading as _t
+    _jid = _t.current_thread().name.replace("dq-job-", "")
+    J.progress_cb(_jid, f"reading {src.name}")
+    df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
+          else CsvSource(str(src)).read(spark))
+    ds = body.dataset or src.stem
+    J.progress_cb(_jid, f"profiling {ds}")
+    rep = engine.profile(df, ds)
+    J.progress_cb(_jid, "generating candidate rules")
+    ruleset_id = f"{ds}_{body.stage.lower()}"
+    candidates = CandidateRuleGenerator().generate(rep, ruleset_id=ruleset_id,
+                                                   version="1.0", stage=body.stage)
+    cand = []
+    for r in candidates.rules:
+        d = r.to_dict()
+        gen = d.get("generation") or {}
+        cand.append({"rule_id": r.rule_id, "name": r.name, "rule_type": r.rule_type.value,
+                     "column": r.column, "severity": r.severity.value,
+                     "confidence": gen.get("confidence"), "evidence": gen.get("evidence"),
+                     "description": r.description, "raw": d})
+    return {"dataset": ds, "ruleset_id": ruleset_id, "stage": body.stage.upper(),
+            "row_count": rep.row_count, "column_count": rep.column_count,
+            "anomalies": rep.anomalies[:20], "schema_anomalies": rep.schema_anomalies[:20],
+            "pk_candidates": rep.primary_key_candidates,
+            "candidates": cand, "candidate_count": len(cand)}
+
+
+@app.post("/api/onboard/preview")
+def onboard_preview(body: PreviewIn) -> dict[str, str]:
+    jid = J.submit("bootstrap_preview", lambda: _do_bootstrap_preview(body))
+    return {"job_id": jid}
+
+
+class FinalizeIn(BaseModel):
+    preview_job_id: str
+    approved_rule_ids: list[str]
+    dataset: str
+    ruleset_id: str
+    pipeline_id: str
+    pipeline_name: str | None = None
+    platform: str = "DATABRICKS"
+    runtime: str = "PYSPARK"
+    stage: str = "SILVER"
+    dq_mode: str = "OBSERVE_ONLY"
+    policy: str = "../policies/default.yaml"
+    owner: str = ""
+    description: str = ""
+    source: str                  # path relative to repo root — used as manifest test_data
+    approved_by: str = "ui-onboard"
+    publish: bool = False
+    onboard: bool = False
+    force: bool = False
+
+
+@app.post("/api/onboard/finalize")
+def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
+    """Write the reviewed ruleset + manifest; optionally publish + onboard."""
+    import re
+    from dq_core.generation.generator import approve_candidates
+    from dq_core.metadata.models import RuleDefinition, RuleSet, RuleSetStatus
+    from dq_core.metadata.serialization import dump_yaml, save_ruleset
+    from dq_core.pipelines.manifest import PipelineManifest
+
+    job = J.get(body.preview_job_id)
+    if not job or job.get("kind") != "bootstrap_preview" or job.get("status") != "COMPLETED":
+        raise HTTPException(400, "preview job not found or not completed")
+    res = job["result"]
+    if res["ruleset_id"] != body.ruleset_id or res["dataset"] != body.dataset:
+        raise HTTPException(400, "preview does not match requested ruleset/dataset")
+
+    raw = {c["rule_id"]: c["raw"] for c in res["candidates"]}
+    missing = set(body.approved_rule_ids) - set(raw)
+    if missing:
+        raise HTTPException(400, f"unknown rule ids: {sorted(missing)}")
+    cand_rs = RuleSet(ruleset_id=body.ruleset_id, dataset=body.dataset, version="1.0",
+                      stage=body.stage, status=RuleSetStatus.DRAFT,
+                      rules=tuple(RuleDefinition.from_dict(
+                          {**c["raw"], "dataset": body.dataset})
+                          for c in res["candidates"]))
+    rs = approve_candidates(cand_rs, body.approved_rule_ids,
+                            ruleset_id=body.ruleset_id, version="1.0",
+                            approved_by=body.approved_by)
+
+    ruleset_path = ROOT / "config" / "rulesets" / f"{body.dataset}_v1.yaml"
+    manifest_path = ROOT / "config" / "pipelines" / f"{body.pipeline_id}.yaml"
+    for p in (ruleset_path, manifest_path):
+        if p.exists() and not body.force:
+            raise HTTPException(409, f"{p.relative_to(ROOT)} exists — pass force to overwrite")
+    save_ruleset(rs, ruleset_path)
+
+    src = (ROOT / body.source).resolve()
+    test_data = os.path.relpath(src, manifest_path.parent).replace("\\", "/") \
+        if src.exists() else body.source
+    pid = body.pipeline_id.upper()
+    manifest = {"pipeline": {
+        "pipeline_id": pid,
+        "pipeline_name": body.pipeline_name or re.sub(r"[_-]+", " ", pid).title(),
+        "platform": body.platform.upper(), "runtime": body.runtime.upper(),
+        "integration_mode": "INLINE", "dq_mode": body.dq_mode.upper(),
+        "owner": body.owner,
+        "description": body.description or f"Onboarded via UI wizard from {src.name} "
+                                           f"({res['row_count']} rows profiled)",
+        "policy": body.policy,
+        "datasets": [{
+            "dataset_id": body.dataset,
+            "format": "CSV" if src.suffix.lower() == ".csv" else "PARQUET",
+            "stages": ["BRONZE", body.stage.upper()],
+            "rulesets": {body.stage.upper(): os.path.relpath(ruleset_path,
+                                                             manifest_path.parent).replace("\\", "/")},
+            "test_data": test_data,
+            "test_data_format": "CSV" if src.suffix.lower() == ".csv" else "PARQUET",
+        }],
+    }}
+    dump_yaml(manifest, manifest_path)
+    try:
+        mf = PipelineManifest.load(manifest_path)
+    except Exception as exc:
+        raise HTTPException(400, f"generated manifest failed validation: {exc}") from exc
+
+    out = {"ok": True, "ruleset": f"{body.ruleset_id}@1.0",
+           "ruleset_path": str(ruleset_path.relative_to(ROOT)).replace("\\", "/"),
+           "manifest_path": str(manifest_path.relative_to(ROOT)).replace("\\", "/"),
+           "rules_approved": len(rs.rules), "rules_rejected": len(cand_rs.rules) - len(rs.rules)}
+    if body.publish:
+        entry = _registry("rulesets").publish(rs, published_by=body.approved_by, activate=True)
+        out["published"] = {"checksum": entry["checksum"][:12]}
+    if body.onboard:
+        entry = _registry("pipelines").onboard(mf, actor=body.approved_by)
+        out["onboarded"] = {"pipeline_id": pid, "state": entry["state"]}
+    out["manifest_yaml"] = manifest_path.read_text(encoding="utf-8")
+    return out

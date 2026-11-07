@@ -1,0 +1,6 @@
+﻿emp_id,emp_name,dept,salary,work_email,start_date
+E001,Asha Nair,HR,72000,asha.nair@corp.example,2020-01-15
+E002,Bharat Rao,ENG,95000,bharat.rao@corp.example,2019-06-01
+E003,,FIN,61000,not-an-email,2021/03/10
+E004,Dinesh K,ENG,,dinesh.k@corp.example,invalid
+E005,Farah S,HR,68000,farah.s@corp.example,2020-01-15
