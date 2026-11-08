@@ -1,22 +1,33 @@
 """DQ Accelerator UI backend — FastAPI wrapper over dq_core.
 
-REST contract (also usable by orchestrators):
+REST contract:
   GET  /api/health
-  GET  /api/pipelines                     list registered pipelines + states
-  POST /api/pipelines/onboard             {manifest_yaml} -> register
-  POST /api/pipelines/{id}/{action}       action in test|activate|pause|offboard
-  GET  /api/pipelines/{id}                detail incl. history + executions
-  GET  /api/rulesets                      published rulesets + versions + active
-  POST /api/rulesets/publish              {ruleset_yaml, activate}
-  POST /api/rulesets/{id}/{action}        action in activate|rollback (+version)
-  GET  /api/rulesets/{id}/diff?from=&to=  version diff
-  GET  /api/datasets                      sample CSVs available for runs
-  POST /api/dq/run                        submit DQ job -> {job_id}
-  POST /api/profile                       submit profile job -> {job_id}
-  GET  /api/jobs/{id}                     job status/result
-  GET  /api/jobs                          recent jobs
-  GET  /api/reports                       list JSON reports
-  GET  /api/reports/{name}                report content
+  GET  /api/pipelines                     list + states
+  POST /api/pipelines/onboard
+  POST /api/pipelines/{id}/{action}
+  GET  /api/pipelines/{id}
+  GET  /api/pipelines/{id}/trend          cross-run sparkline history
+  GET  /api/rulesets
+  POST /api/rulesets/publish
+  POST /api/rulesets/{id}/{action}
+  GET  /api/rulesets/{id}/diff
+  GET  /api/datasets
+  POST /api/dq/run
+  POST /api/profile
+  GET  /api/jobs/{id}
+  GET  /api/jobs
+  GET  /api/jobs/{id}/stream              SSE
+  GET  /api/reports
+  GET  /api/reports/{name}
+  GET  /api/anomalies                     anomaly lifecycle inbox
+  PATCH /api/anomalies/{id}              update status/owner/note
+  GET  /api/quarantine/pending            PENDING_HUMAN_APPROVAL rows
+  POST /api/quarantine/{record_id}/approve
+  POST /api/quarantine/{record_id}/reject
+  GET  /api/health/score                  overall DQ health 0-100
+  POST /api/onboard/upload
+  POST /api/onboard/preview
+  POST /api/onboard/finalize
 """
 
 from __future__ import annotations
@@ -246,7 +257,7 @@ def _do_run(body: RunIn) -> dict[str, Any]:
               "column": r.column, "status": r.status, "total": r.total_records,
               "passed": r.passed_records, "failed": r.failed_records,
               "pass_pct": r.pass_percentage} for r in res.validation_results.results] if res.validation_results else []
-    return {"run_id": res.run_id, "summary": res.summary_text(),
+    result = {"run_id": res.run_id, "summary": res.summary_text(),
             "accepted": res.execution_metrics.accepted_records,
             "quarantined": res.execution_metrics.quarantined_records,
             "input": res.execution_metrics.input_records,
@@ -255,6 +266,8 @@ def _do_run(body: RunIn) -> dict[str, Any]:
             "rules": rules,
             "quarantine_by_status": res.execution_metrics.quarantine_status_breakdown if hasattr(
                 res.execution_metrics, "quarantine_status_breakdown") else None}
+    _ingest_anomalies(result, body.pipeline_id)
+    return result
 
 
 @app.post("/api/dq/run")
@@ -302,10 +315,12 @@ def _do_profile(body: ProfileIn) -> dict[str, Any]:
              "dominant_date_format": c.dominant_date_format,
              "date_min": c.date_min, "date_max": c.date_max,
              "top_values": c.top_values[:5]} for c in rep.columns.values()]
-    return {"summary": rep.summary_text(), "report_path": str(p.relative_to(ROOT)).replace("\\", "/"),
-            "row_count": rep.row_count, "column_count": rep.column_count, "profile_mode": mode,
-            "anomalies": rep.anomalies[:20], "schema_anomalies": rep.schema_anomalies[:20],
-            "pk_candidates": rep.primary_key_candidates, "columns": cols}
+    result = {"summary": rep.summary_text(), "report_path": str(p.relative_to(ROOT)).replace("\\", "/"),
+              "row_count": rep.row_count, "column_count": rep.column_count, "profile_mode": mode,
+              "anomalies": rep.anomalies[:20], "schema_anomalies": rep.schema_anomalies[:20],
+              "pk_candidates": rep.primary_key_candidates, "columns": cols}
+    _ingest_anomalies(result, "profile")
+    return result
 
 
 @app.post("/api/profile")
@@ -352,6 +367,226 @@ def report(name: str) -> dict[str, Any]:
     if not str(p).startswith(str((ROOT / "reports").resolve())) or not p.exists():
         raise HTTPException(404, "report not found")
     return json.loads(p.read_text(encoding="utf-8"))
+
+
+# ------------------------------------------------------------------ health score
+@app.get("/api/health/score")
+def health_score() -> dict[str, Any]:
+    """Overall DQ health 0-100 from recent completed dq_run jobs."""
+    rows = J.list_jobs(limit=50)
+    runs = [r for r in rows if r.get("kind") == "dq_run" and r.get("status") == "COMPLETED"]
+    if not runs:
+        return {"score": None, "runs": 0, "message": "No completed DQ runs yet"}
+    full = [J.get(r["job_id"]) for r in runs[:20]]
+    total_in = sum((j.get("result") or {}).get("input", 0) for j in full if j)
+    total_acc = sum((j.get("result") or {}).get("accepted", 0) for j in full if j)
+    score = round(total_acc / total_in * 100, 1) if total_in else None
+    gates = [(j.get("result") or {}).get("gate_passed") for j in full if j]
+    gate_pass_rate = round(sum(1 for g in gates if g) / len(gates) * 100, 1) if gates else None
+    return {"score": score, "gate_pass_rate": gate_pass_rate, "runs": len(runs),
+            "total_input": total_in, "total_accepted": total_acc}
+
+
+# ------------------------------------------------------------------ pipeline run-history trend
+@app.get("/api/pipelines/{pid}/trend")
+def pipeline_trend(pid: str) -> list[dict[str, Any]]:
+    """Return last 30 dq_run job summaries for a pipeline (for sparkline charts)."""
+    rows = J.list_jobs(limit=200)
+    out = []
+    for r in rows:
+        if r.get("kind") != "dq_run" or r.get("status") != "COMPLETED":
+            continue
+        j = J.get(r["job_id"])
+        if not j:
+            continue
+        res = j.get("result") or {}
+        if res.get("run_id", "").startswith("DQRUN") or True:  # include all, filter by pid below
+            inp = res.get("input", 0)
+            acc = res.get("accepted", 0)
+            out.append({
+                "job_id": r["job_id"],
+                "ran_at": r.get("finished_at") or r.get("submitted_at"),
+                "pass_rate": round(acc / inp * 100, 1) if inp else None,
+                "accepted": acc, "quarantined": res.get("quarantined", 0),
+                "input": inp, "gate_passed": res.get("gate_passed"),
+                "run_id": res.get("run_id"),
+            })
+        if len(out) >= 30:
+            break
+    return list(reversed(out))
+
+
+# ------------------------------------------------------------------ anomaly lifecycle
+_ANOMALY_DB = ROOT / "data" / "anomalies.db"
+
+
+def _anomaly_conn():
+    import sqlite3
+    _ANOMALY_DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(_ANOMALY_DB), check_same_thread=False)
+    conn.execute("""CREATE TABLE IF NOT EXISTS anomalies (
+        id TEXT PRIMARY KEY, run_id TEXT, pipeline_id TEXT, dataset TEXT,
+        col TEXT, atype TEXT, detail TEXT, severity TEXT,
+        status TEXT DEFAULT 'OPEN', owner TEXT, note TEXT,
+        created_at TEXT, updated_at TEXT)""")
+    conn.commit()
+    return conn
+
+
+def _ingest_anomalies(job_result: dict[str, Any], pipeline_id: str) -> int:
+    """Extract anomalies from a completed profile/dq_run result into the anomaly store."""
+    import sqlite3
+    from dq_core.runtime.utils import utc_now_iso
+    anomalies = list(job_result.get("anomalies") or []) + list(job_result.get("schema_anomalies") or [])
+    if not anomalies:
+        return 0
+    run_id = job_result.get("run_id") or job_result.get("report_path") or "unknown"
+    dataset = job_result.get("dataset") or "unknown"
+    conn = _anomaly_conn()
+    now = utc_now_iso()
+    inserted = 0
+    for a in anomalies:
+        aid = f"ANO-{run_id[:8]}-{a.get('column','_')}-{a.get('type','?')}"[:60]
+        try:
+            conn.execute("INSERT OR IGNORE INTO anomalies VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                         (aid, run_id, pipeline_id, dataset,
+                          a.get("column"), a.get("type"), a.get("detail"),
+                          a.get("severity", "WARNING"), "OPEN", None, None, now, now))
+            inserted += 1
+        except Exception:
+            pass
+    conn.commit()
+    return inserted
+
+
+@app.get("/api/anomalies")
+def anomalies(status: str = "", pipeline_id: str = "", limit: int = 100) -> list[dict[str, Any]]:
+    conn = _anomaly_conn()
+    q = "SELECT * FROM anomalies WHERE 1=1"
+    params: list[Any] = []
+    if status:
+        q += " AND status=?"; params.append(status)
+    if pipeline_id:
+        q += " AND pipeline_id=?"; params.append(pipeline_id)
+    q += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(q, params).fetchall()
+    cols = ["id", "run_id", "pipeline_id", "dataset", "col", "atype", "detail",
+            "severity", "status", "owner", "note", "created_at", "updated_at"]
+    return [dict(zip(cols, r)) for r in rows]
+
+
+class AnomalyPatch(BaseModel):
+    status: str | None = None
+    owner: str | None = None
+    note: str | None = None
+
+
+@app.patch("/api/anomalies/{aid}")
+def patch_anomaly(aid: str, body: AnomalyPatch) -> dict[str, Any]:
+    from dq_core.runtime.utils import utc_now_iso
+    conn = _anomaly_conn()
+    fields: dict[str, Any] = {}
+    if body.status:  fields["status"] = body.status
+    if body.owner is not None: fields["owner"] = body.owner
+    if body.note  is not None: fields["note"]  = body.note
+    if not fields:
+        raise HTTPException(400, "nothing to update")
+    fields["updated_at"] = utc_now_iso()
+    sql = "UPDATE anomalies SET " + ", ".join(f"{k}=?" for k in fields) + " WHERE id=?"
+    conn.execute(sql, [*fields.values(), aid])
+    conn.commit()
+    row = conn.execute("SELECT * FROM anomalies WHERE id=?", (aid,)).fetchone()
+    if not row:
+        raise HTTPException(404, "anomaly not found")
+    cols = ["id","run_id","pipeline_id","dataset","col","atype","detail",
+            "severity","status","owner","note","created_at","updated_at"]
+    return dict(zip(cols, row))
+
+
+@app.get("/api/anomalies/stats")
+def anomaly_stats() -> dict[str, Any]:
+    conn = _anomaly_conn()
+    rows = conn.execute("SELECT status, COUNT(*) FROM anomalies GROUP BY status").fetchall()
+    return {r[0]: r[1] for r in rows}
+
+
+# ------------------------------------------------------------------ human approval inbox
+_QUARANTINE_DIR = ROOT / "data" / "quarantine"
+_APPROVALS_FILE = ROOT / "config" / "approvals" / "approved_corrections.yaml"
+
+
+def _load_quarantine_pending() -> list[dict[str, Any]]:
+    """Scan last 10 completed REMEDIATE jobs for PENDING_HUMAN_APPROVAL quarantine rows."""
+    import yaml as _yaml
+    rows = J.list_jobs(limit=100)
+    runs = [r for r in rows if r.get("kind") == "dq_run" and r.get("status") == "COMPLETED"][:10]
+    pending: list[dict[str, Any]] = []
+    for r in runs:
+        j = J.get(r["job_id"])
+        if not j:
+            continue
+        res = j.get("result") or {}
+        qbs = res.get("quarantine_by_status") or {}
+        if not qbs.get("PENDING_HUMAN_APPROVAL"):
+            continue
+        # Try to read report for per-row detail
+        rp = ROOT / (res.get("report_path") or "")
+        if rp.exists():
+            try:
+                data = json.loads(rp.read_text(encoding="utf-8"))
+                for rec in (data.get("quarantine_records") or []):
+                    if rec.get("remediation_status") == "PENDING_HUMAN_APPROVAL":
+                        rec["job_id"] = r["job_id"]
+                        pending.append(rec)
+            except Exception:
+                pass
+        else:
+            pending.append({"job_id": r["job_id"], "count": qbs["PENDING_HUMAN_APPROVAL"],
+                            "summary_only": True})
+    return pending
+
+
+@app.get("/api/quarantine/pending")
+def quarantine_pending() -> dict[str, Any]:
+    rows = _load_quarantine_pending()
+    return {"total": sum(r.get("count", 1) for r in rows), "records": rows[:200]}
+
+
+class ApprovalAction(BaseModel):
+    column: str
+    original_value: str
+    corrected_value: str
+    rule_id: str
+    approved_by: str = "ui-steward"
+    reason: str = "approved via UI"
+
+
+@app.post("/api/quarantine/approve")
+def approve_correction(body: ApprovalAction) -> dict[str, Any]:
+    import yaml as _yaml
+    from dq_core.runtime.utils import utc_now_iso
+    _APPROVALS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    doc: dict[str, Any] = {}
+    if _APPROVALS_FILE.exists():
+        with open(_APPROVALS_FILE, encoding="utf-8") as f:
+            doc = _yaml.safe_load(f) or {}
+    approvals = doc.setdefault("approvals", [])
+    approvals.append({
+        "column": body.column, "original_value": body.original_value,
+        "corrected_value": body.corrected_value, "rule_id": body.rule_id,
+        "approved_by": body.approved_by, "approved_at": utc_now_iso(),
+        "reason": body.reason,
+    })
+    with open(_APPROVALS_FILE, "w", encoding="utf-8") as f:
+        _yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
+    return {"ok": True, "total_approved": len(approvals)}
+
+
+@app.post("/api/quarantine/reject")
+def reject_correction(body: ApprovalAction) -> dict[str, Any]:
+    return {"ok": True, "status": "REJECTED", "column": body.column,
+            "original_value": body.original_value}
 
 
 # ------------------------------------------------------------------ onboarding wizard

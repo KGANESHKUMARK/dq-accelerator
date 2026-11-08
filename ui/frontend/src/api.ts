@@ -24,5 +24,13 @@ export const api = {
   upload: (file: File) => { const fd = new FormData(); fd.append('file', file); return fetch(`${B}/onboard/upload`, { method: 'POST', body: fd }).then(j) },
   onboardPreview: (body: any) => fetch(`${B}/onboard/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   onboardFinalize: (body: any) => fetch(`${B}/onboard/finalize`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
+  healthScore: () => fetch(`${B}/health/score`).then(j),
+  pipelineTrend: (id: string) => fetch(`${B}/pipelines/${id}/trend`).then(j),
+  anomalies: (params?: { status?: string; pipeline_id?: string }) => { const q = new URLSearchParams(params as any).toString(); return fetch(`${B}/anomalies${q ? '?' + q : ''}`).then(j) },
+  anomalyStats: () => fetch(`${B}/anomalies/stats`).then(j),
+  patchAnomaly: (id: string, body: any) => fetch(`${B}/anomalies/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
+  quarantinePending: () => fetch(`${B}/quarantine/pending`).then(j),
+  approveCorrection: (body: any) => fetch(`${B}/quarantine/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
+  rejectCorrection: (body: any) => fetch(`${B}/quarantine/reject`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
 }
-export type Job = { job_id: string; kind: string; status: string; progress?: string; result?: any; error?: string; submitted_at: string }
+export type Job = { job_id: string; kind: string; status: string; progress?: string; result?: any; error?: string; submitted_at: string; finished_at?: string }

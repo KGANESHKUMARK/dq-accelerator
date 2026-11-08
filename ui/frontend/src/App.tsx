@@ -1,23 +1,95 @@
 import React, { useEffect, useState } from 'react'
 import { api } from './api'
-import { Dashboard, Pipelines, Onboard, RunDQ, RuleSets, Reports } from './pages'
+import {
+  Dashboard, Pipelines, Onboard, RunDQ,
+  Anomalies, Approvals, RuleSets, Reports, Settings
+} from './pages'
 
-const PAGES: [string, React.FC][] = [
-  ['Dashboard', Dashboard], ['Pipelines', Pipelines], ['Onboard', Onboard],
-  ['Run DQ', RunDQ], ['Rule Sets', RuleSets], ['Reports', Reports],
+type Page = {
+  id: string
+  label: string
+  icon: string
+  section?: string
+  component: React.FC
+  badge?: () => number | null
+}
+
+const PAGES: Page[] = [
+  { id: 'dashboard',  label: 'Dashboard',      icon: '◈', section: 'OVERVIEW',    component: Dashboard },
+  { id: 'pipelines',  label: 'Pipelines',       icon: '⬡', section: 'GOVERN',      component: Pipelines },
+  { id: 'onboard',    label: 'Onboard',         icon: '＋', component: Onboard },
+  { id: 'rundq',      label: 'Run DQ',          icon: '▶', component: RunDQ },
+  { id: 'anomalies',  label: 'Anomalies',       icon: '⚠', section: 'OBSERVE',    component: Anomalies },
+  { id: 'approvals',  label: 'Approvals',       icon: '✓', component: Approvals },
+  { id: 'rulesets',   label: 'Rule Sets',       icon: '⊞', section: 'CONFIGURE',  component: RuleSets },
+  { id: 'reports',    label: 'Reports',         icon: '▤', component: Reports },
+  { id: 'settings',   label: 'Settings',        icon: '⚙', section: 'SYSTEM',     component: Settings },
 ]
 
 export default function App() {
-  const [tab, setTab] = useState(0)
-  const [health, setHealth] = useState('')
-  useEffect(() => { api.health().then(h => setHealth(h.status)).catch(() => setHealth('backend offline')) }, [])
-  const Page = PAGES[tab][1]
-  return <>
-    <header>
-      <h1>DQ Accelerator</h1>
-      <nav>{PAGES.map(([n], i) => <button key={n} className={i === tab ? 'active' : ''} onClick={() => setTab(i)}>{n}</button>)}</nav>
-      <span style={{ marginLeft: 'auto' }} className="muted">API: <span className={health === 'ok' ? 'ok' : 'err'}>{health || '…'}</span></span>
-    </header>
-    <main><Page /></main>
-  </>
+  const [pageId, setPageId] = useState('dashboard')
+  const [health, setHealth] = useState<string>('')
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    api.health().then(h => setHealth(h.status)).catch(() => setHealth('offline'))
+    // poll pending approvals count for badge
+    const poll = () => api.quarantinePending().then(r => setPendingCount(r.total ?? 0)).catch(() => {})
+    poll()
+    const t = setInterval(poll, 15000)
+    return () => clearInterval(t)
+  }, [])
+
+  const page = PAGES.find(p => p.id === pageId) ?? PAGES[0]
+  const PageComponent = page.component
+
+  return (
+    <div className="app-shell">
+      {/* ---- Sidebar ---- */}
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <h1>DQ Accelerator</h1>
+          <span>Data Quality Platform</span>
+        </div>
+        <nav className="sidebar-nav">
+          {PAGES.map(p => (
+            <React.Fragment key={p.id}>
+              {p.section && <div className="nav-section">{p.section}</div>}
+              <div
+                className={`nav-item${pageId === p.id ? ' active' : ''}`}
+                onClick={() => setPageId(p.id)}
+              >
+                <span className="icon">{p.icon}</span>
+                <span>{p.label}</span>
+                {p.id === 'approvals' && pendingCount > 0 && (
+                  <span className="nav-badge">{pendingCount}</span>
+                )}
+              </div>
+            </React.Fragment>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <span className={`health-dot${health === 'ok' ? ' ok' : health === 'offline' ? ' err' : ''}`} />
+          API {health || '…'}
+        </div>
+      </aside>
+
+      {/* ---- Main area ---- */}
+      <div className="main-content">
+        <div className="top-bar">
+          <div className="breadcrumb">
+            <span>DQ Accelerator</span>
+            <span> / </span>
+            <b>{page.label}</b>
+          </div>
+          <div className="top-bar-right">
+            <span className="muted" style={{ fontSize: 12 }}>Spark local[8] · SQLite registry</span>
+          </div>
+        </div>
+        <div className="page-content">
+          <PageComponent />
+        </div>
+      </div>
+    </div>
+  )
 }
