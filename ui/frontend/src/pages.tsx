@@ -182,91 +182,240 @@ const Lifecycle = ({ state }: { state: string }) => {
 }
 
 /* ============================================================
-   DASHBOARD
+   DASHBOARD  — 100% real data from /api/dashboard/summary
    ============================================================ */
+const DonutBar = ({ label, value, total, color }: { label: string; value: number; total: number; color: string }) => {
+  const pct = total ? Math.round(value / total * 100) : 0
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+        <span style={{ color: 'var(--text2)' }}>{label}</span>
+        <span style={{ fontWeight: 700, color }}>{value.toLocaleString()} <span className="muted">({pct}%)</span></span>
+      </div>
+      <div className="bar"><div className="bar-fill" style={{ width: `${pct}%`, background: color }} /></div>
+    </div>
+  )
+}
+
 export function Dashboard() {
+  const [summary, setSummary] = useState<any>(null)
   const [pipes, setPipes] = useState<any[]>([])
   const [jobs, setJobs] = useState<Job[]>([])
-  const [score, setScore] = useState<any>(null)
   const [anomStats, setAnoStats] = useState<any>({})
   const [viewJob, setViewJob] = useState<Job | null>(null)
   const [trends, setTrends] = useState<Record<string, any[]>>({})
+  const [loading, setLoading] = useState(true)
 
   const load = () => {
+    api.dashboardSummary().then(d => { setSummary(d); setLoading(false) }).catch(() => setLoading(false))
     api.pipelines().then(setPipes)
     api.jobs().then(setJobs)
-    api.healthScore().then(setScore).catch(() => {})
     api.anomalyStats().then(setAnoStats).catch(() => {})
   }
-  useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t) }, [])
+  useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t) }, [])
   useEffect(() => {
-    pipes.slice(0, 6).forEach(p => {
+    pipes.slice(0, 8).forEach(p =>
       api.pipelineTrend(p.pipeline_id).then(t => setTrends(prev => ({ ...prev, [p.pipeline_id]: t }))).catch(() => {})
-    })
+    )
   }, [pipes.length])
 
-  const scoreVal = score?.score
+  const t = summary?.totals ?? {}
+  const scoreVal: number | null = t.overall_pass_rate ?? null
   const scoreClass = scoreVal == null ? '' : scoreVal >= 90 ? 'hi' : scoreVal >= 70 ? 'mid' : 'low'
-  const openAno = anomStats['OPEN'] ?? 0
-  const ackAno  = anomStats['ACKNOWLEDGED'] ?? 0
 
   return <>
     <div className="section-title">Data Quality Command Centre</div>
+    {loading && <div className="info-box">Loading real metrics from {'{'}reports/{'}'}… <span className="spin" /></div>}
 
-    {/* KPI row */}
-    <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))' }}>
-      <div className="stat-tile">
-        <div className={`num ${scoreClass}`}>{scoreVal != null ? scoreVal + '%' : '—'}</div>
-        <div className="lbl">Overall health</div>
-      </div>
-      <div className="stat-tile"><div className="num">{pipes.length}</div><div className="lbl">Pipelines</div></div>
-      <div className="stat-tile"><div className="num ok">{pipes.filter(p => p.state === 'ACTIVE').length}</div><div className="lbl">Active</div></div>
-      <div className="stat-tile"><div className="num bad">{openAno}</div><div className="lbl">Open anomalies</div></div>
-      <div className="stat-tile"><div className="num warn">{ackAno}</div><div className="lbl">Acknowledged</div></div>
-      <div className="stat-tile"><div className="num">{jobs.filter(j => j.status === 'COMPLETED').length}</div><div className="lbl">Completed jobs</div></div>
+    {/* ── Row 1: headline KPIs ── */}
+    <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+      <div className="stat-tile"><div className={`num ${scoreClass}`}>{scoreVal != null ? scoreVal + '%' : '—'}</div><div className="lbl">Acceptance rate</div></div>
+      <div className="stat-tile"><div className="num">{(t.total_runs ?? 0)}</div><div className="lbl">Total DQ runs</div></div>
+      <div className="stat-tile"><div className="num ok">{(t.gates_passed ?? 0)}</div><div className="lbl">Gates passed</div></div>
+      <div className="stat-tile"><div className="num bad">{((t.total_runs ?? 0) - (t.gates_passed ?? 0))}</div><div className="lbl">Gates failed</div></div>
+      <div className="stat-tile"><div className="num">{(t.input_records ?? 0).toLocaleString()}</div><div className="lbl">Total rows processed</div></div>
+      <div className="stat-tile"><div className="num ok">{(t.accepted_records ?? 0).toLocaleString()}</div><div className="lbl">Total accepted</div></div>
+      <div className="stat-tile"><div className="num bad">{(t.quarantined_records ?? 0).toLocaleString()}</div><div className="lbl">Total quarantined</div></div>
+      <div className="stat-tile"><div className="num warn">{anomStats['OPEN'] ?? 0}</div><div className="lbl">Open anomalies</div></div>
     </div>
 
-    {/* Pipeline status grid */}
+    {/* ── Row 2: processing breakdown + remediation ── */}
+    {t.input_records > 0 && <div className="card-row">
+      <div className="card">
+        <h3>Processing breakdown <span className="muted">— all runs combined</span></h3>
+        <DonutBar label="Accepted" value={t.accepted_records ?? 0} total={t.input_records ?? 0} color="#22c55e" />
+        <DonutBar label="Quarantined" value={t.quarantined_records ?? 0} total={t.input_records ?? 0} color="#ef4444" />
+        <DonutBar label="Duplicates removed" value={t.duplicates_removed ?? 0} total={t.input_records ?? 0} color="#94a3b8" />
+        <div className="divider" />
+        <div style={{ display: 'flex', gap: 24, fontSize: 12, flexWrap: 'wrap', marginTop: 8 }}>
+          <span>Rules evaluated: <b>{(t.rules_evaluated ?? 0).toLocaleString()}</b></span>
+          <span>Rules failed: <b style={{ color: 'var(--danger)' }}>{(t.rules_failed ?? 0).toLocaleString()}</b></span>
+          <span>Rule pass rate: <b style={{ color: 'var(--success)' }}>{t.rules_evaluated ? Math.round((t.rules_evaluated - t.rules_failed) / t.rules_evaluated * 100) + '%' : '—'}</b></span>
+        </div>
+      </div>
+      <div className="card">
+        <h3>Remediation summary</h3>
+        <div className="stat-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div className="stat-tile"><div className="num ok">{t.deterministic_fixes ?? 0}</div><div className="lbl">Deterministic fixes</div></div>
+          <div className="stat-tile"><div className="num warn">{t.ai_fixes ?? 0}</div><div className="lbl">AI fixes applied</div></div>
+          <div className="stat-tile"><div className="num">{t.duplicates_removed ?? 0}</div><div className="lbl">Duplicates removed</div></div>
+          <div className="stat-tile"><div className="num">{(t.gate_pass_rate ?? 0)}%</div><div className="lbl">Gate pass rate</div></div>
+        </div>
+        {summary?.mode_distribution && Object.keys(summary.mode_distribution).length > 0 && <>
+          <div className="divider" />
+          <h4>Runs by mode</h4>
+          {Object.entries(summary.mode_distribution).map(([m, c]: any) => (
+            <div key={m} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0' }}>
+              <span className="tag">{m}</span><b>{c}</b>
+            </div>
+          ))}
+        </>}
+      </div>
+    </div>}
+
+    {/* ── Row 3: quarantine breakdown + top failing rules ── */}
+    {summary && <div className="card-row">
+      {Object.keys(summary.quarantine_breakdown ?? {}).length > 0 && <div className="card">
+        <h3>Quarantine breakdown <span className="muted">— all runs</span></h3>
+        {Object.entries(summary.quarantine_breakdown).map(([k, v]: any) => (
+          <div key={k} style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
+              <span className="tag">{k.replace(/_/g, ' ')}</span><b>{v}</b>
+            </div>
+            <div className="bar" style={{ height: 12 }}>
+              <div className="bar-fill" style={{ width: `${Math.round(v / (t.quarantined_records || 1) * 100)}%`, background: k === 'PENDING_HUMAN_APPROVAL' ? '#f59e0b' : k.includes('BELOW') ? '#94a3b8' : '#ef4444' }} />
+            </div>
+          </div>
+        ))}
+      </div>}
+
+      {(summary.top_failing_rules ?? []).length > 0 && <div className="card">
+        <h3>Top failing rules <span className="muted">— across all datasets</span></h3>
+        {summary.top_failing_rules.slice(0, 8).map((r: any) => (
+          <div className="rule-row" key={r.rule_id}>
+            <span style={{ minWidth: 120, fontFamily: 'Consolas, monospace', fontSize: 11 }}>{r.rule_id}</span>
+            <span className="muted">{r.datasets?.join(', ')}</span>
+            <div className="bar" style={{ flex: 1 }}>
+              <div className="bar-fill" style={{ width: `${r.fail_rate}%`, background: '#ef4444' }} />
+              <span className="bar-label">{r.fail_rate}%</span>
+            </div>
+            <span className="muted">{r.failed}/{r.total} runs</span>
+          </div>
+        ))}
+      </div>}
+    </div>}
+
+    {/* ── Row 4: per-dataset processing table (REAL data) ── */}
+    {(summary?.by_dataset ?? []).length > 0 && <div className="card">
+      <h3>Dataset processing summary <span className="muted">— real data from all {summary.totals?.total_runs ?? 0} runs + {summary.profile_runs ?? 0} profiles</span></h3>
+      <table>
+        <thead><tr><th>Dataset</th><th>Runs</th><th>Total rows</th><th>Accepted</th><th>Quarantined</th><th>Acceptance %</th><th>Gate pass%</th><th>Det. fixes</th><th>AI fixes</th><th>Last run</th></tr></thead>
+        <tbody>
+          {summary.by_dataset.map((d: any) => (
+            <tr key={d.dataset}>
+              <td><b>{d.dataset}</b><div className="muted">{d.modes?.join(' · ')}</div></td>
+              <td>{d.runs}</td>
+              <td>{(d.input ?? 0).toLocaleString()}</td>
+              <td style={{ color: 'var(--success)', fontWeight: 600 }}>{(d.accepted ?? 0).toLocaleString()}</td>
+              <td style={{ color: 'var(--danger)', fontWeight: 600 }}>{(d.quarantined ?? 0).toLocaleString()}</td>
+              <td>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="bar" style={{ width: 80, flex: 'none' }}>
+                    <div className="bar-fill" style={{ width: `${d.pass_rate ?? 0}%`, background: (d.pass_rate ?? 0) >= 90 ? '#22c55e' : (d.pass_rate ?? 0) >= 70 ? '#f59e0b' : '#ef4444' }} />
+                    <span className="bar-label">{d.pass_rate ?? '—'}%</span>
+                  </div>
+                </div>
+              </td>
+              <td>{d.gate_pass_rate != null ? d.gate_pass_rate + '%' : '—'}</td>
+              <td>{d.det_fixes ?? 0}</td>
+              <td>{d.ai_fixes ?? 0}</td>
+              <td className="muted">{d.last_run ? new Date(d.last_run).toLocaleDateString() : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>}
+
+    {/* ── Row 5: pipeline status grid with real sparklines ── */}
     <div className="card">
-      <h3>Pipeline status</h3>
-      {pipes.length === 0 && <div className="empty-state"><div className="icon">⬡</div><p>No pipelines registered yet. Use the Onboard wizard to add one.</p></div>}
+      <h3>Pipeline registry</h3>
+      {pipes.length === 0 && <div className="empty-state"><div className="icon">⬡</div><p>No pipelines yet — use Onboard to add one.</p></div>}
       <div className="pipe-grid">
         {pipes.map(p => {
-          const t = trends[p.pipeline_id] || []
-          const rates = t.map((r: any) => r.pass_rate ?? 0)
-          const last = t[t.length - 1]
+          const trd = trends[p.pipeline_id] || []
+          const rates = trd.map((r: any) => r.pass_rate ?? 0)
+          const last = trd[trd.length - 1]
+          const dsRow = (summary?.by_dataset ?? []).find((d: any) => d.dataset === p.pipeline_id?.split('_')[0]?.toLowerCase())
           return (
             <div className="pipe-card" key={p.pipeline_id}>
               <div className="pipe-card-header">
                 <div>
                   <div className="pipe-card-name">{p.pipeline_name ?? p.pipeline_id}</div>
-                  <div className="pipe-card-platform">{p.platform} · {p.runtime}</div>
+                  <div className="pipe-card-platform">{p.platform} · {p.dq_mode}</div>
                 </div>
                 <span className={`badge ${p.state}`}>{p.state}</span>
               </div>
               <div className="pipe-card-stats">
-                {last && <span>Last: {last.pass_rate != null ? last.pass_rate + '% pass' : '—'}</span>}
-                <span>{p.executions ?? 0} runs</span>
+                {last && <span style={{ color: (last.pass_rate ?? 0) >= 90 ? 'var(--success)' : 'var(--warn)' }}>
+                  Last: {last.pass_rate != null ? last.pass_rate + '%' : '—'}
+                </span>}
+                <span>{(p.executions ?? 0)} runs</span>
+                {last?.gate_passed != null && <span className={`badge ${last.gate_passed ? 'COMPLETED' : 'FAILED'}`} style={{ padding: '1px 6px', fontSize: 10 }}>{last.gate_passed ? 'PASS' : 'FAIL'}</span>}
               </div>
-              {rates.length > 1 && <div style={{ marginTop: 10 }}><Sparkline data={rates} color={rates[rates.length-1] >= 90 ? '#22c55e' : '#f59e0b'} /></div>}
+              {rates.length > 1 && <div style={{ marginTop: 10 }}>
+                <Sparkline data={rates} color={rates[rates.length-1] >= 90 ? '#22c55e' : '#f59e0b'} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
+                  <span>{rates[0]}%</span><span>→</span><span>{rates[rates.length-1]}%</span>
+                </div>
+              </div>}
             </div>
           )
         })}
       </div>
     </div>
 
-    {/* Recent jobs */}
+    {/* ── Row 6: run timeline ── */}
+    {(summary?.timeline ?? []).length > 0 && <div className="card">
+      <h3>Recent DQ runs <span className="muted">— from reports on disk (real execution data)</span></h3>
+      <table>
+        <thead><tr><th>Run ID</th><th>Dataset</th><th>Mode</th><th>Input</th><th>Accepted</th><th>Quarantined</th><th>Pass rate</th><th>Gate</th><th>Det.fix</th><th>AI fix</th><th>Duration</th><th>Finished</th></tr></thead>
+        <tbody>
+          {summary.timeline.map((r: any) => (
+            <tr key={r.run_id}>
+              <td><code style={{ fontSize: 10 }}>{r.run_id}</code></td>
+              <td><span className="tag">{r.dataset}</span></td>
+              <td><span className="tag">{r.mode}</span></td>
+              <td>{r.input?.toLocaleString()}</td>
+              <td style={{ color: 'var(--success)', fontWeight: 600 }}>{r.accepted?.toLocaleString()}</td>
+              <td style={{ color: r.quarantined > 0 ? 'var(--danger)' : 'var(--text3)' }}>{r.quarantined?.toLocaleString()}</td>
+              <td>
+                <div className="bar" style={{ width: 70, flex: 'none' }}>
+                  <div className="bar-fill" style={{ width: `${r.pass_rate ?? 0}%`, background: (r.pass_rate ?? 0) >= 90 ? '#22c55e' : (r.pass_rate ?? 0) >= 70 ? '#f59e0b' : '#ef4444' }} />
+                  <span className="bar-label">{r.pass_rate}%</span>
+                </div>
+              </td>
+              <td><span className={`badge ${r.gate_passed ? 'COMPLETED' : 'FAILED'}`}>{r.gate_passed ? 'PASS' : 'FAIL'}</span></td>
+              <td>{r.det_fixes ?? 0}</td>
+              <td>{r.ai_fixes ?? 0}</td>
+              <td className="muted">{r.duration_s}s</td>
+              <td className="muted">{r.finished_at ? new Date(r.finished_at).toLocaleString() : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>}
+
+    {/* ── Recent jobs (for running/queued status) ── */}
     <div className="card">
-      <h3>Recent jobs</h3>
-      {jobs.length === 0 && <p className="muted">No jobs yet.</p>}
+      <h3>Job queue</h3>
       <table>
         <thead><tr><th>Job</th><th>Type</th><th>Status</th><th>Finished</th><th>Progress</th><th></th></tr></thead>
         <tbody>
-          {jobs.slice(0, 10).map(j => (
+          {jobs.slice(0, 8).map(j => (
             <tr key={j.job_id}>
               <td><code style={{ fontSize: 11 }}>{j.job_id}</code></td>
               <td><span className="tag">{j.kind}</span></td>
-              <td><span className={`badge ${j.status}`}>{j.status}</span></td>
+              <td><span className={`badge ${j.status}`}>{j.status}</span>{j.status === 'RUNNING' && <span className="spin" />}</td>
               <td className="muted">{j.finished_at ? new Date(j.finished_at).toLocaleString() : '—'}</td>
               <td className="muted">{j.progress}</td>
               <td>{j.status === 'COMPLETED' && <button className="btn sm sec" onClick={() => api.job(j.job_id).then(setViewJob)}>View</button>}</td>
@@ -277,9 +426,9 @@ export function Dashboard() {
     </div>
 
     {viewJob && <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3>Job detail — {viewJob.job_id}</h3>
-        <button className="btn sec sm" onClick={() => setViewJob(null)}>✕ Close</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <h3>Job result — {viewJob.job_id}</h3>
+        <button className="btn sec sm" onClick={() => setViewJob(null)}>✕</button>
       </div>
       <JobResult job={viewJob} />
       {viewJob.kind === 'profile' && <ProfileView r={viewJob.result} jid={viewJob.job_id} />}
@@ -293,6 +442,7 @@ export function Dashboard() {
 export function Pipelines() {
   const [pipes, setPipes] = useState<any[]>([])
   const [sel, setSel] = useState<any>(null)
+  const [metrics, setMetrics] = useState<any>(null)
   const [yaml, setYaml] = useState('')
   const [msg, setMsg] = useState(''); const [err, setErr] = useState('')
   const [trend, setTrend] = useState<any[]>([])
@@ -313,6 +463,7 @@ export function Pipelines() {
   const open = async (id: string) => {
     const d = await api.pipeline(id); setSel(d)
     api.pipelineTrend(id).then(setTrend).catch(() => setTrend([]))
+    api.pipelineMetrics(id).then(setMetrics).catch(() => setMetrics(null))
   }
 
   const ACTIONS: Record<string, string[]> = {
@@ -388,6 +539,49 @@ export function Pipelines() {
               <tr key={i}><td><code style={{ fontSize: 11 }}>{e.dq_run_id?.slice(0, 20)}</code></td><td>{e.dataset}</td><td>{e.mode}</td><td>{e.input?.toLocaleString()}</td><td>{e.accepted?.toLocaleString()}</td><td><span className={`badge ${e.gate_passed ? 'COMPLETED' : 'FAILED'}`}>{e.gate_passed ? 'PASS' : 'FAIL'}</span></td><td className="muted">{e.finished_at ? new Date(e.finished_at).toLocaleString() : ''}</td></tr>
             ))}</tbody>
           </table>
+        </>}
+        {metrics && metrics.runs > 0 && <>
+          <div className="divider" />
+          <h4>Detailed metrics from reports <span className="muted">— {metrics.runs} runs · {(metrics.total_input ?? 0).toLocaleString()} rows total</span></h4>
+          <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginTop: 10 }}>
+            <div className="stat-tile"><div className="num ok">{metrics.overall_pass_rate ?? '—'}%</div><div className="lbl">Acceptance rate</div></div>
+            <div className="stat-tile"><div className="num">{(metrics.total_input ?? 0).toLocaleString()}</div><div className="lbl">Total rows</div></div>
+            <div className="stat-tile"><div className="num ok">{(metrics.total_accepted ?? 0).toLocaleString()}</div><div className="lbl">Accepted</div></div>
+            <div className="stat-tile"><div className="num bad">{(metrics.total_quarantined ?? 0).toLocaleString()}</div><div className="lbl">Quarantined</div></div>
+          </div>
+          {metrics.executions?.slice(0, 3).map((ex: any, i: number) => (
+            <div key={i} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px 14px', marginTop: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <code style={{ fontSize: 11, color: 'var(--info)' }}>{ex.run_id?.slice(0, 28)}</code>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <span className="tag">{ex.mode}</span>
+                  <span className={`badge ${ex.gate_passed ? 'COMPLETED' : 'FAILED'}`}>{ex.gate_passed ? 'PASS' : 'FAIL'}</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 20, fontSize: 12, flexWrap: 'wrap' }}>
+                <span>{ex.input?.toLocaleString()} in → <span style={{ color: 'var(--success)', fontWeight: 700 }}>{ex.accepted?.toLocaleString()} accepted</span> · <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{ex.quarantined?.toLocaleString()} quarantined</span></span>
+                <span>Det.fix: {ex.det_fixes ?? 0} · AI: {ex.ai_fixes ?? 0} · Dups: {ex.removed_duplicates ?? 0}</span>
+                <span className="muted">{ex.duration_s}s · {ex.rules_evaluated} rules ({ex.rules_failed} failed)</span>
+              </div>
+              {Object.keys(ex.phase_durations_s ?? {}).length > 0 && <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+                {Object.entries(ex.phase_durations_s).map(([ph, s]: any) => <span key={ph}>{ph}: {s}s</span>)}
+              </div>}
+              {ex.rules?.filter((r: any) => r.status === 'FAILED').length > 0 && <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>Failing rules:</div>
+                {ex.rules.filter((r: any) => r.status === 'FAILED').slice(0, 5).map((r: any) => (
+                  <div className="rule-row" key={r.rule_id} style={{ padding: '4px 0' }}>
+                    <span style={{ minWidth: 110, fontSize: 11 }}>{r.rule_id}</span>
+                    <span className="tag" style={{ fontSize: 10 }}>{r.column ?? '—'}</span>
+                    <div className="bar" style={{ flex: 1, height: 14 }}>
+                      <div className="bar-fill" style={{ width: `${r.pass_pct ?? 0}%`, background: '#ef4444' }} />
+                      <span className="bar-label" style={{ fontSize: 10 }}>{r.pass_pct?.toFixed(1)}%</span>
+                    </div>
+                    <span className="muted" style={{ fontSize: 10 }}>{r.failed}/{r.total}</span>
+                  </div>
+                ))}
+              </div>}
+            </div>
+          ))}
         </>}
       </div>
     )}

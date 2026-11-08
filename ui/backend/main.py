@@ -389,13 +389,223 @@ def health_score() -> dict[str, Any]:
     if not runs:
         return {"score": None, "runs": 0, "message": "No completed DQ runs yet"}
     full = [J.get(r["job_id"]) for r in runs[:20]]
-    total_in = sum((j.get("result") or {}).get("input", 0) for j in full if j)
-    total_acc = sum((j.get("result") or {}).get("accepted", 0) for j in full if j)
+    total_in  = sum((j.get("result") or {}).get("input", 0)      for j in full if j)
+    total_acc = sum((j.get("result") or {}).get("accepted", 0)   for j in full if j)
+    total_q   = sum((j.get("result") or {}).get("quarantined", 0) for j in full if j)
     score = round(total_acc / total_in * 100, 1) if total_in else None
     gates = [(j.get("result") or {}).get("gate_passed") for j in full if j]
     gate_pass_rate = round(sum(1 for g in gates if g) / len(gates) * 100, 1) if gates else None
     return {"score": score, "gate_pass_rate": gate_pass_rate, "runs": len(runs),
-            "total_input": total_in, "total_accepted": total_acc}
+            "total_input": total_in, "total_accepted": total_acc, "total_quarantined": total_q,
+            "total_failed_runs": sum(1 for r in rows if r.get("kind") == "dq_run" and r.get("status") == "FAILED")}
+
+
+# ------------------------------------------------------------------ dashboard summary (real data from reports)
+def _read_reports_index() -> list[dict[str, Any]]:
+    """Read all report JSONs from disk — cached by mtime so hot requests are fast."""
+    d = ROOT / "reports"
+    if not d.exists():
+        return []
+    result = []
+    for f in sorted(d.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True):
+        try:
+            result.append(json.loads(f.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    return result
+
+
+@app.get("/api/dashboard/summary")
+def dashboard_summary() -> dict[str, Any]:
+    """Aggregate real metrics from all reports + jobs for the Dashboard."""
+    reports = _read_reports_index()
+    dq_reports = [r for r in reports if r.get("execution_metrics")]
+
+    # --- totals across all runs ---
+    total_input = sum(r["execution_metrics"].get("input_records", 0) for r in dq_reports)
+    total_accepted = sum(r["execution_metrics"].get("accepted_records", 0) for r in dq_reports)
+    total_quarantined = sum(r["execution_metrics"].get("quarantined_records", 0) for r in dq_reports)
+    total_det_fixes = sum(r["execution_metrics"].get("deterministic_corrections", 0) for r in dq_reports)
+    total_ai_fixes = sum(r["execution_metrics"].get("ai_corrections_applied", 0) for r in dq_reports)
+    total_removed_dups = sum(r["execution_metrics"].get("removed_duplicates", 0) for r in dq_reports)
+    total_rules_failed = sum(r["execution_metrics"].get("rules_failed", 0) for r in dq_reports)
+    total_rules_evaluated = sum(r["execution_metrics"].get("rules_evaluated", 0) for r in dq_reports)
+    gates_passed = sum(1 for r in dq_reports if r["execution_metrics"].get("quality_gate_passed"))
+    gates_total = len(dq_reports)
+
+    # --- per-dataset aggregation ---
+    from collections import defaultdict
+    by_dataset: dict[str, dict] = defaultdict(lambda: {
+        "runs": 0, "input": 0, "accepted": 0, "quarantined": 0,
+        "rules_failed": 0, "rules_evaluated": 0, "gates_passed": 0,
+        "det_fixes": 0, "ai_fixes": 0, "modes": [], "last_run": None
+    })
+    for r in dq_reports:
+        m = r["execution_metrics"]
+        ds = m.get("dataset", "unknown")
+        by_dataset[ds]["runs"] += 1
+        by_dataset[ds]["input"] += m.get("input_records", 0)
+        by_dataset[ds]["accepted"] += m.get("accepted_records", 0)
+        by_dataset[ds]["quarantined"] += m.get("quarantined_records", 0)
+        by_dataset[ds]["rules_failed"] += m.get("rules_failed", 0)
+        by_dataset[ds]["rules_evaluated"] += m.get("rules_evaluated", 0)
+        by_dataset[ds]["det_fixes"] += m.get("deterministic_corrections", 0)
+        by_dataset[ds]["ai_fixes"] += m.get("ai_corrections_applied", 0)
+        if m.get("quality_gate_passed"):
+            by_dataset[ds]["gates_passed"] += 1
+        mode = m.get("integration_mode")
+        if mode and mode not in by_dataset[ds]["modes"]:
+            by_dataset[ds]["modes"].append(mode)
+        fa = m.get("finished_at")
+        if fa and (not by_dataset[ds]["last_run"] or fa > by_dataset[ds]["last_run"]):
+            by_dataset[ds]["last_run"] = fa
+
+    # Compute pass_rate per dataset
+    datasets_list = []
+    for ds, v in sorted(by_dataset.items()):
+        pass_rate = round(v["accepted"] / v["input"] * 100, 1) if v["input"] else None
+        gate_rate = round(v["gates_passed"] / v["runs"] * 100, 1) if v["runs"] else None
+        rule_pass_rate = round((v["rules_evaluated"] - v["rules_failed"]) / v["rules_evaluated"] * 100, 1) \
+            if v["rules_evaluated"] else None
+        datasets_list.append({
+            "dataset": ds, **v, "pass_rate": pass_rate,
+            "gate_pass_rate": gate_rate, "rule_pass_rate": rule_pass_rate
+        })
+    datasets_list.sort(key=lambda x: x["input"], reverse=True)
+
+    # --- rule-level aggregation across all reports ---
+    rule_agg: dict[str, dict] = defaultdict(lambda: {"total": 0, "failed": 0, "passed": 0, "datasets": set()})
+    for r in dq_reports:
+        vr = r.get("validation_results") or {}
+        all_rules = list(vr.get("row_level_results") or []) + list(vr.get("dataset_level_results") or [])
+        for rule in all_rules:
+            rid = rule.get("rule_id", "?")
+            rule_agg[rid]["total"] += 1
+            if rule.get("status") == "FAILED":
+                rule_agg[rid]["failed"] += 1
+            else:
+                rule_agg[rid]["passed"] += 1
+            rule_agg[rid]["datasets"].add(rule.get("dataset", "?"))
+    top_failing_rules = sorted(
+        [{"rule_id": k, **{kk: v for kk, v in v.items() if kk != "datasets"},
+          "datasets": list(v["datasets"]),
+          "fail_rate": round(v["failed"] / v["total"] * 100, 1) if v["total"] else 0}
+         for k, v in rule_agg.items() if v["failed"] > 0],
+        key=lambda x: x["fail_rate"], reverse=True
+    )[:10]
+
+    # --- quarantine breakdown across all reports ---
+    qbs_total: dict[str, int] = defaultdict(int)
+    for r in dq_reports:
+        for status, count in (r["execution_metrics"].get("quarantine_status_breakdown") or {}).items():
+            qbs_total[status] += count
+
+    # --- mode distribution ---
+    mode_dist: dict[str, int] = defaultdict(int)
+    for r in dq_reports:
+        mode_dist[r["execution_metrics"].get("integration_mode", "UNKNOWN")] += 1
+
+    # --- recent runs timeline (last 20) ---
+    timeline = []
+    for r in dq_reports[:20]:
+        m = r["execution_metrics"]
+        timeline.append({
+            "run_id": m.get("dq_run_id", "")[:20],
+            "dataset": m.get("dataset"),
+            "mode": m.get("integration_mode"),
+            "input": m.get("input_records", 0),
+            "accepted": m.get("accepted_records", 0),
+            "quarantined": m.get("quarantined_records", 0),
+            "pass_rate": round(m.get("acceptance_rate", 0) * 100, 1),
+            "gate_passed": m.get("quality_gate_passed"),
+            "duration_s": round(m.get("duration_ms", 0) / 1000, 1),
+            "finished_at": m.get("finished_at"),
+            "rules_failed": m.get("rules_failed", 0),
+            "rules_evaluated": m.get("rules_evaluated", 0),
+            "det_fixes": m.get("deterministic_corrections", 0),
+            "ai_fixes": m.get("ai_corrections_applied", 0),
+        })
+
+    return {
+        "totals": {
+            "input_records": total_input,
+            "accepted_records": total_accepted,
+            "quarantined_records": total_quarantined,
+            "total_runs": gates_total,
+            "gates_passed": gates_passed,
+            "gate_pass_rate": round(gates_passed / gates_total * 100, 1) if gates_total else None,
+            "overall_pass_rate": round(total_accepted / total_input * 100, 1) if total_input else None,
+            "deterministic_fixes": total_det_fixes,
+            "ai_fixes": total_ai_fixes,
+            "duplicates_removed": total_removed_dups,
+            "rules_evaluated": total_rules_evaluated,
+            "rules_failed": total_rules_failed,
+        },
+        "by_dataset": datasets_list,
+        "top_failing_rules": top_failing_rules,
+        "quarantine_breakdown": dict(qbs_total),
+        "mode_distribution": dict(mode_dist),
+        "timeline": timeline,
+        "profile_runs": len([r for r in reports if not r.get("execution_metrics")]),
+    }
+
+
+@app.get("/api/pipelines/{pid}/metrics")
+def pipeline_metrics(pid: str) -> dict[str, Any]:
+    """All real execution metrics for a specific pipeline — from reports on disk."""
+    reports = _read_reports_index()
+    pipe_reports = [r for r in reports
+                    if (r.get("execution_metrics") or {}).get("pipeline_id") == pid]
+    if not pipe_reports:
+        return {"pipeline_id": pid, "runs": 0, "message": "No reports found for this pipeline"}
+
+    runs = []
+    for r in pipe_reports:
+        m = r["execution_metrics"]
+        vr = r.get("validation_results") or {}
+        all_rules = list(vr.get("row_level_results") or []) + list(vr.get("dataset_level_results") or [])
+        runs.append({
+            "run_id": m.get("dq_run_id"),
+            "dataset": m.get("dataset"),
+            "stage": m.get("stage"),
+            "mode": m.get("integration_mode"),
+            "ruleset": f"{m.get('ruleset_id')}@{m.get('ruleset_version')}",
+            "input": m.get("input_records", 0),
+            "accepted": m.get("accepted_records", 0),
+            "quarantined": m.get("quarantined_records", 0),
+            "removed_duplicates": m.get("removed_duplicates", 0),
+            "pass_rate": round(m.get("acceptance_rate", 0) * 100, 1),
+            "gate_passed": m.get("quality_gate_passed"),
+            "duration_s": round(m.get("duration_ms", 0) / 1000, 1),
+            "phase_durations_s": {k: round(v / 1000, 1) for k, v in (m.get("phase_durations_ms") or {}).items()},
+            "rules_evaluated": m.get("rules_evaluated", 0),
+            "rules_failed": m.get("rules_failed", 0),
+            "det_fixes": m.get("deterministic_corrections", 0),
+            "ai_fixes": m.get("ai_corrections_applied", 0),
+            "ai_proposals": m.get("ai_proposals_evaluated", 0),
+            "quarantine_breakdown": m.get("quarantine_status_breakdown") or {},
+            "finished_at": m.get("finished_at"),
+            "rules": [{"rule_id": r2.get("rule_id"), "column": r2.get("column"),
+                       "status": r2.get("status"), "pass_pct": r2.get("pass_percentage"),
+                       "failed": r2.get("failed_records", 0), "total": r2.get("total_records", 0),
+                       "severity": r2.get("severity")}
+                      for r2 in all_rules],
+        })
+    runs.sort(key=lambda x: x.get("finished_at") or "", reverse=True)
+
+    # Aggregate across all runs for this pipeline
+    total_in = sum(r["input"] for r in runs)
+    total_acc = sum(r["accepted"] for r in runs)
+    return {
+        "pipeline_id": pid,
+        "runs": len(runs),
+        "total_input": total_in,
+        "total_accepted": total_acc,
+        "total_quarantined": sum(r["quarantined"] for r in runs),
+        "overall_pass_rate": round(total_acc / total_in * 100, 1) if total_in else None,
+        "gate_pass_rate": round(sum(1 for r in runs if r["gate_passed"]) / len(runs) * 100, 1),
+        "executions": runs,
+    }
 
 
 # ------------------------------------------------------------------ pipeline run-history trend
