@@ -217,6 +217,82 @@ Review anomalies → Fix / quarantine → Audit trail
 
 ---
 
+## ✅ DONE — Phase A: UI redesign (client-attractive)
+
+### A1 · Layout — left sidebar + header breadcrumb ✅
+- [x] Persistent left sidebar: OVERVIEW / GOVERN / OBSERVE / CONFIGURE / SYSTEM sections
+- [x] Health dot + API status in sidebar footer
+- [x] Approval pending count badge on Anomalies nav item
+- [x] Top-bar breadcrumb + runtime info chip
+
+### A2 · Dashboard — data health command centre ✅
+- [x] Overall health score (accepted ÷ total across last N runs) — live from job history
+- [x] Pipeline status grid with per-pipeline pass-rate sparklines
+- [x] KPI tiles: active pipelines, open anomalies, completed jobs
+- [x] Recent jobs table with inline view button (re-renders charts from SQLite)
+
+### A3 · Reports — summary cards ✅
+- [x] Per-report summary: health %, input/accepted/quarantined stat tiles, quality gate badge
+- [x] Top failing rules with pass-rate bars
+- [x] Quarantine breakdown by status
+- [x] Raw JSON collapsed to `<details>` (accessible but not the default view)
+
+### A4 · Pages rebuilt with new design system ✅
+- [x] Pipelines: status grid, lifecycle stepper, history table, executions table, trend sparkline
+- [x] Onboard wizard: 5-step with new design language, colour-coded confidence checklist
+- [x] Run DQ: governed/ad-hoc mode with clearer layout, all 9 rulesets in ad-hoc list
+- [x] Rule Sets: grouped by ID, diff summary cards with added/removed/modified counts
+- [x] Settings: AI provider live status + DQX setup guide + confidence policy reference
+
+## ✅ DONE — Phase B: Missing workflows
+
+### B1 · Anomaly lifecycle (SQLite) ✅
+- [x] `data/anomalies.db` — anomalies table with status, owner, note, timestamps
+- [x] `GET /api/anomalies` + `PATCH /api/anomalies/{id}` — status/owner/note update
+- [x] `GET /api/anomalies/stats` — open/acknowledged/resolved counts for sidebar badge
+- [x] Auto-ingestion from every completed dq_run (failed rules → anomalies) + profile jobs
+- [x] Anomalies page: open/acknowledged/resolved tabs, acknowledge form with owner+note
+- [x] **E2E verified**: 27 anomalies from orders ENFORCE + healthcare REMEDIATE runs
+  - `NOT_NULL/customer_id`, `RANGE/unit_price`, `ALLOWED_VALUES/currency`, etc.
+
+### B2 · Cross-run trend history ✅
+- [x] `GET /api/pipelines/{id}/trend` — last 30 job summaries with pass_rate, accepted, gate
+- [x] Sparkline component on Pipeline detail card + Dashboard pipeline grid
+- [x] `GET /api/health/score` — overall health % from all recent runs
+- [x] **E2E verified**: HEALTHCARE_PATIENT_PIPELINE_V2 → 15 trend points, health=74.7%
+
+### B3 · Human approval inbox ✅
+- [x] `GET /api/quarantine/pending` — reads ai_decisions from report JSON,
+  filters `REQUIRES_APPROVAL` (= PENDING_HUMAN_APPROVAL), returns per-row detail
+- [x] `POST /api/quarantine/approve` — writes to `config/approvals/approved_corrections.yaml`
+- [x] `POST /api/quarantine/reject`
+- [x] Approvals page: table with original/proposed values, confidence, approve/reject buttons
+- [x] Sidebar nav badge shows pending count (polls every 15s)
+- [x] **E2E verified**: 4 pending rows from healthcare runs (J0hn Smith/patient_name 0.98,
+  r.khan@hospital-mail/contact_email 0.93); approve writes YAML correctly
+
+## ✅ DONE — Phase C: DQX provider integration
+
+### C1 · DQXProvider ✅
+- [x] `packages/dq-core/src/dq_core/ai/dqx_provider.py` (241 lines)
+  - Implements `AIRemediationProvider` interface — engine uses it identically to MockAI
+  - Lazy-initialises DQX on first `propose()` call
+  - Auto-fallback to MockAI when: dqx not installed, credentials absent, endpoint not set, call fails
+  - `describe()` reports: provider, model_version, dqx_available, credentials_set, simulated
+  - Bridges `ProposalRequest` → DQX `DQLLMEngine.detect_business_rules_with_llm()` → `AIProposal`
+  - Batches requests by (column, rule_type) — not one LLM call per row
+- [x] `create_provider('dqx', ...)` in `ai/__init__.py`
+- [x] `AISettings.dqx_model_endpoint` + `dqx_fallback_on_error` in `runtime/config.py`
+- [x] `config/engine.yaml` — `provider: mock` default with DQX config commented in-place
+- [x] `GET /api/ai/status` backend endpoint + Settings page live provider status
+- [x] **E2E verified**: `dqx_available=False, credentials_set=False` → clean fallback to mock
+
+### C1 · To activate DQX (needs Databricks workspace)
+1. `pip install 'databricks-labs-dqx[llm]'`
+2. Set env: `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DQX_MODEL_ENDPOINT`
+3. Edit `config/engine.yaml` → `ai.provider: dqx`, uncomment `dqx_model_endpoint`
+4. Restart backend — Settings page shows green "Connected to Databricks Model Serving"
+
 ## 🔨 DOING NOW — Phase A: UI redesign (client-attractive)
 
 ### A1 · Layout redesign — left sidebar + header breadcrumb

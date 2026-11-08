@@ -25,6 +25,7 @@ export const api = {
   onboardPreview: (body: any) => fetch(`${B}/onboard/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   onboardFinalize: (body: any) => fetch(`${B}/onboard/finalize`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   healthScore: () => fetch(`${B}/health/score`).then(j),
+  aiStatus: () => fetch(`${B}/ai/status`).then(j),
   pipelineTrend: (id: string) => fetch(`${B}/pipelines/${id}/trend`).then(j),
   anomalies: (params?: { status?: string; pipeline_id?: string }) => { const q = new URLSearchParams(params as any).toString(); return fetch(`${B}/anomalies${q ? '?' + q : ''}`).then(j) },
   anomalyStats: () => fetch(`${B}/anomalies/stats`).then(j),

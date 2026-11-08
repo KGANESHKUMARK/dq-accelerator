@@ -32,9 +32,16 @@ engine:
     collect_failure_examples: true
 
   ai:
-    provider: mock             # MockAIProvider - SIMULATED outputs, no external calls
+    provider: mock             # mock | dqx
+    # mock  : MockAIProvider - SIMULATED outputs, no external calls, no credentials needed (default)
+    # dqx   : DQXProvider - real LLM via databricks-labs-dqx[llm]; requires:
+    #           pip install 'databricks-labs-dqx[llm]'
+    #           env: DATABRICKS_HOST, DATABRICKS_TOKEN, DQX_MODEL_ENDPOINT
+    #         auto-falls back to mock if package not installed or credentials absent
     mock_responses_path: ai/mock_ai_responses.yaml
     similarity_fallback: true
+    # dqx_model_endpoint: databricks-meta-llama-3-3-70b-instruct   # uncomment for DQX
+    # dqx_fallback_on_error: true
 
   outputs:
     base_path: ../data

@@ -59,6 +59,9 @@ class AISettings:
     provider: str = "mock"
     mock_responses_path: str | None = None
     similarity_fallback: bool = True
+    # DQX provider settings (only used when provider = "dqx")
+    dqx_model_endpoint: str | None = None    # Databricks Model Serving endpoint name
+    dqx_fallback_on_error: bool = True       # fall back to mock if DQX call fails
 
 
 @dataclass

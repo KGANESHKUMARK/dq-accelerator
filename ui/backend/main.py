@@ -369,6 +369,17 @@ def report(name: str) -> dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+# ------------------------------------------------------------------ AI provider status
+@app.get("/api/ai/status")
+def ai_status() -> dict[str, Any]:
+    """Current AI provider info — tells UI whether DQX or mock is active."""
+    try:
+        engine = J.get_engine()
+        return engine.ai_provider.describe()
+    except Exception as exc:
+        return {"error": str(exc), "provider": "unknown"}
+
+
 # ------------------------------------------------------------------ health score
 @app.get("/api/health/score")
 def health_score() -> dict[str, Any]:
@@ -417,51 +428,88 @@ def pipeline_trend(pid: str) -> list[dict[str, Any]]:
 
 
 # ------------------------------------------------------------------ anomaly lifecycle
+import sqlite3 as _sqlite3
+
 _ANOMALY_DB = ROOT / "data" / "anomalies.db"
+_ANOMALY_DB.parent.mkdir(parents=True, exist_ok=True)
+_ano_conn = _sqlite3.connect(str(_ANOMALY_DB), check_same_thread=False)
+_ano_conn.execute("""CREATE TABLE IF NOT EXISTS anomalies (
+    id TEXT PRIMARY KEY, run_id TEXT, pipeline_id TEXT, dataset TEXT,
+    col TEXT, atype TEXT, detail TEXT, severity TEXT,
+    status TEXT DEFAULT 'OPEN', owner TEXT, note TEXT,
+    created_at TEXT, updated_at TEXT)""")
+_ano_conn.commit()
+_ano_lock = __import__("threading").Lock()
 
 
 def _anomaly_conn():
-    import sqlite3
-    _ANOMALY_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(_ANOMALY_DB), check_same_thread=False)
-    conn.execute("""CREATE TABLE IF NOT EXISTS anomalies (
-        id TEXT PRIMARY KEY, run_id TEXT, pipeline_id TEXT, dataset TEXT,
-        col TEXT, atype TEXT, detail TEXT, severity TEXT,
-        status TEXT DEFAULT 'OPEN', owner TEXT, note TEXT,
-        created_at TEXT, updated_at TEXT)""")
-    conn.commit()
-    return conn
+    return _ano_conn
 
 
 def _ingest_anomalies(job_result: dict[str, Any], pipeline_id: str) -> int:
-    """Extract anomalies from a completed profile/dq_run result into the anomaly store."""
-    import sqlite3
+    """Extract anomalies from a completed profile/dq_run result into the anomaly store.
+
+    For profile jobs: pulls from job_result['anomalies'] + ['schema_anomalies'].
+    For dq_run jobs: creates anomaly records from each FAILED rule, so the
+    Anomalies inbox always has actionable items even without a separate profile run.
+    Also backfills from the written report's validation_results.
+    """
     from dq_core.runtime.utils import utc_now_iso
-    anomalies = list(job_result.get("anomalies") or []) + list(job_result.get("schema_anomalies") or [])
-    if not anomalies:
-        return 0
-    run_id = job_result.get("run_id") or job_result.get("report_path") or "unknown"
-    dataset = job_result.get("dataset") or "unknown"
-    conn = _anomaly_conn()
     now = utc_now_iso()
     inserted = 0
-    for a in anomalies:
-        aid = f"ANO-{run_id[:8]}-{a.get('column','_')}-{a.get('type','?')}"[:60]
-        try:
-            conn.execute("INSERT OR IGNORE INTO anomalies VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                         (aid, run_id, pipeline_id, dataset,
-                          a.get("column"), a.get("type"), a.get("detail"),
-                          a.get("severity", "WARNING"), "OPEN", None, None, now, now))
+    run_id = job_result.get("run_id") or job_result.get("report_path") or "unknown"
+    dataset = job_result.get("dataset", "unknown") or "unknown"
+
+    # -- profile anomalies (direct from job result) --
+    ano_list = list(job_result.get("anomalies") or []) + list(job_result.get("schema_anomalies") or [])
+    for a in ano_list:
+        aid = f"ANO-{str(run_id)[:10]}-{a.get('column','_')[:20]}-{a.get('type','?')[:15]}"[:60]
+        with _ano_lock:
+            _ano_conn.execute("INSERT OR IGNORE INTO anomalies VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                             (aid, run_id, pipeline_id, dataset, a.get("column"), a.get("type"),
+                              a.get("detail"), a.get("severity", "WARNING"), "OPEN", None, None, now, now))
             inserted += 1
-        except Exception:
-            pass
-    conn.commit()
+    if ano_list:
+        _ano_conn.commit()
+
+    # -- dq_run: create anomaly per FAILED rule from the report on disk --
+    report_path = job_result.get("report_path")
+    if report_path and not ano_list:
+        rp = ROOT / report_path
+        if rp.exists():
+            try:
+                data = json.loads(rp.read_text(encoding="utf-8"))
+                vr = (data.get("validation_results") or {})
+                all_results = list(vr.get("row_level_results") or []) + list(vr.get("dataset_level_results") or [])
+                for r in all_results:
+                    if r.get("status") != "FAILED":
+                        continue
+                    col = r.get("column") or r.get("rule_id", "?")
+                    detail = f"rule {r['rule_id']} failed: {r.get('failed_records', '?')} records ({100 - r.get('pass_percentage', 0):.1f}% failure rate)"
+                    aid = f"ANO-{str(run_id)[:10]}-{col[:20]}-{r.get('rule_type','?')[:15]}"[:60]
+                    with _ano_lock:
+                        _ano_conn.execute("INSERT OR IGNORE INTO anomalies VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                         (aid, run_id, pipeline_id, dataset, col, r.get("rule_type", "RULE_FAILURE"),
+                                          detail, r.get("severity", "ERROR"), "OPEN", None, None, now, now))
+                        inserted += 1
+                _ano_conn.commit()
+            except Exception:
+                pass
     return inserted
+
+
+# IMPORTANT: /api/anomalies/stats must be declared BEFORE /api/anomalies/{aid}
+# otherwise FastAPI routes 'stats' as a path parameter.
+@app.get("/api/anomalies/stats")
+def anomaly_stats() -> dict[str, Any]:
+    with _ano_lock:
+        rows = _ano_conn.execute("SELECT status, COUNT(*) FROM anomalies GROUP BY status").fetchall()
+    total = sum(r[1] for r in rows)
+    return {r[0]: r[1] for r in rows} | {"total": total}
 
 
 @app.get("/api/anomalies")
 def anomalies(status: str = "", pipeline_id: str = "", limit: int = 100) -> list[dict[str, Any]]:
-    conn = _anomaly_conn()
     q = "SELECT * FROM anomalies WHERE 1=1"
     params: list[Any] = []
     if status:
@@ -470,7 +518,8 @@ def anomalies(status: str = "", pipeline_id: str = "", limit: int = 100) -> list
         q += " AND pipeline_id=?"; params.append(pipeline_id)
     q += " ORDER BY created_at DESC LIMIT ?"
     params.append(limit)
-    rows = conn.execute(q, params).fetchall()
+    with _ano_lock:
+        rows = _ano_conn.execute(q, params).fetchall()
     cols = ["id", "run_id", "pipeline_id", "dataset", "col", "atype", "detail",
             "severity", "status", "owner", "note", "created_at", "updated_at"]
     return [dict(zip(cols, r)) for r in rows]
@@ -485,18 +534,18 @@ class AnomalyPatch(BaseModel):
 @app.patch("/api/anomalies/{aid}")
 def patch_anomaly(aid: str, body: AnomalyPatch) -> dict[str, Any]:
     from dq_core.runtime.utils import utc_now_iso
-    conn = _anomaly_conn()
     fields: dict[str, Any] = {}
-    if body.status:  fields["status"] = body.status
-    if body.owner is not None: fields["owner"] = body.owner
-    if body.note  is not None: fields["note"]  = body.note
+    if body.status:              fields["status"] = body.status
+    if body.owner is not None:   fields["owner"]  = body.owner
+    if body.note  is not None:   fields["note"]   = body.note
     if not fields:
         raise HTTPException(400, "nothing to update")
     fields["updated_at"] = utc_now_iso()
     sql = "UPDATE anomalies SET " + ", ".join(f"{k}=?" for k in fields) + " WHERE id=?"
-    conn.execute(sql, [*fields.values(), aid])
-    conn.commit()
-    row = conn.execute("SELECT * FROM anomalies WHERE id=?", (aid,)).fetchone()
+    with _ano_lock:
+        _ano_conn.execute(sql, [*fields.values(), aid])
+        _ano_conn.commit()
+        row = _ano_conn.execute("SELECT * FROM anomalies WHERE id=?", (aid,)).fetchone()
     if not row:
         raise HTTPException(404, "anomaly not found")
     cols = ["id","run_id","pipeline_id","dataset","col","atype","detail",
@@ -504,24 +553,17 @@ def patch_anomaly(aid: str, body: AnomalyPatch) -> dict[str, Any]:
     return dict(zip(cols, row))
 
 
-@app.get("/api/anomalies/stats")
-def anomaly_stats() -> dict[str, Any]:
-    conn = _anomaly_conn()
-    rows = conn.execute("SELECT status, COUNT(*) FROM anomalies GROUP BY status").fetchall()
-    return {r[0]: r[1] for r in rows}
-
-
 # ------------------------------------------------------------------ human approval inbox
-_QUARANTINE_DIR = ROOT / "data" / "quarantine"
 _APPROVALS_FILE = ROOT / "config" / "approvals" / "approved_corrections.yaml"
 
 
 def _load_quarantine_pending() -> list[dict[str, Any]]:
-    """Scan last 10 completed REMEDIATE jobs for PENDING_HUMAN_APPROVAL quarantine rows."""
-    import yaml as _yaml
+    """Scan last 10 completed REMEDIATE jobs — read ai_decisions from report JSON
+    and return rows with decision == REQUIRES_APPROVAL (PENDING_HUMAN_APPROVAL)."""
     rows = J.list_jobs(limit=100)
     runs = [r for r in rows if r.get("kind") == "dq_run" and r.get("status") == "COMPLETED"][:10]
     pending: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for r in runs:
         j = J.get(r["job_id"])
         if not j:
@@ -530,18 +572,40 @@ def _load_quarantine_pending() -> list[dict[str, Any]]:
         qbs = res.get("quarantine_by_status") or {}
         if not qbs.get("PENDING_HUMAN_APPROVAL"):
             continue
-        # Try to read report for per-row detail
         rp = ROOT / (res.get("report_path") or "")
-        if rp.exists():
-            try:
-                data = json.loads(rp.read_text(encoding="utf-8"))
-                for rec in (data.get("quarantine_records") or []):
-                    if rec.get("remediation_status") == "PENDING_HUMAN_APPROVAL":
-                        rec["job_id"] = r["job_id"]
-                        pending.append(rec)
-            except Exception:
-                pass
-        else:
+        if not rp.exists():
+            pending.append({"job_id": r["job_id"], "count": qbs["PENDING_HUMAN_APPROVAL"],
+                            "summary_only": True, "dataset": "unknown"})
+            continue
+        try:
+            data = json.loads(rp.read_text(encoding="utf-8"))
+            # ai_decisions lives in remediation_results
+            decisions = (data.get("remediation_results") or {}).get("ai_decisions") or []
+            for d in decisions:
+                if d.get("decision") != "REQUIRES_APPROVAL":
+                    continue
+                key = f"{d.get('record_id')}-{d.get('column')}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                pending.append({
+                    "job_id": r["job_id"],
+                    "run_id": res.get("run_id"),
+                    "dataset": (data.get("execution_metrics") or {}).get("dataset", "unknown"),
+                    "record_id":      d.get("record_id"),
+                    "record_key":     d.get("record_key"),
+                    "column":         d.get("column"),
+                    "rule_id":        d.get("rule_id"),
+                    "original_value": d.get("original_value"),
+                    "proposed_value": d.get("proposed_value"),
+                    "confidence":     d.get("confidence"),
+                    "reason":         d.get("reason"),
+                    "sensitive_category": d.get("sensitive_category"),
+                    "decision_reason": d.get("decision_reason"),
+                    "provider":       d.get("provider"),
+                    "simulated":      d.get("simulated"),
+                })
+        except Exception:
             pending.append({"job_id": r["job_id"], "count": qbs["PENDING_HUMAN_APPROVAL"],
                             "summary_only": True})
     return pending

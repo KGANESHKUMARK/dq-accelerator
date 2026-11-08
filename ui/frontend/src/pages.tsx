@@ -995,30 +995,80 @@ export function Reports() {
    ============================================================ */
 export function Settings() {
   const [health, setHealth] = useState<any>(null)
-  useEffect(() => { api.health().then(setHealth) }, [])
+  const [ai, setAi] = useState<any>(null)
+  useEffect(() => {
+    api.health().then(setHealth)
+    api.aiStatus().then(setAi).catch(() => {})
+  }, [])
+
+  const dqxReady = ai && !ai.simulated && ai.provider === 'DQXProvider'
+
   return <>
-    <div className="section-title">Settings</div>
+    <div className="section-title">Settings &amp; Configuration</div>
+
     <div className="card">
       <h3>Engine</h3>
       <div className="form-grid">
         <div className="kv"><span>Engine</span><b>{health?.engine ?? '—'}</b></div>
         <div className="kv"><span>Root</span><code style={{ fontSize: 11, wordBreak: 'break-all' }}>{health?.root ?? '—'}</code></div>
+        <div className="kv"><span>Runtime</span><b>Spark local[8] · 2g driver</b></div>
+        <div className="kv"><span>Registry</span><b>File + SQLite · anomalies.db · jobs.db</b></div>
       </div>
     </div>
+
     <div className="card">
-      <h3>DQ mode reference</h3>
-      {[['OBSERVE_ONLY', 'All rows pass through; violations flagged only. Safe start for new pipelines.'],
-        ['ENFORCE',      'Failed rows quarantined; accepted rows continue. No remediation attempted.'],
-        ['REMEDIATE',    'Deterministic fixes applied, then AI (≥90% confidence), then revalidation. Remaining failures quarantined.']
-      ].map(([m, d]) => <div key={m} className="gstep"><span className="n">{m[0]}</span><span><b>{m}</b> — {d}</span></div>)}
+      <h3>AI remediation provider</h3>
+      {ai && <>
+        <div className={dqxReady ? 'success-box' : 'warn-box'} style={{ marginBottom: 14 }}>
+          <b>Provider: {ai.provider ?? '—'}</b> · model: {ai.model_version ?? '—'} ·{' '}
+          {dqxReady
+            ? '✓ Connected to Databricks Model Serving — real LLM corrections active'
+            : ai.simulated
+              ? '⚠ SIMULATED (MockAIProvider) — deterministic YAML lookup, not a real LLM'
+              : '⚠ Fallback active — see setup below'
+          }
+          {ai.dqx_available === false && <div style={{ marginTop: 6 }}>databricks-labs-dqx[llm] not installed</div>}
+          {ai.credentials_set === false && <div style={{ marginTop: 6 }}>DATABRICKS_HOST / DATABRICKS_TOKEN not set</div>}
+        </div>
+      </>}
+      <h4>Phase C — Enable DQX LLM provider</h4>
+      <div className="gstep"><span className="n">1</span><span>Install: <code>pip install 'databricks-labs-dqx[llm]'</code></span></div>
+      <div className="gstep"><span className="n">2</span><span>Set environment: <code>DATABRICKS_HOST=https://&lt;workspace&gt;.azuredatabricks.net</code></span></div>
+      <div className="gstep"><span className="n">3</span><span>Set environment: <code>DATABRICKS_TOKEN=&lt;personal-access-token&gt;</code></span></div>
+      <div className="gstep"><span className="n">4</span><span>Set environment: <code>DQX_MODEL_ENDPOINT=databricks-meta-llama-3-3-70b-instruct</code></span></div>
+      <div className="gstep"><span className="n">5</span><span>Edit <code>config/engine.yaml</code> → <code>ai.provider: dqx</code> + uncomment <code>dqx_model_endpoint</code></span></div>
+      <div className="gstep"><span className="n">6</span><span>Restart the backend — DQXProvider auto-falls back to mock if credentials are absent</span></div>
+      <div className="info-box" style={{ marginTop: 12 }}>MockAI uses a deterministic lookup table (<code>config/ai/mock_ai_responses.yaml</code>) — confidence is real but corrections are pre-scripted. DQX uses a live LLM via Databricks Model Serving for genuine NLP corrections. Both go through the same 90% confidence gate and sensitive-column policy.</div>
     </div>
+
     <div className="card">
-      <h3>AI remediation</h3>
-      <div className="warn-box">Current provider: <b>MockAIProvider</b> — deterministic YAML lookup, not a real LLM. Phase C will swap in <code>databricks-labs-dqx[llm]</code> using <code>DQLLMEngine</code> (requires Databricks workspace + Model Serving endpoint).</div>
+      <h3>DQ modes</h3>
+      {[
+        ['OBSERVE_ONLY', 'All rows pass through untouched. Violations flagged only. Zero data risk — safe start for all new pipelines.'],
+        ['ENFORCE',      'Failed rows quarantined (ENFORCE_NO_REMEDIATION_ATTEMPTED). Accepted rows continue. No corrections attempted.'],
+        ['REMEDIATE',    'Deterministic fixes → AI (≥90% confidence) → revalidation. Remaining failures quarantined with reasons. Highest data quality but requires reviewed + published rulesets.'],
+      ].map(([m, d]) => <div key={m} className="gstep" style={{ marginBottom: 8 }}><span className="n">{m[0]}</span><span><b style={{ color: 'var(--info)' }}>{m}</b> — {d}</span></div>)}
     </div>
+
     <div className="card">
-      <h3>Confidence threshold</h3>
-      <p className="muted">Default: <b>90%</b> — configured in <code>config/policies/default.yaml</code>. Corrections below this threshold are quarantined as <code>BELOW_CONFIDENCE_THRESHOLD</code>. Sensitive-column corrections above threshold are held as <code>PENDING_HUMAN_APPROVAL</code> regardless.</p>
+      <h3>Confidence threshold &amp; policy</h3>
+      <div className="form-grid">
+        <div className="kv"><span>Default threshold</span><b>90%</b></div>
+        <div className="kv"><span>Config</span><code>config/policies/default.yaml</code></div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        {[
+          ['≥ 90% + non-sensitive', 'AUTO_APPLY — correction applied automatically'],
+          ['≥ 90% + sensitive column', 'PENDING_HUMAN_APPROVAL — held for steward review (Approvals tab)'],
+          ['&lt; 90%', 'BELOW_CONFIDENCE_THRESHOLD — quarantined, not applied'],
+          ['0% / no match', 'NO_PROPOSAL — quarantined as UNRESOLVED_NO_SAFE_REMEDIATION'],
+        ].map(([c, r]) => (
+          <div key={c} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
+            <span className="tag" style={{ minWidth: 220 }} dangerouslySetInnerHTML={{ __html: c }} />
+            <span className="muted">{r}</span>
+          </div>
+        ))}
+      </div>
     </div>
   </>
 }
