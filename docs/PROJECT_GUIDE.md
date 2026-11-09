@@ -61,10 +61,16 @@ scratch all live under `.venv\` and `.tmp\` **inside this folder on D:**.
 
 ## 3. Setup (one time, ~10–15 min)
 
+**Easiest: double-click `DQ_start.bat`** — it checks Python 3.12 / JDK 21 /
+Node 18+ (prints install URLs if missing), creates `.venv`, installs
+`requirements.txt`, optionally installs `requirements-llm.txt` when
+`DATABRICKS_TOKEN` is set, builds the frontend, and launches backend + frontend.
+
 Open **PowerShell** in the project root
 (`D:\Siddharitha\SIDDHARITHA TECHNOLOGIES PRIVATE LIMITED\Projects\Linkedin\DQ-Accelerator`):
 
 ```powershell
+# Manual alternative:
 # 1. Full setup: create .venv, install pinned deps, verify Spark runtime
 powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 
@@ -221,11 +227,12 @@ from dq_core import DataQualityEngine, PipelineContext
 
 ### 0. One-click launcher (easiest)
 
-Double-click **`start.bat`** in the project root — it sets up the D:-only
-environment and shows an interactive menu: standalone demo, full/unit test
-suites, a `dqctl` submenu (profile / run / ruleset / pipeline / bootstrap), regenerate
-sample data, runtime check, and open docs. If `.venv` is missing it runs
-`scripts\setup.ps1` automatically first.
+Double-click **`DQ_start.bat`** in the project root — checks Python/JDK/Node,
+installs all deps (+ `requirements-llm.txt` when `DATABRICKS_TOKEN` is set),
+builds the frontend, and launches backend (`:8000`) + frontend (`:5173`).
+
+Legacy launchers (`start.bat`, `start_ui.bat`, `setup_new_machine.bat`) are in
+`archive/` — kept for reference, not needed.
 
 ### 6.1 Automated tests (the main verification)
 
@@ -431,15 +438,25 @@ notebook/job, attach the `dq-core` wheel, point `DQ_CONFIG_PATH` at
 
 ### 6.5b Web UI (React + FastAPI)
 
-```powershell
-.\start_ui.bat   # starts FastAPI :8000 + Vite :5173, opens browser
-```
+`DQ_start.bat` starts FastAPI :8000 + Vite :5173 and opens the browser.
 
 Or manually: `& $VenvPython -m uvicorn main:app --app-dir ui\backend --port 8000` then
 `cd ui\frontend && npm run dev`. Pages: Dashboard, Pipelines (onboard + lifecycle),
-Run DQ (submit + live job progress), Rule Sets (publish/diff/activate), Reports.
-API contract: `ui\backend\main.py` — also callable by orchestrators. Jobs persist to
+Onboard (5-step wizard), Run DQ (live phase progress), Anomalies, Approvals,
+Rule Sets (publish/diff/activate), Reports, Settings. API contract:
+`ui\backend\main.py` — also callable by orchestrators. Jobs persist to
 `data\jobs.db` (SQLite); real-time progress via `GET /api/jobs/{id}/stream` (SSE).
+
+**UI extras:**
+- **DQ Assistant** — floating chatbot (bottom-right); answers about pipelines,
+  rulesets, jobs, anomalies, setup, roadmap. Uses real Databricks LLM when
+  `DATABRICKS_TOKEN` is set, built-in answers otherwise. Toggle + chat log in
+  Settings → DQ Assistant (`logs/assistant/chat_log.jsonl`).
+- **Hot config reload** — `POST /api/engine/reload` re-reads `engine.yaml`
+  without restart; Settings → Apply buttons.
+- **System status** — `GET /api/system/status` detects Python/Java/Node/
+  packages/env vars; shown in Settings.
+- **Per-pipeline trends** — Dashboard cards are clickable → pipeline detail.
 
 **Registry backend**: `engine.yaml registry.backend` — `file` (default, JSON under
 `registry\`) or `sqlite` (SQL store at `registry.db_path`; `SqlRuleSetRegistry` /

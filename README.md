@@ -43,38 +43,64 @@ quality gates, metrics and audit reports.
 All artefacts stay on the **D: drive inside this project** — virtualenv, pip cache,
 Spark scratch and temp files. Nothing is written to C:.
 
+### One file: `DQ_start.bat`
+
+Double-click **`DQ_start.bat`** — it checks Python 3.12 / JDK 21 / Node 18+
+(prints download links if missing), creates `.venv`, installs
+`requirements.txt` (+ `requirements-llm.txt` when `DATABRICKS_TOKEN` is set),
+runs `npm install` + build, then launches backend (`:8000`) + frontend (`:5173`)
+in separate windows and opens the browser.
+
 ```powershell
-# 1. New machine: run the automated setup (Python 3.12 + JDK 21 required)
-.\setup_new_machine.bat
-
-# 2. Or manual setup (if you prefer):
-.\scripts\setup.ps1        # creates .venv, redirects TEMP/TMP/pip cache to .tmp on D:
-. .\scripts\env.ps1         # activate env for the session
-
-# 3. Verify the Spark runtime (Python / Spark / Java / Parquet round-trip)
-& $VenvPython scripts\check_runtime.py
-
-# 4. Regenerate the deterministic synthetic data if needed
-& $VenvPython scripts\generate_sample_data.py
-
-# 5. Start the full application (backend + frontend)
-.\start_ui.bat
-
-# 6. Run the test suite (~8 min; starts a local Spark session)
-& $VenvPython -m pytest packages\dq-core\tests\ -v
+.\DQ_start.bat          # daily use + first-time setup
 ```
+
+### Manual steps (advanced)
+
+```powershell
+.\scripts\setup.ps1     # creates .venv, redirects TEMP/TMP/pip cache to .tmp on D:
+. .\scripts\env.ps1      # activate env for the session
+& $VenvPython scripts\check_runtime.py    # verify Spark runtime
+& $VenvPython scripts\generate_sample_data.py   # regenerate synthetic data
+.\archive\start_ui.bat                    # legacy launcher (old; use DQ_start.bat)
+& $VenvPython -m pytest packages\dq-core\tests\ -v   # test suite (~8 min)
+```
+
+**Legacy launchers** live in `archive/` — `DQ_start.bat` is the only entry point.
 
 **Optional: Enable real Databricks LLM remediation**
 
-```powershell
-# Set your Databricks credentials (get PAT from workspace → User Settings → Developer)
-set DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
-set DATABRICKS_TOKEN=your-pat-token
-set DQX_MODEL_ENDPOINT=databricks-meta-llama-3-3-70b-instruct
+Set env vars **before** running `DQ_start.bat` (System Properties → Environment
+Variables, or `$env:` in PowerShell). When `DATABRICKS_TOKEN` is present the
+launcher auto-installs `requirements-llm.txt`:
 
-# Edit config/engine.yaml → ai.provider: dqx (already done by default)
-# Restart backend → Settings page shows green "Connected to Databricks Model Serving"
 ```
+DATABRICKS_HOST   = https://<workspace>.cloud.databricks.com
+DATABRICKS_TOKEN  = <personal-access-token>
+DQX_MODEL_ENDPOINT= databricks-meta-llama-3-3-70b-instruct
+```
+
+Without credentials the app runs MockAI (deterministic YAML lookup, no external
+calls). `config/engine.yaml` → `ai.provider: dqx` is the default; DQXProvider
+auto-falls back to MockAI on failure.
+
+## UI features
+
+- **Dashboard** — real report-derived metrics, per-pipeline trend cards
+  (clickable → opens pipeline detail), run timeline, acceptance rates
+- **Pipelines** — registry + lifecycle (test → activate → pause → offboard),
+  per-pipeline trend sparkline, executions, lifecycle history
+- **Onboard** — 5-step wizard: upload → profile → review rules → publish →
+  pipeline register (no YAML hand-writing)
+- **Run DQ** — live progress panel with phase chips (Queued → Spark →
+  Validating → AI remediation → Revalidating → Report)
+- **Anomalies / Approvals** — lifecycle inbox + quarantine review
+- **Settings** — system status (Python/Java/Node/packages/env vars),
+  **Apply config** hot-reload buttons (engine.yaml changes without restart),
+  AI provider status, **DQ Assistant** toggle + chat log
+- **DQ Assistant** — Genie-style chatbot (floating panel) that answers about
+  onboarded pipelines, rulesets, jobs, anomalies, reports, setup, and roadmap;
+  uses real Databricks LLM when credentials are set, built-in answers otherwise
 
 ## Minimal integration example
 

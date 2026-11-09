@@ -18,7 +18,9 @@ Verify: `python --version`, `java -version`, `node --version` — or just run `D
 DQ_start.bat
 ```
 
-What it does: verifies Python/Java/Node → creates `.venv` → `pip install -r requirements.txt` → `npm install` + `npm run build` → opens **DQ-Backend** (:8000) and **DQ-Frontend** (:5173) windows + browser.
+What it does: verifies Python/Java/Node → creates `.venv` → `pip install -r requirements.txt` → installs `requirements-llm.txt` **only if `DATABRICKS_TOKEN` is set** → `npm install` + `npm run build` → opens **DQ-Backend** (:8000) and **DQ-Frontend** (:5173) windows + browser.
+
+Legacy launchers (`start.bat`, `start_ui.bat`, `setup_new_machine.bat`) are in `archive/` — not needed.
 
 Stop: close the two service windows.
 
@@ -37,6 +39,18 @@ DQX_MODEL_ENDPOINT= databricks-meta-llama-3-3-70b-instruct
 Or install LLM deps manually: `pip install -r requirements-llm.txt`
 
 `config/engine.yaml` has `ai.provider: dqx` — without credentials it auto-falls back to MockAI. Status visible in UI → **Settings → AI remediation provider** + **System status**.
+
+## DQ Assistant (chatbot)
+
+Floating `✦ DQ Assistant` button bottom-right on every page. Answers questions about onboarded pipelines, rulesets, jobs, anomalies, reports, setup steps, and roadmap — using the same Databricks LLM when credentials exist, built-in answers otherwise.
+
+- Toggle on/off: **Settings → DQ Assistant** (writes `engine.yaml` → `assistant.enabled`)
+- Chat history: `logs/assistant/chat_log.jsonl` (JSONL, one entry per turn)
+- Endpoints: `POST /api/chat`, `GET/PUT /api/assistant/enabled`, `GET /api/chat/log`
+
+## Hot config reload
+
+After editing `config/engine.yaml` (provider, thresholds, runtime), use **Settings → Apply config changes** — no backend restart needed. For `runtime.*` changes (memory/partitions) use **Reload + restart Spark** (~30 s).
 
 ## Repo layout
 
