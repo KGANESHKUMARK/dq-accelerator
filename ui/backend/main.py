@@ -467,6 +467,20 @@ def report(name: str) -> dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+# ------------------------------------------------------------------ DQ Assistant (chatbot)
+class ChatIn(BaseModel):
+    message: str
+
+
+@app.post("/api/chat")
+def chat(body: ChatIn) -> dict[str, Any]:
+    """DQ Assistant — answers questions about pipelines, rulesets, jobs, setup."""
+    if not body.message.strip():
+        raise HTTPException(400, "empty message")
+    import assistant as A
+    return A.answer(body.message.strip())
+
+
 # ------------------------------------------------------------------ AI provider status
 @app.get("/api/ai/status")
 def ai_status() -> dict[str, Any]:

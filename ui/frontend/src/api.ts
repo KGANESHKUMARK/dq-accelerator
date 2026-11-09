@@ -34,6 +34,7 @@ export const api = {
   patchAnomaly: (id: string, body: any) => fetch(`${B}/anomalies/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   getConfig: () => fetch(`${B}/config`).then(j),
   systemStatus: () => fetch(`${B}/system/status`).then(j),
+  chat: (message: string) => fetch(`${B}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) }).then(j),
   quarantinePending: () => fetch(`${B}/quarantine/pending`).then(j),
   approveCorrection: (body: any) => fetch(`${B}/quarantine/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   rejectCorrection: (body: any) => fetch(`${B}/quarantine/reject`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),

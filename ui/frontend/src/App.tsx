@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { api } from './api'
 import {
   Dashboard, Pipelines, Onboard, RunDQ,
-  Anomalies, Approvals, RuleSets, Reports, Settings
+  Anomalies, Approvals, RuleSets, Reports, Settings, ChatPanel
 } from './pages'
 
 type Page = {
@@ -90,6 +90,7 @@ export default function App() {
           <PageComponent />
         </div>
       </div>
+      <ChatPanel />
     </div>
   )
 }

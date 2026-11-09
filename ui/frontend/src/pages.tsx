@@ -1331,3 +1331,86 @@ export function Settings() {
     </div>
   </>
 }
+
+/* ============================================================
+   DQ ASSISTANT — floating chatbot panel (Genie-style, app-scoped)
+   ============================================================ */
+type ChatMsg = { role: 'user' | 'bot'; text: string; source?: string }
+
+export function ChatPanel() {
+  const [open, setOpen] = useState(false)
+  const [msgs, setMsgs] = useState<ChatMsg[]>([
+    { role: 'bot', text: "Hi! I'm DQ Assistant. Ask me about onboarded pipelines, rulesets, jobs, anomalies, how to run DQ, or the roadmap." },
+  ])
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const endRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, open])
+
+  const send = async () => {
+    const text = input.trim()
+    if (!text || busy) return
+    setMsgs(m => [...m, { role: 'user', text }])
+    setInput('')
+    setBusy(true)
+    try {
+      const r = await api.chat(text)
+      setMsgs(m => [...m, { role: 'bot', text: r.answer, source: r.source }])
+    } catch (e: any) {
+      setMsgs(m => [...m, { role: 'bot', text: `Error: ${e.message ?? e}` }])
+    }
+    setBusy(false)
+  }
+
+  const SUGGESTIONS = ['Which pipelines are onboarded?', 'Show rulesets', 'Is the real LLM active?', 'How do I run DQ?', 'Next steps roadmap']
+
+  return <>
+    {!open && <button onClick={() => setOpen(true)} title="DQ Assistant"
+      style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, width: 52, height: 52,
+               borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 22,
+               background: 'var(--info)', color: '#fff', boxShadow: '0 4px 14px rgba(0,0,0,.4)' }}>?</button>}
+
+    {open && <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, width: 360,
+        maxHeight: 500, display: 'flex', flexDirection: 'column',
+        background: 'var(--card, #1e1e2e)', border: '1px solid var(--border, #444)',
+        borderRadius: 10, boxShadow: '0 8px 30px rgba(0,0,0,.5)' }}>
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border, #444)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <b style={{ fontSize: 13 }}>DQ Assistant</b>
+        <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none',
+            color: 'var(--muted, #999)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 12, minHeight: 260, maxHeight: 340 }}>
+        {msgs.map((m, i) => (
+          <div key={i} style={{ marginBottom: 10, textAlign: m.role === 'user' ? 'right' : 'left' }}>
+            <div style={{ display: 'inline-block', padding: '8px 11px', borderRadius: 10,
+                fontSize: 12, whiteSpace: 'pre-wrap', maxWidth: '85%', textAlign: 'left',
+                background: m.role === 'user' ? 'var(--info)' : 'var(--bg, #2a2a3a)',
+                color: m.role === 'user' ? '#fff' : 'var(--text, #ddd)' }}>
+              {m.text}
+              {m.source && <div style={{ fontSize: 9, opacity: .6, marginTop: 4 }}>{m.source === 'llm' ? 'Databricks LLM' : 'built-in answers'}</div>}
+            </div>
+          </div>
+        ))}
+        {busy && <div className="muted" style={{ fontSize: 11 }}>thinking…</div>}
+        <div ref={endRef} />
+      </div>
+      <div style={{ padding: '6px 10px', display: 'flex', gap: 6, flexWrap: 'wrap', borderTop: '1px solid var(--border, #444)' }}>
+        {SUGGESTIONS.map(s => <button key={s} onClick={() => { setInput(s) }}
+          style={{ fontSize: 10, padding: '3px 8px', borderRadius: 10, cursor: 'pointer',
+                   border: '1px solid var(--border, #444)', background: 'transparent',
+                   color: 'var(--muted, #999)' }}>{s}</button>)}
+      </div>
+      <div style={{ padding: 10, display: 'flex', gap: 8, borderTop: '1px solid var(--border, #444)' }}>
+        <input value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()} placeholder="Ask about pipelines, jobs, setup…"
+          style={{ flex: 1, padding: '7px 10px', fontSize: 12, borderRadius: 8,
+                   border: '1px solid var(--border, #444)', background: 'var(--bg, #14141f)',
+                   color: 'var(--text, #ddd)' }} />
+        <button onClick={send} disabled={busy} className="primary"
+          style={{ padding: '7px 14px', fontSize: 12 }}>Send</button>
+      </div>
+    </div>}
+  </>
+}
