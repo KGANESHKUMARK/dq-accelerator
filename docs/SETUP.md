@@ -24,7 +24,9 @@ Stop: close the two service windows.
 
 ## Real LLM (optional — Databricks Model Serving)
 
-Set env vars **before** running `DQ_start.bat` (System properties → Environment Variables, or a `.env`/powershell profile):
+Core deps are in `requirements.txt` — LLM deps are in **`requirements-llm.txt`** and are installed **automatically by `DQ_start.bat` only when `DATABRICKS_TOKEN` is set**. Without them the app runs with MockAI (no external LLM).
+
+Set env vars **before** running `DQ_start.bat`:
 
 ```
 DATABRICKS_HOST   = https://<workspace>.cloud.databricks.com
@@ -32,7 +34,9 @@ DATABRICKS_TOKEN  = <personal-access-token>
 DQX_MODEL_ENDPOINT= databricks-meta-llama-3-3-70b-instruct
 ```
 
-`config/engine.yaml` already has `ai.provider: dqx` — without credentials it auto-falls back to MockAI. Status visible in UI → **Settings → AI remediation provider** + **System status** (shows which software/env vars are detected).
+Or install LLM deps manually: `pip install -r requirements-llm.txt`
+
+`config/engine.yaml` has `ai.provider: dqx` — without credentials it auto-falls back to MockAI. Status visible in UI → **Settings → AI remediation provider** + **System status**.
 
 ## Repo layout
 

@@ -104,6 +104,16 @@ if errorlevel 1 (
 )
 echo      [OK] Python deps installed
 
+rem Optional: real LLM deps only when Databricks env vars are set
+if defined DATABRICKS_TOKEN (
+    echo      DATABRICKS_TOKEN detected - installing LLM deps...
+    "%VENV_PY%" -m pip install -r "%ROOT%\requirements-llm.txt" -q
+    if errorlevel 1 ( echo      [WARN] LLM dep install failed - MockAI fallback will be used )
+    echo      [OK] LLM deps ready
+) else (
+    echo      DATABRICKS_TOKEN not set - skipping LLM deps (MockAI mode)
+)
+
 rem ------------------------------------------------------------- 5. FRONTEND
 echo [5/6] Frontend dependencies + build ...
 if not exist "%ROOT%\ui\frontend\node_modules" (
