@@ -11,7 +11,7 @@ REMEDIATE flow::
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
@@ -87,11 +87,16 @@ class DQRunner:
 
     def run(self, df: DataFrame, ruleset: RuleSet, policy: RemediationPolicyConfig, context: PipelineContext,
             mode: IntegrationMode, *, reference_data: Mapping[str, DataFrame] | None = None, profile: bool = False,
-            ruleset_published: bool = False, runtime: dict[str, Any] | None = None) -> DQResult:
+            ruleset_published: bool = False, runtime: dict[str, Any] | None = None,
+            on_phase: Callable[[str], None] | None = None) -> DQResult:
         run_id = new_run_id()
         started = utc_now_iso()
         total_sw = Stopwatch().__enter__()
         phases: dict[str, float] = {}
+
+        def _ph(key: str) -> None:
+            if on_phase is not None:
+                on_phase(key)
         exec_ctx = ExecutionContext(
             run_id=run_id, pipeline=context, mode=mode, started_at=started, ruleset_id=ruleset.ruleset_id,
             ruleset_version=ruleset.version, ruleset_checksum=ruleset.checksum(), policy_id=policy.policy_id,
@@ -102,10 +107,12 @@ class DQRunner:
         input_columns = user_columns(df.columns)
         profile_report = None
         if profile:
+            _ph("profiling")
             with Stopwatch() as sw:
                 profile_report = self.profiler.profile(df, context.dataset)
             phases["profiling"] = sw.elapsed_ms
 
+        _ph("validation")
         with Stopwatch() as sw:
             initial = self.validation.validate(df, ruleset, reference_data=reference_data)
         phases["validation"] = sw.elapsed_ms
@@ -117,18 +124,21 @@ class DQRunner:
         fix_stats = {"corrected_passed": 0, "corrected_failed": 0, "deterministic_fixes": 0, "ai_fixes": 0}
 
         if mode == IntegrationMode.OBSERVE_ONLY:
+            _ph("quarantine")
             with Stopwatch() as sw:
                 accepted = df  # the pipeline output is never modified in OBSERVE_ONLY
                 quarantine = build_quarantine(initial.failed(), exec_ctx, mode)
                 accepted_count, quarantined_count = report.total_records, report.failed_records
             phases["quarantine"] = sw.elapsed_ms
         elif mode == IntegrationMode.ENFORCE:
+            _ph("quarantine")
             with Stopwatch() as sw:
                 accepted = _project_accepted(initial.passed(), input_columns, self.include_dq_columns)
                 quarantine = build_quarantine(initial.failed(), exec_ctx, mode)
                 accepted_count, quarantined_count = report.passed_records, report.failed_records
             phases["quarantine"] = sw.elapsed_ms
         else:
+            _ph("remediation_deterministic")
             with Stopwatch() as sw:
                 remediable = [r.rule_id for r in ruleset.executable_rules() if r.remediation.is_remediable]
                 needs = (F.col(C.ERROR_COUNT) > 0) | F.exists(F.col(C.VIOLATIONS), lambda v: v["rule_id"].isin(remediable))
@@ -138,8 +148,10 @@ class DQRunner:
                 intermediate = self.validation.validate(deterministic.dataframe, ruleset, reference_data=reference_data)
                 persisted.append(intermediate)
                 policy_engine = ConfidencePolicyEngine(policy, ApprovalStore.load(policy.approvals_path))
+                _ph("remediation_ai")
                 ai = AIRemediator(self.provider, policy_engine, policy).apply(intermediate.annotated, ruleset, run_id)
             phases["remediation"] = sw.elapsed_ms
+            _ph("revalidation")
             with Stopwatch() as sw:
                 final_input = (C.ensure_remediation_columns(C.strip_annotations(untouched))
                                .unionByName(C.ensure_remediation_columns(C.strip_annotations(ai.dataframe))))
@@ -148,6 +160,7 @@ class DQRunner:
                 fix_stats = reval.stats
             phases["revalidation"] = sw.elapsed_ms
             persisted.append(final)
+            _ph("quarantine")
             with Stopwatch() as sw:
                 final_report = final.report
                 accepted = _project_accepted(final.passed(), input_columns, self.include_dq_columns)

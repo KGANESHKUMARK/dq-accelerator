@@ -1,0 +1,304 @@
+employee_id,full_name,work_email,department,role,annual_salary,hire_date,project_id,is_active,manager_id,skills,phone
+EMP-1149,Divya Verma,divya.verma@acme-corp.com,Engineering,Developer,76044,2023-03-23,PRJ-1001,yes,EMP-1033,"ml,pytorch",+918113457241
+EMP-1081,rohan malhotra,rohan.malhotra@acme-corp.com,Product,Data Analyst,172352,2018-11-07,PRJ-1003,yes,EMP-1021,"js,react",+917534616074
+EMP-1184,Suresh Menon,suresh.menon@acme-corp.com,Product,DevOps Engineer,149949,2024-12-06,PRJ-1001,yes,EMP-1011,"js,react",+919725152347
+EMP-1150,Kiran Das,kirandas@acme-corp.com,Engineering,Tech Lead,50203,2022-06-02,PRJ-1004,yes,EMP-1010,"js,react",+917441973220
+EMP-1223,Deepak Nair,deepak.nair@acme-corp.com,Product,Senior Developer,137124,2018-12-24,PRJ-1001,yes,EMP-1000,"aws,docker",+919811254192
+EMP-1255,Kavya Nair,kavya.nair@acme-corp.com,DevOps,QA Engineer,122359,2022-06-28,PRJ-1003,yes,EMP-1020,"ml,pytorch",+918033895513
+EMP-1237,Kavya Nair,kavya.nair@acme-corp.com,Data,QA Engineer,115220,2021-12-15,PRJ-1001,yes,EMP-1040,"java,spring",+917719731446
+EMP-1211,Pooja Sharma,pooja.sharma@acme-corp.com,Engineering,Tech Lead,109872,2023-12-12,PRJ-1002,yes,EMP-1032,"java,spring",+917691293717
+EMP-1115,Arjun Nair,arjun.nair@acme-corp.com,Product,DevOps Engineer,114309,2021-08-18,PRJ-1003,yes,EMP-1031,"aws,docker",+917423519117
+EMP-1121,Kavya Joshi,kavya.joshi@acme-corp.com,Engineering,Developer,178579,2018-02-22,PRJ-1003,yes,EMP-1002,"java,spring",8820716211
+EMP-1078,Lakshmi Chopra,lakshmi.chopra@acme-corp.com,QA,DevOps Engineer,149829,2023-13-45,PRJ-1004,Y,EMP-1032,"ml,pytorch",+918039116361
+EMP-1042,Ananya Rao,ananya.rao@acme-corp.com,DevOps,Product Manager,135952,2024-01-22,PRJ-1005,yes,EMP-1033,"js,react",+919674192109
+EMP-1089,Meera Joshi,meera.joshi@acme-corp.com,Data,Senior Developer,174399,2023-05-20,PRJ-1005,yes,EMP-1037,"ml,pytorch",+917662259333
+EMP-1290,Deepak Bose,deepak.bose@acme-corp.com,QA,Intern,48247,2023-10-25,PRJ-1004,yes,EMP-1003,"python,sql",+917934635444
+EMP-1193,Priya Iyer,priya.iyer@acme-corp.com,DevOps,Intern,124004,2024-11-27,PRJ-1002,yes,EMP-1026,"aws,docker",+917197449658
+EMP-1040,Meera Menon,meera.menon@acme-corp.com,QA,Intern,101367,2021-08-03,PRJ-1005,yes,EMP-1020,"ml,pytorch",8822944679
+EMP-1052,Ananya Joshi,ananya.joshi@acme-corp.com,Product,Data Analyst,73134,2024-08-26,PRJ-1003,yes,EMP-1007,"aws,docker",+917323408297
+EMP-1046,Kavya Verma,kavya.verma@acme-corp.com,DevOps,QA Engineer,663345,2020-02-28,PRJ-1004,yes,EMP-1000,"go,k8s",+917619142798
+EMP-1090,Lakshmi Joshi,lakshmi.joshi@acme-corp.com,Engineering,Product Manager,139205,2018-08-21,PRJ-1005,yes,EMP-1030,"java,spring",+919942013255
+EMP-1135,Sneha Iyer,sneha.iyer@acme-corp.com,DevOps,QA Engineer,157577,2023-11-06,PRJ-1005,yes,EMP-1011,"js,react",+918937034431
+EMP-1032,Kavya Kulkarni,kavya.kulkarni@acme-corp.com,Security,QA Engineer,100800,2022-08-15,PRJ-1004,yes,EMP-1020,"c#,azure",+918054393708
+EMP-1252,manish patel,manish.patel@acme-corp.com,Product,DevOps Engineer,38340,2024-07-22,PRJ-1004,yes,EMP-1016,"python,sql",+918573478551
+EMP-1158,Divya Reddy,divya.reddy@acme-corp.com,Security,Senior Developer,49657,03/04/2023,PRJ-1004,yes,EMP-1021,"python,sql",+917183379287
+EMP-1080,Aarav Kulkarni,aarav.kulkarni@acme-corp.com,Security,Senior Developer,117167,2020-09-11,PRJ-1002,yes,EMP-1030,"go,k8s",+917782878018
+EMP-1202,Shreya Menon,shreya.menon@acme-corp.com,Engineering,Developer,44838,2024-03-10,PRJ-1003,yes,EMP-1018,"java,spring",8791183272
+EMP-1073,Rahul Reddy,rahul.reddy@acme-corp.com,Security,Senior Developer,124851,10/03/2019,PRJ-1003,no,EMP-1014,"java,spring",+917665484476
+EMP-1132,rohan menon,rohan.menon@acme-corp.com,Engineering,Senior Developer,93940,2022-03-11,PRJ-1005,yes,EMP-1025,"go,k8s",+917792214339
+EMP-1296,Rahul Sharma,rahul.sharma@acme-corp.com,DevOps,Data Analyst,107232,2018-12-20,PRJ-1003,yes,EMP-1003,"go,k8s",+919032209020
+EMP-1153,Pooja Bose,pooja.bose@acme-corp.com,Security,DevOps Engineer,36267,2020-11-27,PRJ-1001,Y,EMP-1024,"c#,azure",+918320748157
+EMP-1248,Rahul Sharma,rahul.sharma@acme-corp.com,Engineering,developer,-46269,2022-03-12,PRJ-1001,yes,EMP-1039,"js,react",+919684922912
+EMP-1166,Ishita Reddy,ishita.reddy@company-mail.com,QA,QA Engineer,118014,2020-04-08,PRJ-1001,yes,EMP-1000,"python,sql",+918657587204
+EMP-1256,Arjun Rao,arjun.rao@acme-corp.com,QA,Intern,39086,2022-01-17,PRJ-1002,no,EMP-1019,"java,spring",+917922656948
+EMP-1059,Aarav Verma,aarav.verma@acme-corp.com,DevOps,Intern,51178,2019-02-05,PRJ-1003,yes,EMP-1020,"aws,docker",+919565778475
+EMP-1134,Vikram Bose,vikram.bose@acme-corp.com,Data,Tech Lead,150025,2024-11-23,PRJ-1003,no,EMP-1008,"js,react",+917506211965
+EMP-1095,Rahul Kulkarni,rahul.kulkarni@acme-corp.com,Data,Developer,117304,2022-08-05,PRJ-1005,yes,EMP-1039,"js,react",+917697940975
+EMP-1289,Ananya Malhotra,ananya.malhotra@acme-corp.com,Data,QA Engineer,119316,2023-10-14,PRJ-1004,yes,EMP-1015,"java,spring",+919845897967
+EMP-1180,Manish Rao,,Security,Data Analyst,104102,2018-08-03,PRJ-1003,no,EMP-1017,"js,react",+919818012241
+EMP-1250,Nikhil Menon,nikhil.menon@acme-corp.com,Data,Data Analyst,175364,2022-03-15,PRJ-1003,yes,EMP-1029,"python,sql",+919740301061
+EMP-1277,Lakshmi Iyer,lakshmi.iyer@acme-corp.com,QA,Senior Developer,129336,2024-07-27,PRJ-1005,yes,EMP-1007,"go,k8s",+918178618666
+EMP-1188,Priya Rao,priya.rao@acme-corp.com,Data,Developer,35175,04/07/2021,PRJ-1004,yes,EMP-1009,"java,spring",+919985827033
+EMP-1088,Deepak Patel,deepak.patel@acme-corp.com,Engineering,Data Analyst,174520,2019-03-14,PRJ-1005,no,EMP-1007,"ml,pytorch",+917657196424
+EMP-1297,Deepak Verma,deepak.verma@acme-corp.com,Security,Product Manager,50148,2020-05-05,PRJ-1005,yes,EMP-1000,"go,k8s",+917479101035
+EMP-1249,Pooja Reddy,pooja.reddy@acme-corp.com,Product,Data Analyst,121047,2021-12-07,PRJ-1001,yes,EMP-1008,"js,react",+917169602003
+EMP-1246,Ishita Iyer,ishita.iyer@acme-corp.com,DevOps,Senior Developer,130872,2021-04-24,PRJ-1001,yes,EMP-1006,"ml,pytorch",+919860482054
+EMP-1251,Meera Sharma,meera.sharma@acme-corp.com,Data,Senior Developer,131578,2023-08-25,PRJ-1005,yes,EMP-1026,"go,k8s",+918383082793
+EMP-1011,Nikhil Reddy,nikhil.reddy@acme-corp.com,Product,Senior Developer,174264,,PRJ-1005,yes,EMP-1015,"java,spring",+918745535098
+EMP-1037,Ishita Bose,ishita.bose@acme-corp.com,Engineering,Intern,158908,2023-13-45,PRJ-1001,yes,EMP-1019,"python,sql",+918065972034
+EMP-1174,Deepak Nair,deepak.nair@acme-corp.com,QA,Product Manager,154006,09/07/2019,PRJ-1005,yes,EMP-1002,"aws,docker",+918423756197
+EMP-1264,Aarav Patel,aarav.patel@acme-corp.com,Security,developer,131324,2021-09-23,PRJ-1001,no,EMP-1038,"ml,pytorch",+917378045890
+EMP-1233,Manish Das,manish.das@acme-corp.com,Product,Tech Lead,161720,2024-11-25,PRJ-1002,yes,EMP-1033,"aws,docker",+918355711871
+EMP-1056,Pooja Verma,pooja.verma@acme-corp.com,Engineering,Intern,35598,2023-13-45,PRJ-1003,yes,EMP-1036,"java,spring",+917294678352
+EMP-1224,Rahul Chopra,rahul.chopra@acme-corp.com,Security,Product Manager,125851,2023-07-25,PRJ-1002,yes,EMP-1030,"java,spring",+918590052587
+EMP-1274,Suresh Verma,suresh.verma@acme-corp.com,Data,QA Engineer,43450,2020-12-25,PRJ-1004,yes,EMP-1008,"java,spring",+917015173668
+EMP-1100,kiran menon,kiran.menon@acme-corp.com,Engineering,Intern,86095,2022-05-18,PRJ-1003,yes,EMP-1037,"java,spring",+918041349374
+EMP-1072,Suresh Menon,suresh.menon@acme-corp.com,Data,Data Analyst,121703,2023-12-22,PRJ-1004,yes,EMP-1005,"js,react",+919400552009
+EMP-1105,Deepak Sharma,deepak.sharma@acme-corp.com,Product,Senior Developer,161732,2023-05-23,PRJ-1001,yes,EMP-1023,"ml,pytorch",+917948540266
+EMP-1143,Meera Verma,meera.verma@acme-corp.com,Security,Tech Lead,30284,2018-03-19,PRJ-1002,yes,EMP-1000,"go,k8s",+918475639733
+EMP-1190,Pooja Chopra,,DevOps,Intern,7751,,PRJ-1001,yes,EMP-1009,"python,sql",+919197757742
+EMP-1104,Deepak Singh,deepak.singh@acme-corp.com,DevOps,Data Analyst,78439,2021-06-08,PRJ-1001,yes,EMP-1017,"js,react",+918296847488
+EMP-1240,Rohan Nair,rohan.nair@acme-corp.com,Security,Tech Lead,104494,2019-03-17,PRJ-1002,yes,EMP-1020,"c#,azure",+919045069031
+EMP-1269,Divya Kumar,,Engineering,Intern,152883,2020-03-28,PRJ-1004,yes,EMP-1012,"java,spring",+917138424884
+EMP-1226,Priya Iyer,priya.iyer@acme-corp.com,Engineering,Intern,46798,2020-02-20,PRJ-1001,yes,EMP-1025,"ml,pytorch",+919818251159
+EMP-1071,Meera Verma,meera.verma@acme-corp.com,DevOps,QA Engineer,131558,2020-11-20,PRJ-1001,yes,EMP-1004,"js,react",+917405899939
+EMP-1054,Aarav Joshi,aarav.joshi@acme-corp.com,Engineering,Intern,137032,2018-01-10,PRJ-1004,yes,EMP-1034,"java,spring",+918669221121
+EMP-1025,Sneha Malhotra,sneha.malhotra@acme-corp.com,Data,Data Analyst,162324,2022-08-06,PRJ-1004,yes,EMP-1040,"js,react",+919238965651
+EMP-1220,Meera Rao,meera.rao@acme-corp.com,Engineering,Product Manager,153578,2019-04-27,PRJ-1004,yes,EMP-1011,"ml,pytorch",+919833169800
+EMP-1242,Pooja Chopra,pooja.chopra@acme-corp.com,Engineering,QA Engineer,32180,2021-08-10,PRJ-1001,yes,EMP-1038,"java,spring",+917031001012
+EMP-1191,Sneha Das,sneha.das@acme-corp.com,QA,Developer,40340,2020-11-11,PRJ-1004,yes,EMP-1002,"python,sql",+917594399606
+EMP-1148,Manish Chopra,manish.chopra@acme-corp.com,Security,QA Engineer,164035,2024-03-18,PRJ-1003,yes,EMP-1004,"js,react",+918878988236
+EMP-1013,rahul verma,rahul.verma@acme-corp.com,Data,Senior Developer,47815,2019-07-04,PRJ-1005,yes,EMP-1039,"python,sql",+918800557283
+EMP-1118,Rohan Verma,rohan.verma@acme-corp.com,Security,developer,127832,2023-13-45,PRJ-1005,no,EMP-1001,"python,sql",+919285835206
+EMP-1285,Ananya Das,ananya.das@acme-corp.com,Security,QA Engineer,176702,2019-09-12,PRJ-1005,yes,EMP-1018,"ml,pytorch",+918051515688
+EMP-1094,Pooja Rao,pooja.rao@acme-corp.com,Data,Data Analyst,162187,2022-05-27,PRJ-1005,yes,EMP-1006,"aws,docker",+918602874642
+EMP-1261,Lakshmi Kumar,lakshmi.kumar@acme-corp.com,DevOps,Senior Developer,125752,2020-06-20,PRJ-1001,yes,EMP-1022,"ml,pytorch",+918899277934
+EMP-1182,Divya Bose,divya.bose@acme-corp.com,Data,QA Engineer,77483,2021-03-24,PRJ-1003,yes,EMP-1011,"go,k8s",+918441530442
+EMP-1273,Arjun Malhotra,arjun.malhotra@acme-corp.com,Security,QA Engineer,59927,2023-06-03,PRJ-1005,yes,EMP-1032,"ml,pytorch",+917686763846
+EMP-1022,Rahul Rao,rahul.rao@acme-corp.com,Product,Tech Lead,179187,2022-01-10,PRJ-1003,yes,EMP-1038,"go,k8s",+918384049914
+EMP-1001,Vikram Sharma,vikram.sharma@acme-corp.com,DevOps,QA Engineer,56793,,PRJ-1001,yes,EMP-1016,"c#,azure",+917186618211
+EMP-1016,Sneha Reddy,sneha.reddy@acme-corp.com,Security,Product Manager,43316,,PRJ-1004,yes,EMP-1021,"c#,azure",+917561866144
+EMP-1155,Deepak Verma,deepak.verma@acme-corp.com,Product,Data Analyst,115524,2020-04-03,PRJ-1002,yes,EMP-1006,"java,spring",+917453796587
+EMP-1142,Nikhil Sharma,nikhil.sharma@acme-corp.com,DevOps,Tech Lead,64580,2020-03-28,PRJ-1003,yes,EMP-1005,"js,react",+919854043590
+EMP-1079,  Ananya Chopra  ,ananya.chopra@acme-corp.com,Data,Senior Developer,167903,2024-09-18,PRJ-1001,yes,EMP-1040,"aws,docker",+918603321558
+EMP-1060,Nikhil Chopra,nikhil.chopra@acme-corp.com,Security,DevOps Engineer,138478,2021-07-14,PRJ-1001,yes,EMP-1016,"js,react",+917655579180
+EMP-1108,Priya Malhotra,priya.malhotra@acme-corp.com,Engineering,Developer,41872,2023-02-18,PRJ-1001,no,EMP-1030,"python,sql",+918233045201
+EMP-1217,nikhil verma,nikhil.verma@acme-corp.com,Engineering,Product Manager,172698,2021-11-13,PRJ-1003,yes,EMP-1004,"ml,pytorch",+918080555408
+EMP-1120,Suresh Malhotra,suresh.malhotra@acme-corp.com,Product,Senior Developer,38305,,PRJ-1004,yes,EMP-1040,"python,sql",+917736086849
+EMP-1185,Nikhil Das,nikhil.das@acme-corp.com,Data,Intern,63922,2023-07-13,PRJ-1004,no,EMP-1002,"ml,pytorch",+917856477685
+EMP-1107,Shreya Singh,shreya.singh@acme-corp.com,QA,Intern,158143,,PRJ-1005,yes,EMP-1008,"ml,pytorch",+918784234958
+EMP-1175,Priya Bose,priya.bose@acme-corp.com,Engineering,Product Manager,55747,2019-03-10,PRJ-1004,yes,EMP-1026,"ml,pytorch",+919772636814
+EMP-1259,Divya Sharma,divya.sharma@acme-corp.com,Engineering,Developer,115676,2019-03-02,PRJ-1004,no,EMP-1036,"ml,pytorch",+917386903346
+EMP-1141,Pooja Patel,pooja.patel@acme-corp.com,DevOps,Intern,118540,2019-10-28,PRJ-1004,yes,EMP-1003,"python,sql",+917427670241
+EMP-1235,Meera Reddy,meera.reddy@acme-corp.com,Engineering,DevOps Engineer,81396,2023-03-16,PRJ-1001,yes,EMP-1040,"ml,pytorch",+919293437741
+EMP-1129,Ananya Kumar,ananya.kumar@acme-corp.com,DevOps,Senior Developer,135068,2024-12-14,PRJ-1005,yes,EMP-1034,"ml,pytorch",+919740963777
+EMP-1086,Ishita Singh,ishita.singh@acme-corp.com,DevOps,Intern,113778,2023-02-18,PRJ-1005,yes,EMP-1010,"go,k8s",+919738900744
+EMP-1058,  Divya Joshi  ,divya.joshi@acme-corp.com,Product,Senior Developer,124906,2018-08-17,PRJ-1002,no,EMP-1033,"js,react",+918967277638
+EMP-1189,Aarav Menon,aaravmenon@acme-corp.com,Data,QA Engineer,164108,2018-05-04,PRJ-1001,yes,EMP-1016,"c#,azure",+919246895401
+EMP-1151,Sneha Kumar,,Engineering,Intern,76913,2024-01-18,PRJ-1004,yes,EMP-1020,"js,react",+917334522402
+EMP-1083,Rohan Joshi,rohan.joshi@acme-corp.com,Data,QA Engineer,41103,2020-10-14,PRJ-1003,yes,EMP-1003,"python,sql",+919882712850
+EMP-1133,  Kavya Rao  ,kavya.rao@acme-corp.com,Product,Tech Lead,83945,2023-02-19,PRJ-1001,yes,EMP-1023,"js,react",+917846427583
+EMP-1214,Rahul Bose,rahul.bose@acme-corp.com,QA,Senior Developer,103561,2019-09-07,PRJ-1003,yes,EMP-1004,"python,sql",+919178314265
+EMP-1140,Kiran Das,kiran.das@acme-corp.com,Engineering,Senior Developer,126749,2021-06-19,PRJ-1001,yes,EMP-1005,"go,k8s",+918969024554
+EMP-1276,Arjun Verma,arjun.verma@company-mail.com,qa,Developer,108234,2018-01-04,PRJ-1004,no,EMP-1018,"ml,pytorch",+919838649569
+EMP-1245,Aarav Kumar,,Product,Product Manager,127359,2024-01-11,PRJ-1001,yes,EMP-1003,"js,react",+918685438702
+EMP-1283,Ananya Singh,ananya.singh@acme-corp.com,QA,DevOps Engineer,36536,2022-03-07,PRJ-1003,no,EMP-1033,"js,react",+918405905813
+EMP-1243,Arjun Chopra,arjun.chopra@acme-corp.com,Product,Tech Lead,50764,2019-09-25,PRJ-1005,yes,EMP-1018,"go,k8s",+919284683201
+EMP-1007,Pooja Iyer,pooja.iyer@acme-corp.com,Data,Data Analyst,125153,2024-05-08,PRJ-1001,yes,EMP-1005,"python,sql",+919087313121
+EMP-1043,Nikhil Verma,nikhil.verma@acme-corp.com,QA,Intern,92730,2020-09-01,PRJ-1005,yes,EMP-1007,"aws,docker",+917504513251
+EMP-1126,Rohan Iyer,rohan.iyer@acme-corp.com,DevOps,Data Analyst,159971,2019-08-04,PRJ-1002,yes,EMP-1021,"c#,azure",+919663705160
+EMP-1002,Shreya Nair,shreya.nair@acme-corp.com,Data,Data Analyst,42012,2024-05-03,PRJ-1002,yes,EMP-1029,"go,k8s",+918566942273
+EMP-1159,Priya Iyer,priya.iyer@acme-corp.com,Security,Developer,122784,2019-05-09,PRJ-1004,yes,EMP-1039,"ml,pytorch",+918055637578
+EMP-1162,Shreya Verma,shreya.verma@acme-corp.com,Data,Tech Lead,75537,2022-06-26,PRJ-1003,Y,EMP-1022,"ml,pytorch",+919420671425
+EMP-1106,Kiran Bose,kiran.bose@acme-corp.com,Data,Intern,87255,2023-10-28,PRJ-1001,yes,EMP-1023,"python,sql",+919423086220
+EMP-1279,Ishita Bose,ishita.bose@acme-corp.com,Product,developer,727921,2023-04-26,PRJ-1005,no,EMP-1021,"js,react",+919406966240
+EMP-1063,  Aarav Das  ,aarav.das@acme-corp.com,QA,developer,178457,2018-03-24,PRJ-1001,yes,EMP-1024,"aws,docker",+918948393831
+EMP-1039,Kavya Malhotra,kavya.malhotra@acme-corp.com,Engineering,Product Manager,91190,2024-11-19,PRJ-1002,yes,EMP-1009,"js,react",+917610900200
+EMP-1225,Ishita Das,ishita.das@acme-corp.com,Security,QA Engineer,90233,2023-03-04,PRJ-1002,yes,EMP-1035,"ml,pytorch",+919993838759
+EMP-1069,Nikhil Joshi,nikhil.joshi@acme-corp.com,Product,Intern,102004,2020-09-03,PRJ-1003,yes,EMP-1023,"c#,azure",+918232986477
+EMP-1101,Manish Kumar,manish.kumar@company-mail.com,DevOps,Intern,31358,2019-07-21,PRJ-1004,yes,EMP-1018,"js,react",+918225849566
+EMP-1187,Lakshmi Joshi,lakshmi.joshi@acme-corp.com,Product,Intern,135746,08/12/2019,PRJ-1002,yes,EMP-1010,"python,sql",+918574498300
+EMP-1294,Kavya Iyer,kavya.iyer@acme-corp.com,DevOps,DevOps Engineer,160588,2019-12-17,PRJ-1003,yes,EMP-1023,"python,sql",+917162629078
+EMP-1257,Aarav Das,aarav.das@acme-corp.com,Data,QA Engineer,70922,2020-10-08,PRJ-1002,yes,EMP-1036,"aws,docker",+919444115276
+EMP-1030,Lakshmi Reddy,lakshmi.reddy@acme-corp.com,Engineering,DevOps Engineer,126703,2022-12-23,PRJ-1001,yes,EMP-1019,"python,sql",9410288290
+EMP-1238,Rahul Chopra,rahul.chopra@acme-corp.com,Engineering,Data Analyst,106377,2022-11-13,PRJ-1003,yes,EMP-1023,"go,k8s",+919520801229
+EMP-1278,Kavya Singh,kavya.singh@acme-corp.com,Engineering,Senior Developer,105284,2024-06-09,PRJ-1005,yes,EMP-1008,"ml,pytorch",+919416496073
+EMP-1003,Pooja Singh,pooja.singh@acme-corp.com,Security,QA Engineer,151178,2023-12-18,PRJ-1002,yes,EMP-1003,"java,spring",+917137869475
+EMP-1024,Ishita Patel,ishita.patel@acme-corp.com,Data,Tech Lead,31453,2024-02-25,PRJ-1004,yes,EMP-1033,"aws,docker",+917215686308
+EMP-1292,  Pooja Verma  ,pooja.verma@acme-corp.com,QA,Product Manager,133355,2023-07-13,PRJ-1004,yes,EMP-1011,"aws,docker",+917597296237
+EMP-1035,Pooja Chopra,pooja.chopra@acme-corp.com,QA,Product Manager,80484,2023-09-25,PRJ-1002,yes,EMP-1017,"go,k8s",+919532256470
+EMP-1253,Rohan Sharma,rohan.sharma@acme-corp.com,DevOps,Senior Developer,124614,2021-06-26,PRJ-1001,yes,EMP-1002,"go,k8s",+917302314710
+EMP-1209,Vikram Patel,vikram.patel@acme-corp.com,QA,Intern,34427,2018-09-01,PRJ-1005,yes,EMP-1002,"go,k8s",+917311769311
+EMP-1295,Pooja Nair,pooja.nair@acme-corp.com,Engineering,Product Manager,53185,2023-12-22,PRJ-1001,yes,EMP-1037,"js,react",+919632982968
+EMP-1124,Kiran Rao,kiranrao@acme-corp.com,Engineering,Intern,64735,,PRJ-1004,yes,EMP-1026,"python,sql",+917112794026
+EMP-1152,Sneha Verma,sneha.verma@acme-corp.com,Engineering,Senior Developer,111447,2022-08-01,PRJ-1003,yes,EMP-1019,"go,k8s",+919674551397
+EMP-1192,Meera Joshi,meera.joshi@acme-corp.com,Data,Senior Developer,59840,2021-05-27,PRJ-1004,yes,EMP-1026,"go,k8s",+917716309186
+EMP-1173,Rohan Patel,rohan.patel@acme-corp.com,QA,Intern,7868,2022-07-04,PRJ-1004,yes,EMP-1037,"c#,azure",+917430372878
+EMP-1076,Sneha Nair,sneha.nair@acme-corp.com,QA,QA Engineer,88205,2020-01-14,PRJ-1001,yes,EMP-1024,"python,sql",+918610237679
+EMP-1048,Ananya Kumar,ananya.kumar@acme-corp.com,Engineering,Senior Developer,37588,26/01/2020,PRJ-1003,yes,EMP-1033,"aws,docker",+919430642523
+EMP-1194,Rahul Sharma,rahul.sharma@acme-corp.com,Security,DevOps Engineer,118683,2023-12-20,PRJ-1001,yes,EMP-1030,"js,react",+919850615512
+EMP-1010,Divya Bose,divya.bose@acme-corp.com,Engineering,Data Analyst,44200,2023-02-02,PRJ-1004,yes,EMP-1006,"java,spring",+917822873088
+EMP-1203,Sneha Kumar,sneha.kumar@acme-corp.com,Product,Product Manager,-26007,2024-11-11,PRJ-1005,yes,EMP-1012,"ml,pytorch",+918902944754
+EMP-1206,Shreya Rao,shreya.rao@acme-corp.com,Product,Data Analyst,169067,2022-11-01,PRJ-1001,yes,EMP-1039,"ml,pytorch",+918047229693
+EMP-1074,Sneha Verma,sneha.verma@acme-corp.com,Data,Tech Lead,73395,2018-07-12,PRJ-1002,no,EMP-1028,"java,spring",+919293560436
+EMP-1117,Rahul Das,rahul.das@acme-corp.com,Security,Intern,122320,2023-09-16,PRJ-1002,no,EMP-1003,"ml,pytorch",+917145271935
+EMP-1020,Vikram Kulkarni,vikram.kulkarni@acme-corp.com,Data,Developer,76810,2020-01-04,PRJ-1005,yes,EMP-1020,"aws,docker",+919603647189
+EMP-1087,Pooja Kumar,pooja.kumar@acme-corp.com,Product,developer,126707,2022-03-20,PRJ-1001,yes,EMP-1030,"ml,pytorch",+918764351603
+EMP-1287,Rohan Malhotra,rohan.malhotra@company-mail.com,Security,Intern,152000,2019-03-28,PRJ-1005,yes,EMP-1011,"go,k8s",+919856929012
+EMP-1093,Ishita Sharma,ishita.sharma@acme-corp.com,DevOps,DevOps Engineer,-19438,2024-11-22,PRJ-1004,Y,EMP-1006,"aws,docker",+917575246182
+EMP-1023,Nikhil Singh,nikhil.singh@acme-corp.com,Security,Senior Developer,117867,,PRJ-1002,yes,EMP-1012,"java,spring",+917104906255
+EMP-1014,Deepak Joshi,deepak.joshi@acme-corp.com,Security,Product Manager,108642,2024-02-01,PRJ-1004,yes,EMP-1006,"python,sql",+919309122187
+EMP-1102,Rohan Kumar,rohan.kumar@acme-corp.com,Engineering,QA Engineer,39526,2021-08-06,PRJ-1003,Y,EMP-1036,"ml,pytorch",+917460852958
+EMP-1077,Rahul Nair,rahul.nair@acme-corp.com,Product,Product Manager,66383,2021-08-20,PRJ-1001,Y,EMP-1013,"c#,azure",+917642181881
+EMP-1215,Deepak Rao,deepak.rao@acme-corp.com,Engineering,Intern,132891,2024-10-24,PRJ-1003,yes,EMP-1005,"aws,docker",+918562790683
+EMP-1091,Nikhil Patel,nikhil.patel@acme-corp.com,DevOps,DevOps Engineer,113706,2024-06-13,PRJ-1002,yes,EMP-1006,"js,react",+918038256217
+EMP-1137,Deepak Bose,deepakbose@acme-corp.com,Engineering,Data Analyst,145701,2021-02-24,PRJ-1002,yes,EMP-1028,"js,react",+918497126699
+EMP-1265,Manish Malhotra,manish.malhotra@acme-corp.com,Engineering,Product Manager,71157,22/06/2020,PRJ-1003,yes,EMP-1032,"js,react",+917266329625
+EMP-1031,Suresh Singh,suresh.singh@acme-corp.com,Security,Product Manager,61733,2022-01-12,PRJ-1005,yes,EMP-1032,"go,k8s",3105400301
+EMP-1282,Rohan Reddy,,DevOps,QA Engineer,60630,2024-05-23,PRJ-1003,yes,EMP-1005,"aws,docker",+918020665694
+EMP-1263,Shreya Singh,shreya.singh@acme-corp.com,QA,QA Engineer,128725,2023-09-02,PRJ-1003,yes,EMP-1039,"js,react",+917227999411
+EMP-1241,Shreya Das,shreya.das@acme-corp.com,Security,Intern,177845,2023-11-18,PRJ-1003,no,EMP-1014,"c#,azure",+917384631600
+EMP-1057,Shreya Singh,shreya.singh@acme-corp.com,Product,QA Engineer,102685,2019-03-18,PRJ-1003,yes,EMP-1001,"java,spring",+917063824611
+EMP-1254,Rohan Singh,rohan.singh@company-mail.com,Security,Tech Lead,95211,2019-09-24,PRJ-1005,yes,EMP-1040,"ml,pytorch",+918537440949
+EMP-1212,Lakshmi Das,lakshmi.das@acme-corp.com,Data,Intern,47658,2019-12-19,PRJ-1004,no,EMP-1015,"python,sql",+918224654701
+EMP-1103,Rahul Menon,rahul.menon@acme-corp.com,Data,QA Engineer,80544,2020-03-24,PRJ-1004,yes,EMP-1000,"go,k8s",+918447885778
+EMP-1258,Rohan Joshi,rohan.joshi@acme-corp.com,Security,Senior Developer,130020,2023-13-45,PRJ-1001,no,EMP-1027,"aws,docker",+917517717617
+EMP-1122,Rohan Menon,rohan.menon@acme-corp.com,DevOps,Data Analyst,50559,2020-01-04,PRJ-1004,yes,EMP-1038,"c#,azure",+919636531097
+EMP-1201,Shreya Singh,shreya.singh@acme-corp.com,QA,QA Engineer,76612,2023-11-11,PRJ-1001,yes,EMP-1037,"ml,pytorch",+919865418497
+EMP-1131,Nikhil Reddy,,Engineering,Senior Developer,67139,2020-08-26,PRJ-1002,yes,EMP-1006,"aws,docker",+919992575455
+EMP-1176,Nikhil Singh,nikhil.singh@acme-corp.com,DevOps,Data Analyst,71673,2023-13-45,PRJ-1005,yes,EMP-1033,"ml,pytorch",+917124331395
+EMP-1005,Kiran Bose,,Engineering,QA Engineer,46653,2022-08-17,PRJ-1003,no,EMP-1000,"go,k8s",+917491995979
+EMP-1204,Pooja Singh,pooja.singh@acme-corp.com,QA,Senior Developer,164701,2018-07-09,PRJ-1005,yes,EMP-1016,"python,sql",+918419756364
+EMP-1084,Pooja Iyer,pooja.iyer@acme-corp.com,Data,Intern,126030,2022-01-20,PRJ-1002,yes,EMP-1023,"aws,docker",+917330220406
+EMP-1267,Shreya Reddy,shreya.reddy@acme-corp.com,Data,DevOps Engineer,167312,2021-03-21,PRJ-1005,no,EMP-1035,"ml,pytorch",+917508469555
+EMP-1068,Sneha Singh,sneha.singh@acme-corp.com,Security,QA Engineer,81713,2019-11-03,PRJ-1002,no,EMP-1029,"c#,azure",+919421225455
+EMP-1216,Divya Iyer,divya.iyer@acme-corp.com,Product,QA Engineer,124056,25/08/2019,PRJ-1001,yes,EMP-1013,"ml,pytorch",+918551562813
+EMP-1270,Aarav Das,aarav.das@acme-corp.com,Security,DevOps Engineer,145155,2021-12-11,PRJ-1004,yes,EMP-1002,"ml,pytorch",+918633694617
+EMP-1009,Aarav Kumar,,Security,DevOps Engineer,573239,2023-13-45,PRJ-1002,yes,EMP-1034,"java,spring",+919452611418
+EMP-1000,Sneha Sharma,sneha.sharma@acme-corp.com,Product,Senior Developer,449123,2022-10-01,PRJ-1005,yes,EMP-1034,"aws,docker",+917946785248
+EMP-1234,Aarav Singh,aaravsingh@acme-corp.com,QA,Product Manager,100623,2022-06-12,PRJ-1002,yes,EMP-1023,"js,react",+918720532107
+EMP-1167,Kavya Iyer,kavya.iyer@acme-corp.com,DevOps,Tech Lead,89135,2018-01-10,PRJ-1001,yes,EMP-1004,"js,react",+917730596287
+EMP-1038,Kavya Kumar,kavya.kumar@acme-corp.com,DevOps,Tech Lead,56013,2019-11-07,PRJ-1003,yes,EMP-1011,"ml,pytorch",+917322401182
+EMP-1127,Rahul Malhotra,rahul.malhotra@acme-corp.com,Security,QA Engineer,82652,2019-07-11,PRJ-1003,yes,EMP-1036,"c#,azure",+918041204430
+EMP-1275,Vikram Sharma,vikram.sharma@acme-corp.com,Data,Intern,154705,2021-02-20,PRJ-1005,yes,EMP-1017,"ml,pytorch",+919699968591
+EMP-1114,Nikhil Kulkarni,nikhil.kulkarni@acme-corp.com,Product,Tech Lead,49079,2024-10-24,PRJ-1005,yes,EMP-1021,"js,react",+917065857791
+EMP-1239,Nikhil Chopra,nikhil.chopra@acme-corp.com,Product,Product Manager,50988,2021-02-04,PRJ-1001,no,EMP-1003,"python,sql",+918705155784
+EMP-1146,Lakshmi Menon,lakshmi.menon@acme-corp.com,Security,DevOps Engineer,132695,2018-04-16,PRJ-1004,yes,EMP-1038,"python,sql",+919268973245
+EMP-1186,Aarav Joshi,aarav.joshi@acme-corp.com,Engineering,DevOps Engineer,111813,2021-09-19,PRJ-1003,yes,EMP-1019,"js,react",+918958188576
+EMP-1291,Deepak Sharma,deepak.sharma@acme-corp.com,DevOps,Tech Lead,83912,2020-05-19,PRJ-1003,no,EMP-1022,"python,sql",2263513519
+EMP-1008,Shreya Reddy,shreya.reddy@acme-corp.com,Data,Tech Lead,82730,2021-11-21,PRJ-1003,yes,EMP-1007,"java,spring",+917965067727
+EMP-1026,Divya Das,divya.das@acme-corp.com,Product,Data Analyst,69539,2023-03-23,PRJ-1002,yes,EMP-1034,"aws,docker",+918785736751
+EMP-1213,Arjun Joshi,arjun.joshi@acme-corp.com,Security,QA Engineer,112924,2019-01-11,PRJ-1002,yes,EMP-1027,"js,react",+918543980627
+EMP-1183,Divya Kulkarni,divya.kulkarni@acme-corp.com,DevOps,Data Analyst,151572,2021-01-28,PRJ-1005,yes,EMP-1030,"java,spring",+919149533961
+EMP-1113,Kavya Chopra,kavya.chopra@acme-corp.com,Data,DevOps Engineer,151379,2022-07-14,PRJ-1005,yes,EMP-1016,"java,spring",+918418468740
+EMP-1284,Sneha Reddy,,DevOps,developer,52826,2018-02-17,PRJ-1003,yes,EMP-1040,"java,spring",+918378170698
+EMP-1164,Kiran Nair,kiran.nair@acme-corp.com,Engineering,Tech Lead,114568,2019-12-14,PRJ-1004,yes,EMP-1035,"go,k8s",+919635860024
+EMP-1157,Pooja Rao,pooja.rao@acme-corp.com,QA,QA Engineer,148541,2022-04-04,PRJ-1004,yes,EMP-1007,"python,sql",+917264867118
+EMP-1055,Shreya Chopra,shreya.chopra@acme-corp.com,DevOps,Intern,103332,12/04/2021,PRJ-1004,no,EMP-1006,"go,k8s",+918577691630
+EMP-1110,Aarav Menon,aarav.menon@acme-corp.com,DevOps,DevOps Engineer,102259,2023-02-02,PRJ-1004,yes,EMP-1001,"java,spring",+917885113834
+EMP-1231,Rahul Patel,rahul.patel@acme-corp.com,QA,Product Manager,79851,2019-04-24,PRJ-1002,yes,EMP-1012,"c#,azure",+918072433719
+EMP-1288,Rahul Malhotra,rahul.malhotra@company-mail.com,Engineering,Intern,121387,2019-09-04,PRJ-1004,yes,EMP-1020,"ml,pytorch",+919789372578
+EMP-1036,Manish Menon,manish.menon@acme-corp.com,QA,QA Engineer,63182,2018-09-10,PRJ-1002,yes,EMP-1006,"c#,azure",+917052679490
+EMP-1027,Kavya Rao,kavya.rao@acme-corp.com,security,Tech Lead,108279,2024-07-18,PRJ-1005,yes,EMP-1031,"java,spring",+918172248246
+EMP-1207,Rahul Rao,rahul.rao@acme-corp.com,DevOps,developer,128293,2022-08-16,PRJ-1001,yes,EMP-1020,"ml,pytorch",+917353670997
+EMP-1247,Ishita Rao,ishita.rao@acme-corp.com,QA,Developer,62018,2023-05-07,PRJ-1003,yes,EMP-1013,"python,sql",+918013465558
+EMP-1293,Suresh Kulkarni,suresh.kulkarni@acme-corp.com,Security,Developer,7954,2023-07-05,PRJ-1001,yes,EMP-1029,"c#,azure",+919986679532
+EMP-1100,kiran menon,kiran.menon@acme-corp.com,Engineering,Intern,86095,2022-05-18,PRJ-1003,yes,EMP-1037,"java,spring",+918041349374
+EMP-1156,Nikhil Joshi,nikhil.joshi@acme-corp.com,Product,Intern,71317,2020-12-23,PRJ-1005,yes,EMP-1020,"java,spring",+917391756438
+EMP-1051,Aarav Verma,aarav.verma@acme-corp.com,QA,DevOps Engineer,79841,2023-12-25,PRJ-1002,yes,EMP-1002,"js,react",1564409423
+EMP-1125,Shreya Patel,shreya.patel@acme-corp.com,devops,Tech Lead,176679,2019-10-17,PRJ-1002,yes,EMP-1017,"js,react",+918152798401
+EMP-1262,Nikhil Verma,nikhil.verma@acme-corp.com,Security,Senior Developer,68712,2024-05-01,PRJ-1003,yes,EMP-1028,"aws,docker",+917097702405
+EMP-1280,Arjun Sharma,arjun.sharma@acme-corp.com,QA,Product Manager,31607,2020-06-13,PRJ-1005,Y,EMP-1011,"java,spring",+918419550393
+EMP-1045,Aarav Menon,aarav.menon@acme-corp.com,Data,Intern,156967,2022-09-13,PRJ-1004,no,EMP-1015,"ml,pytorch",+918644847276
+EMP-1067,Aarav Joshi,aarav.joshi@acme-corp.com,DevOps,Data Analyst,93783,2021-09-03,PRJ-1004,yes,EMP-1014,"js,react",+917722124509
+EMP-1208,Meera Sharma,meera.sharma@acme-corp.com,Security,Tech Lead,144094,2018-12-22,PRJ-1002,yes,EMP-1002,"python,sql",+917314597900
+EMP-1066,Meera Reddy,meera.reddy@acme-corp.com,Data,Data Analyst,41089,2021-02-28,PRJ-1003,yes,EMP-1040,"aws,docker",+918243458354
+EMP-1218,Divya Rao,divya.rao@acme-corp.com,DevOps,Developer,73412,2022-11-09,PRJ-1002,yes,EMP-1038,"go,k8s",+917508224423
+EMP-1085,Manish Kulkarni,manish.kulkarni@acme-corp.com,Product,Developer,131446,2018-05-25,PRJ-1003,yes,EMP-1039,"js,react",+919980624159
+EMP-1281,Ishita Bose,ishita.bose@acme-corp.com,DevOps,Intern,117846,2024-07-24,PRJ-1001,yes,EMP-1020,"ml,pytorch",8712828384
+EMP-1097,Deepak Bose,deepak.bose@acme-corp.com,Data,Tech Lead,38276,2023-02-07,PRJ-1001,yes,EMP-1026,"go,k8s",+917875708102
+EMP-1015,Vikram Reddy,vikram.reddy@acme-corp.com,Product,QA Engineer,109303,2024-11-17,PRJ-1001,yes,EMP-1006,"java,spring",+918135872495
+EMP-1198,Ananya Kulkarni,,Product,Tech Lead,79163,2024-07-07,PRJ-1004,yes,EMP-1021,"python,sql",+918780136605
+EMP-1232,Pooja Reddy,poojareddy@acme-corp.com,Engineering,Intern,171944,2024-08-12,PRJ-1005,yes,EMP-1036,"c#,azure",+918179969405
+EMP-1018,Arjun Kumar,arjun.kumar@acme-corp.com,Data,Tech Lead,92059,2024-03-14,PRJ-1001,yes,EMP-1026,"c#,azure",+919877229210
+EMP-1199,Deepak Nair,deepak.nair@acme-corp.com,Security,QA Engineer,8015,14/10/2021,PRJ-1005,yes,EMP-1037,"java,spring",+917551395583
+EMP-1041,Deepak Verma,deepak.verma@acme-corp.com,Data,Product Manager,158902,2021-06-14,PRJ-1003,yes,EMP-1010,"js,react",+918768002206
+EMP-1065,Kavya Nair,kavya.nair@acme-corp.com,DevOps,Product Manager,44360,10/04/2024,PRJ-1002,yes,EMP-1007,"python,sql",+919136253713
+EMP-1082,Kavya Rao,kavya.rao@acme-corp.com,DevOps,QA Engineer,166125,2018-12-14,PRJ-1001,yes,EMP-1011,"ml,pytorch",+918261717180
+EMP-1227,Lakshmi Verma,lakshmi.verma@acme-corp.com,Security,Developer,165830,2018-10-17,PRJ-1005,yes,EMP-1002,"js,react",+918027599387
+EMP-1197,Ananya Singh,ananya.singh@acme-corp.com,QA,Developer,117024,2022-10-16,PRJ-1003,yes,EMP-1014,"python,sql",+918466117662
+EMP-1170,Rohan Bose,rohan.bose@acme-corp.com,DevOps,Product Manager,78465,2021-06-06,PRJ-1004,yes,EMP-1016,"java,spring",+918153464986
+EMP-1177,Arjun Verma,arjun.verma@acme-corp.com,QA,Product Manager,134056,2018-11-01,PRJ-1002,yes,EMP-1011,"c#,azure",+919038315396
+EMP-1109,Kiran Chopra,kiran.chopra@acme-corp.com,DevOps,Tech Lead,171374,2024-06-04,PRJ-1002,no,EMP-1008,"go,k8s",+917956447193
+EMP-1196,Suresh Kum4r,suresh.kumar@acme-corp.com,Data,Intern,160383,2018-02-13,PRJ-1004,yes,EMP-1005,"c#,azure",+919595033294
+EMP-1070,Rohan Rao,rohan.rao@acme-corp.com,Security,Intern,79345,2021-09-05,PRJ-1001,yes,EMP-1021,"go,k8s",+917362190850
+EMP-1116,Ishita Joshi,ishita.joshi@acme-corp.com,DevOps,DevOps Engineer,7266,2022-12-14,PRJ-1003,yes,EMP-1024,"ml,pytorch",+918055402371
+EMP-1163,Arjun Bose,arjun.bose@acme-corp.com,Engineering,DevOps Engineer,6957,20/04/2024,PRJ-1002,yes,EMP-1020,"python,sql",+917094115188
+EMP-1019,Divya Das,divya.das@acme-corp.com,DevOps,Intern,150665,2024-04-08,PRJ-1001,yes,EMP-1017,"c#,azure",+917298159856
+EMP-1169,Shreya Das,shreya.das@acme-corp.com,Engineering,Intern,142094,,PRJ-1005,yes,EMP-1013,"java,spring",+919741008001
+EMP-1119,Aarav Sharma,aarav.sharma@acme-corp.com,qa,Tech Lead,58053,2022-03-08,PRJ-1002,yes,EMP-1022,"js,react",+918704657157
+EMP-1075,Ishita Singh,ishita.singh@acme-corp.com,DevOps,Product Manager,139749,2024-04-26,PRJ-1005,yes,EMP-1030,"c#,azure",+918594343845
+EMP-1064,Pooja Menon,pooja.menon@acme-corp.com,Data,Developer,43044,2020-08-22,PRJ-1004,yes,EMP-1017,"java,spring",+919200510647
+EMP-1244,Kavya Singh,kavya.singh@acme-corp.com,QA,Intern,158973,2018-03-02,PRJ-1005,yes,EMP-1018,"js,react",+917537039291
+EMP-1178,Pooja Kulkarni,pooja.kulkarni@acme-corp.com,Security,Senior Developer,72705,2024-04-28,PRJ-1002,yes,EMP-1017,"go,k8s",+918758820024
+EMP-1028,Aarav Rao,aarav.rao@acme-corp.com,DevOps,Intern,170017,13/10/2022,PRJ-1001,yes,EMP-1029,"java,spring",+917215970859
+EMP-1299,Nikhil Iyer,nikhil.iyer@acme-corp.com,QA,Product Manager,73935,2021-05-16,PRJ-1005,yes,EMP-1024,"aws,docker",+918127966460
+EMP-1260,Ananya Rao,ananya.rao@acme-corp.com,DevOps,Developer,134471,2024-12-05,PRJ-1002,yes,EMP-1025,"go,k8s",+919453846612
+EMP-1205,Kiran Verma,kiran.verma@acme-corp.com,Engineering,Product Manager,123869,2023-13-45,PRJ-1003,yes,EMP-1033,"python,sql",+919169561289
+EMP-1144,Kavya Reddy,kavya.reddy@acme-corp.com,Engineering,Senior Developer,108447,2024-03-21,PRJ-1002,yes,EMP-1039,"go,k8s",+917704875220
+EMP-1165,Divya Iyer,divya.iyer@acme-corp.com,QA,Developer,132655,2024-10-02,PRJ-1002,yes,EMP-1039,"java,spring",+919747261955
+EMP-1230,Rahul Malhotra,rahul.malhotra@acme-corp.com,Engineering,Product Manager,87771,2019-06-14,PRJ-1003,Y,EMP-1016,"java,spring",+918233899367
+EMP-1298,Deepak Reddy,deepak.reddy@acme-corp.com,Product,DevOps Engineer,38674,2018-03-20,PRJ-1002,yes,EMP-1026,"c#,azure",+918645689727
+EMP-1168,Meera Patel,meera.patel@acme-corp.com,Engineering,Intern,73253,2021-03-02,PRJ-1001,yes,EMP-1026,"go,k8s",+919379894770
+EMP-1096,Lakshmi Menon,lakshmi.menon@acme-corp.com,Data,Product Manager,6356,2021-10-10,PRJ-1001,yes,EMP-1037,"ml,pytorch",+917977290717
+EMP-1033,Rohan Das,rohan.das@acme-corp.com,DevOps,Tech Lead,115200,2019-06-26,PRJ-1003,yes,EMP-1017,"ml,pytorch",+917043598698
+EMP-1154,Manish Kumar,manish.kumar@acme-corp.com,Product,Senior Developer,166251,2020-08-24,PRJ-1001,yes,EMP-1040,"c#,azure",+918693725910
+EMP-1219,Kavya Joshi,kavya.joshi@acme-corp.com,DevOps,QA Engineer,93876,19/10/2019,PRJ-1002,yes,EMP-1036,"java,spring",+917240140248
+EMP-1044,Kiran Bose,kiran.bose@acme-corp.com,Security,Intern,174510,2019-10-17,PRJ-1002,yes,EMP-1026,"js,react",+919180716723
+EMP-1061,Ishita Patel,ishita.patel@company-mail.com,DevOps,Data Analyst,177216,2023-02-14,PRJ-1003,yes,EMP-1027,"c#,azure",+917220959215
+EMP-1062,Lakshmi Menon,lakshmi.menon@acme-corp.com,Product,Intern,175821,2024-05-19,PRJ-1002,yes,EMP-1039,"ml,pytorch",+919899002906
+EMP-1111,Lakshmi Verma,lakshmi.verma@acme-corp.com,Engineering,Developer,86955,2024-01-05,PRJ-1005,no,EMP-1036,"js,react",+919480235438
+EMP-1029,Rahul Singh,rahul.singh@acme-corp.com,DevOps,Tech Lead,35081,2018-06-08,PRJ-1001,yes,EMP-1001,"java,spring",+917856247605
+EMP-1047,Kiran Patel,kiran.patel@acme-corp.com,QA,Tech Lead,169885,2020-11-23,PRJ-1004,yes,EMP-1004,"java,spring",+919710815922
+EMP-1012,Arjun Rao,arjun.rao@acme-corp.com,Engineering,Product Manager,104776,2023-09-22,PRJ-1004,yes,EMP-1003,"ml,pytorch",+919328710672
+EMP-1017,Vikram Iyer,vikram.iyer@acme-corp.com,DevOps,Senior Developer,69073,2024-06-19,PRJ-1005,yes,EMP-1019,"js,react",+917171347175
+EMP-1098,Lakshmi Bose,lakshmi.bose@acme-corp.com,Engineering,DevOps Engineer,155402,2020-03-15,PRJ-1005,yes,EMP-1016,"ml,pytorch",+919079537716
+EMP-1128,Vikram Rao,vikram.rao@acme-corp.com,Product,QA Engineer,151011,2019-08-26,PRJ-1003,yes,EMP-1026,"go,k8s",+919144490990
+EMP-1145,Arjun Reddy,arjun.reddy@acme-corp.com,DevOps,Senior Developer,62284,2021-06-14,PRJ-1003,yes,EMP-1005,"java,spring",+919376820435
+EMP-1112,Rahul Kumar,rahul.kumar@acme-corp.com,Security,Tech Lead,75910,2021-09-16,PRJ-1001,no,EMP-1024,"c#,azure",+919252551683
+EMP-1179,Aarav Bose,aarav.bose@acme-corp.com,Data,DevOps Engineer,110074,2023-11-09,PRJ-1004,yes,EMP-1029,"js,react",+917937200760
+EMP-1228,Meera Patel,meera.patel@acme-corp.com,QA,Tech Lead,47987,2022-05-24,PRJ-1005,no,EMP-1017,"java,spring",+919604310993
+EMP-1053,Divya Rao,divya.rao@acme-corp.com,QA,developer,149219,2023-11-09,PRJ-1005,yes,EMP-1023,"python,sql",+919898400928
+EMP-1268,Kiran Sharma,kiran.sharma@acme-corp.com,DevOps,Product Manager,101774,2019-02-05,PRJ-1002,yes,EMP-1039,"js,react",+919601051560
+EMP-1286,Ananya Joshi,ananya.joshi@company-mail.com,Engineering,Developer,141795,2023-10-19,PRJ-1004,yes,EMP-1012,"go,k8s",+919881365834
+EMP-1210,Manish Nair,manish.nair@acme-corp.com,Data,Intern,38079,2022-04-05,PRJ-1004,yes,EMP-1018,"go,k8s",+917618799724
+EMP-1042,Ananya Rao,ananya.rao@acme-corp.com,DevOps,Product Manager,135952,2024-01-22,PRJ-1005,yes,EMP-1033,"js,react",+919674192109
+EMP-1034,Arjun Patel,arjun.patel@acme-corp.com,Data,Intern,34520,,PRJ-1002,yes,EMP-1037,"js,react",+919032638323
+EMP-1004,Suresh D4s,suresh.das@acme-corp.com,Data,Data Analyst,150285,2019-04-24,PRJ-1005,yes,EMP-1027,"ml,pytorch",+918715412119
+EMP-1005,Kiran Bose,,Engineering,QA Engineer,46653,2022-08-17,PRJ-1003,no,EMP-1000,"go,k8s",+917491995979
+EMP-1160,Ishita Chopra,ishita.chopra@acme-corp.com,Engineering,QA Engineer,167839,2024-09-26,PRJ-1001,no,EMP-1022,"aws,docker",+919338686158
+EMP-1092,Vikram Malhotra,vikram.malhotra@company-mail.com,QA,Tech Lead,71864,2022-12-11,PRJ-1002,yes,EMP-1032,"aws,docker",+919142156616
+EMP-1172,Priya Reddy,priya.reddy@acme-corp.com,Product,QA Engineer,63078,03/11/2021,PRJ-1002,no,EMP-1038,"js,react",+918373313591
+EMP-1266,Suresh Sharma,suresh.sharma@acme-corp.com,Product,Tech Lead,130193,2023-10-28,PRJ-1002,yes,EMP-1027,"js,react",+919600039571
+EMP-1099,Divya Das,divya.das@acme-corp.com,QA,DevOps Engineer,155777,2024-12-09,PRJ-1003,yes,EMP-1024,"aws,docker",+918482342139
+EMP-1123,  Suresh Joshi  ,suresh.joshi@acme-corp.com,DevOps,Data Analyst,78690,2023-07-03,PRJ-1005,yes,EMP-1004,"python,sql",+918150931110
+EMP-1236,Ishita Menon,ishita.menon@acme-corp.com,Engineering,QA Engineer,154921,2018-08-24,PRJ-1003,yes,EMP-1035,"c#,azure",+918106876746
+EMP-1200,Lakshmi Joshi,lakshmi.joshi@acme-corp.com,Data,DevOps Engineer,107115,2019-03-14,PRJ-1005,yes,EMP-1019,"c#,azure",+919352808730
+EMP-1130,Sneha Kumar,sneha.kumar@acme-corp.com,Security,Tech Lead,142841,2018-05-08,PRJ-1005,yes,EMP-1036,"java,spring",+918914604319
+EMP-1050,Nikhil Kulkarni,nikhil.kulkarni@acme-corp.com,DevOps,Intern,130845,2018-04-13,PRJ-1005,yes,EMP-1018,"python,sql",+919827075539
+EMP-1136,Pooja Sharma,pooja.sharma@acme-corp.com,DevOps,Intern,146353,2018-10-01,PRJ-1002,yes,EMP-1034,"js,react",+917722452036
+EMP-1138,Rohan Malhotra,rohanmalhotra@acme-corp.com,Product,Data Analyst,142241,2019-04-27,PRJ-1002,yes,EMP-1034,"js,react",+919563484242
+EMP-1171,Kiran Nair,kiran.nair@acme-corp.com,Data,DevOps Engineer,166991,2022-11-28,PRJ-1004,yes,EMP-1019,"python,sql",+918695671834
+EMP-1139,Rahul Menon,rahul.menon@acme-corp.com,Data,Senior Developer,137897,2020-11-05,PRJ-1002,yes,EMP-1015,"c#,azure",+919904405303
+EMP-1221,Meera Joshi,meera.joshi@acme-corp.com,Engineering,Tech Lead,7141,2022-11-14,PRJ-1002,yes,EMP-1039,"ml,pytorch",+917167660765
+EMP-1181,Ananya Singh,ananya.singh@acme-corp.com,Engineering,Tech Lead,36672,2020-05-14,PRJ-1004,yes,EMP-1036,"c#,azure",+917815679418
+EMP-1272,Kavya Menon,kavya.menon@company-mail.com,Data,Intern,161244,2024-10-23,PRJ-1005,yes,EMP-1028,"python,sql",+917768277634
+EMP-1049,Meera Iyer,meera.iyer@acme-corp.com,DevOps,DevOps Engineer,90866,2020-08-09,PRJ-1001,yes,EMP-1018,"go,k8s",+919347621138
+EMP-1021,Sneha Rao,sneha.rao@acme-corp.com,Engineering,Developer,81651,2018-11-11,PRJ-1005,yes,EMP-1019,"ml,pytorch",+918328367510
+EMP-1271,Suresh Verma,suresh.verma@acme-corp.com,Engineering,DevOps Engineer,40289,2022-11-02,PRJ-1002,yes,EMP-1019,"c#,azure",+918227993812
+EMP-1161,Pooja Joshi,pooja.joshi@acme-corp.com,QA,Developer,45359,2021-09-12,PRJ-1005,no,EMP-1006,"java,spring",+919821211202
+EMP-1195,Suresh Reddy,suresh.reddy@acme-corp.com,Data,QA Engineer,159980,2018-08-11,PRJ-1002,yes,EMP-1032,"java,spring",+919364360455
+EMP-1229,Nikhil Rao,nikhil.rao@acme-corp.com,DevOps,Senior Developer,60673,2020-09-27,PRJ-1005,yes,EMP-1024,"ml,pytorch",+919077174577
+EMP-1147,Aarav Kulkarni,aarav.kulkarni@acme-corp.com,Data,QA Engineer,49134,03/01/2020,PRJ-1002,yes,EMP-1025,"ml,pytorch",+918230455714
+EMP-1006,Shreya Das,shreya.das@acme-corp.com,QA,developer,99045,2024-03-17,PRJ-1001,yes,EMP-1040,"ml,pytorch",+919615507143
+EMP-1222,Shreya Nair,shreya.nair@acme-corp.com,Data,Developer,143114,2020-01-23,PRJ-1005,yes,EMP-1030,"c#,azure",+918637398296

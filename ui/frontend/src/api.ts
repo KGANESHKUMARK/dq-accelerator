@@ -16,6 +16,7 @@ export const api = {
   rulesetDiff: (id: string) => fetch(`${B}/rulesets/${id}/diff`).then(j),
   datasets: () => fetch(`${B}/datasets`).then(j),
   run: (body: any) => fetch(`${B}/dq/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
+  pipelineRun: (id: string, body: any) => fetch(`${B}/pipelines/${id}/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   profile: (body: any) => fetch(`${B}/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   job: (id: string) => fetch(`${B}/jobs/${id}`).then(j),
   jobs: () => fetch(`${B}/jobs`).then(j),
@@ -43,4 +44,4 @@ export const api = {
   approveCorrection: (body: any) => fetch(`${B}/quarantine/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   rejectCorrection: (body: any) => fetch(`${B}/quarantine/reject`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
 }
-export type Job = { job_id: string; kind: string; status: string; progress?: string; result?: any; error?: string; submitted_at: string; finished_at?: string }
+export type Job = { job_id: string; kind: string; status: string; progress?: string; result?: any; error?: string; submitted_at: string; started_at?: string; finished_at?: string }

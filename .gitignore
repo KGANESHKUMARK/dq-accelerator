@@ -15,6 +15,10 @@ ui/frontend/dist/
 .venv/
 .tmp/
 
+# Secrets — never commit credentials
+.env
+.env.*
+
 # Machine-local Devin CLI config
 .devin/config.local.json
 

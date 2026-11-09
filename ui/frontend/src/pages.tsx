@@ -9,7 +9,7 @@ const usePoll = (jobId: string | null, ms = 2500) => {
   const [job, setJob] = useState<Job | null>(null)
   useEffect(() => {
     if (!jobId) { setJob(null); return }
-    setJob({ job_id: jobId, kind: '', status: 'QUEUED', progress: 'submitting…', submitted_at: '' } as Job)
+    setJob({ job_id: jobId, kind: '', status: 'QUEUED', progress: 'submitting…', submitted_at: new Date().toISOString() } as Job)
     let dead = false; let pollTimer: number | undefined
     const es = new EventSource(`/api/jobs/${jobId}/stream`)
     es.addEventListener('status', ev => {
@@ -35,44 +35,84 @@ const usePoll = (jobId: string | null, ms = 2500) => {
   return job
 }
 
-const PHASES: Array<[RegExp, string]> = [
-  [/submit|queue/i, 'Queued'],
-  [/spark|engine/i, 'Starting Spark'],
-  [/read|load/i, 'Reading data'],
-  [/profil/i, 'Profiling'],
-  [/validat/i, 'Validating'],
-  [/remediat|ai|llm/i, 'AI remediation'],
-  [/revalidat/i, 'Revalidating'],
-  [/report|writ/i, 'Writing report'],
-  [/done|complet/i, 'Done'],
+const PHASE_LABELS = ['Queued', 'Starting Spark', 'Reading data', 'Profiling', 'Validating',
+  'AI remediation', 'Revalidating', 'Quarantine', 'Writing report', 'Done']
+// Backend progress messages may carry an explicit "phase=<key> |" tag — preferred.
+const PHASE_KEY: Record<string, number> = {
+  queued: 0, spark: 1, read: 2, profile: 3, validate: 4, remediate: 5, ai: 5,
+  revalidate: 6, quarantine: 7, report: 8, done: 9,
+}
+// Fallback regexes for untaged messages — revalidat must be tested before validat.
+const PHASE_FALLBACK: Array<[RegExp, number]> = [
+  [/submit|queue/i, 0], [/spark|engine/i, 1], [/read|load|sampl/i, 2], [/profil/i, 3],
+  [/revalidat/i, 6], [/validat/i, 4], [/remediat|llm/i, 5], [/quarantin/i, 7],
+  [/report|writ/i, 8], [/done|complet/i, 9],
 ]
+const phaseIndex = (progress: string): number => {
+  const m = /phase=(\w+)/.exec(progress || '')
+  if (m && PHASE_KEY[m[1]] != null) return PHASE_KEY[m[1]]
+  for (const [re, idx] of PHASE_FALLBACK) if (re.test(progress || '')) return idx
+  return -1
+}
 
-const JobStatus = ({ job }: { job: Job | null }) => !job ? null : (
-  <div className="card" style={{ borderLeft: '4px solid var(--info)' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-      <span className={`badge ${job.status}`} style={{ fontSize: 12 }}>{job.status}</span>
-      {(job.status === 'RUNNING' || job.status === 'QUEUED') && <span className="spin" />}
-      <b style={{ flex: 1, fontSize: 13 }}>{job.progress || 'waiting…'}</b>
-      <span className="muted" style={{ fontSize: 11 }}>{job.job_id}</span>
-    </div>
-    {(job.status === 'RUNNING' || job.status === 'QUEUED') && <>
+const fmtClock = (ms: number) => {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
+
+const JobStatus = ({ job }: { job: Job | null }) => {
+  const [now, setNow] = useState(() => Date.now())
+  const active = !!job && (job.status === 'RUNNING' || job.status === 'QUEUED')
+  useEffect(() => {
+    if (!active) return
+    const t = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(t)
+  }, [active])
+  if (!job) return null
+  const t0 = Date.parse(job.started_at || job.submitted_at || '') || now
+  const t1 = job.finished_at ? Date.parse(job.finished_at) : now
+  const cur = phaseIndex(job.progress || '')
+  const chip = (i: number) => {
+    let style: React.CSSProperties
+    let marker = '○'
+    if (job.status === 'COMPLETED') { style = { background: 'var(--success)', color: '#fff' }; marker = '✓' }
+    else if (job.status === 'FAILED') {
+      if (i < cur) { style = { background: 'var(--success)', color: '#fff' }; marker = '✓' }
+      else if (i === cur) { style = { background: 'var(--danger)', color: '#fff' }; marker = '✕' }
+      else { style = { background: 'var(--border)', color: 'var(--muted)' } }
+    } else {
+      if (i < cur) { style = { background: 'var(--success)', color: '#fff', opacity: 0.75 }; marker = '✓' }
+      else if (i === cur) { style = { background: 'var(--info)', color: '#fff' }; marker = '▶' }
+      else { style = { background: 'var(--border)', color: 'var(--muted)' } }
+    }
+    return <span key={i} className="badge" style={{ fontSize: 10, ...style }}>{marker} {PHASE_LABELS[i]}</span>
+  }
+  const phases = job.result?.phases as Record<string, number> | undefined
+  return (
+    <div className="card" style={{ borderLeft: `4px solid ${job.status === 'FAILED' ? 'var(--danger)' : 'var(--info)'}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <span className={`badge ${job.status}`} style={{ fontSize: 12 }}>{job.status}</span>
+        {active && <span className="spin" />}
+        <b style={{ flex: 1, fontSize: 13 }}>{job.progress || 'waiting…'}</b>
+        <span className="muted" style={{ fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
+          {active ? `elapsed ${fmtClock(now - t0)}` : job.finished_at ? `took ${fmtClock(t1 - t0)}` : ''}
+        </span>
+        <span className="muted" style={{ fontSize: 11 }}>{job.job_id}</span>
+      </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-        {PHASES.map(([re, label]) => {
-          const active = re.test(job.progress || '')
-          return <span key={label} className="badge" style={{
-            fontSize: 10, opacity: active ? 1 : 0.35,
-            background: active ? 'var(--info)' : 'var(--border)',
-            color: active ? '#fff' : 'var(--muted)' }}>{label}</span>
-        })}
+        {PHASE_LABELS.map((_, i) => chip(i))}
       </div>
-      <div className="progress-bar" style={{ height: 8 }}>
-        <div className="progress-fill" style={{ width: '60%', animation: 'pulse 1.2s infinite' }} />
-      </div>
-    </>}
-    {job.error && <pre className="err" style={{ marginTop: 8 }}>{job.error}</pre>}
-    {job.result?.summary && <pre style={{ marginTop: 8 }}>{job.result.summary}</pre>}
-  </div>
-)
+      {active && <div className="progress-bar" style={{ height: 8 }}>
+        <div className="progress-fill" style={{ width: `${Math.min(95, 8 + (cur >= 0 ? cur : 0) * 10)}%`, animation: 'pulse 1.2s infinite' }} />
+      </div>}
+      {phases && <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+        phase timings: {Object.entries(phases).map(([k, v]) => `${k} ${(v / 1000).toFixed(1)}s`).join(' · ')}
+      </div>}
+      {job.error && <pre className="err" style={{ marginTop: 8 }}>{job.error}</pre>}
+      {job.result?.summary && <pre style={{ marginTop: 8 }}>{job.result.summary}</pre>}
+    </div>
+  )
+}
 
 /* ---- Bar chart ---- */
 const Bar = ({ pct, color }: { pct: number; color?: string }) => (
@@ -147,10 +187,41 @@ const RulesView = ({ rules }: { rules: any[] }) => !rules?.length ? null : (
   </div>
 )
 
+const PipelineRunView = ({ r, jid }: { r: any; jid?: string }) => (
+  <div className="card">
+    <h3>Pipeline run <span className="muted">— {jid} · {r.pipeline_id} / {r.dataset} [{r.mode}]</span></h3>
+    <div className="stat-grid" style={{ marginBottom: 12 }}>
+      <div className="stat-tile"><div className="num">{r.stages?.length ?? 0}</div><div className="lbl">Stages</div></div>
+      <div className="stat-tile"><div className={`num ${r.gate_passed ? 'ok' : 'bad'}`}>{r.gate_passed ? 'PASS' : 'FAIL'}</div><div className="lbl">Overall gate</div></div>
+      <div className="stat-tile"><div className="num">{r.halted ? 'HALTED' : 'DONE'}</div><div className="lbl">Flow</div></div>
+      <div className="stat-tile"><div className="num">{((r.duration_ms ?? 0) / 1000).toFixed(1)}s</div><div className="lbl">Duration</div></div>
+    </div>
+    <table className="tbl">
+      <thead><tr><th>Stage</th><th>Status</th><th>Ruleset</th><th>Input</th><th>Accepted</th><th>Quarantined</th><th>Gate</th><th>Time</th></tr></thead>
+      <tbody>
+        {(r.stages || []).map((s: any) => (
+          <tr key={s.stage}>
+            <td><b>{s.stage}</b></td>
+            <td><span className={`badge ${s.status === 'COMPLETED' ? 'COMPLETED' : s.status === 'SKIPPED' ? 'REGISTERED' : 'FAILED'}`}>{s.status}</span></td>
+            <td className="muted">{s.ruleset ?? '—'}</td>
+            <td>{s.input?.toLocaleString() ?? '—'}</td>
+            <td className="ok">{s.accepted?.toLocaleString() ?? '—'}</td>
+            <td className="bad">{s.quarantined?.toLocaleString() ?? '—'}</td>
+            <td>{s.gate_passed == null ? '—' : s.gate_passed ? <span className="ok">PASS</span> : <span className="bad">FAIL</span>}</td>
+            <td className="muted">{s.duration_ms ? `${(s.duration_ms / 1000).toFixed(1)}s` : '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {r.summary && <pre style={{ marginTop: 10 }}>{r.summary}</pre>}
+  </div>
+)
+
 const JobResult = ({ job }: { job: Job | null }) => {
   const r = job?.result
   if (!job || !r) return null
   if (job.kind === 'profile' || job.kind === 'bootstrap_preview') return <ProfileView r={r} jid={job.job_id} />
+  if (job.kind === 'pipeline_run') return <PipelineRunView r={r} jid={job.job_id} />
   const score = r.input ? Math.round(r.accepted / r.input * 100) : null
   return <>
     <div className="card">
@@ -658,12 +729,15 @@ export function Onboard() {
   const pickDs = (path: string, name: string) => { setSource(path); setDataset(name); if (!pipelineId) setPipelineId(`${name.toUpperCase()}_PIPELINE`) }
   const upload = async (f: File) => { setErr(''); try { const r = await api.upload(f); pickDs(r.path, r.filename.replace(/\.[^.]+$/, '').toLowerCase()) } catch (e: any) { setErr(e.message) } }
   const runPreview = async () => { setErr(''); setResult(null); try { setJobId((await api.onboardPreview({ source, dataset, stage })).job_id); setStep(2) } catch (e: any) { setErr(e.message) } }
+  const [finishing, setFinishing] = useState(false)
+  const previewBusy = !!job && (job.status === 'RUNNING' || job.status === 'QUEUED')
   const finalize = async () => {
-    setErr('')
+    if (finishing) return
+    setErr(''); setFinishing(true)
     try {
       setResult(await api.onboardFinalize({ preview_job_id: jobId, approved_rule_ids: [...approved], dataset, ruleset_id: preview.ruleset_id, pipeline_id: pipelineId, platform, stage, dq_mode: dqMode, policy, owner, source, publish: pub, onboard: onb, force }))
       setStep(4)
-    } catch (e: any) { setErr(e.message) }
+    } catch (e: any) { setErr(e.message) } finally { setFinishing(false) }
   }
   const confColor = (c: number) => c >= 0.9 ? 'var(--success)' : c >= 0.7 ? 'var(--warn)' : 'var(--danger)'
 
@@ -727,7 +801,7 @@ export function Onboard() {
       </div>
       <div className="btn-row">
         <button className="btn sec" onClick={() => setStep(0)}>← Back</button>
-        <button className="btn" onClick={runPreview} disabled={!dataset || !pipelineId}>Profile + generate rules →</button>
+        <button className="btn" onClick={runPreview} disabled={!dataset || !pipelineId || previewBusy}>{previewBusy ? 'Profiling…' : 'Profile + generate rules →'}</button>
       </div>
     </div>}
 
@@ -762,7 +836,7 @@ export function Onboard() {
       </div>
       <div className="btn-row">
         <button className="btn sec" onClick={() => setStep(1)}>← Options</button>
-        <button className="btn" onClick={finalize} disabled={!approved.size}>Write ruleset + manifest{onb ? ' + register' : ''} →</button>
+        <button className="btn" onClick={finalize} disabled={!approved.size || finishing}>{finishing ? 'Writing…' : `Write ruleset + manifest${onb ? ' + register' : ''} →`}</button>
       </div>
     </div>}
 
@@ -838,8 +912,24 @@ export function RunDQ() {
     if (d.manifest?.policy) setPol(resolveRel(d.manifest.policy))
     if (dss.length) applyDs(dss[0])
   }
-  const submit = async () => { const r = await api.run({ source: src, ruleset: rs, mode, dataset: ds, pipeline_id: pid, policy: pol }); setJobId(r.job_id) }
-  const submitProfile = async () => { const r = await api.profile({ source: src, dataset: ds, mode: 'FULL' }); setPjob(r.job_id) }
+  const [err, setErr] = useState('')
+  const jobActive = (j: Job | null) => !!j && (j.status === 'RUNNING' || j.status === 'QUEUED')
+  const busy = jobActive(job) || jobActive(prof)
+  const submit = async () => {
+    setErr('')
+    try { const r = await api.run({ source: src, ruleset: rs, mode, dataset: ds, pipeline_id: pid, policy: pol }); setJobId(r.job_id) }
+    catch (e: any) { setErr(e.message) }
+  }
+  const submitProfile = async () => {
+    setErr('')
+    try { const r = await api.profile({ source: src, dataset: ds, mode: 'FULL' }); setPjob(r.job_id) }
+    catch (e: any) { setErr(e.message) }
+  }
+  const submitPipeline = async () => {
+    setErr('')
+    try { const r = await api.pipelineRun(pipeSel, { dataset_id: ds, mode }); setJobId(r.job_id) }
+    catch (e: any) { setErr(e.message) }
+  }
   const rsOptions = governed ? rsOpts : ADHOC_RS.map(([l, v]) => ({ label: l, value: v }))
 
   return <>
@@ -892,10 +982,12 @@ export function RunDQ() {
         </div>
       </div>
       {governed && <div className="info-box">Governed mode — dataset, source, ruleset and policy are locked to the manifest. Only the execution mode is adjustable.</div>}
+      {err && <div className="warn-box">{err}</div>}
       <div className="btn-row">
-        <button className="btn" onClick={submit}>▶ Run DQ</button>
-        <button className="btn sec" onClick={submitProfile}>⬡ Profile only</button>
-        <span className="muted">Spark runs take 15–120 s. Live progress streams automatically.</span>
+        <button className="btn" onClick={submit} disabled={busy}>▶ Run DQ</button>
+        {governed && <button className="btn" style={{ background: 'var(--success)' }} onClick={submitPipeline} disabled={busy}>▶▶ Run all stages</button>}
+        <button className="btn sec" onClick={submitProfile} disabled={busy}>⬡ Profile only</button>
+        <span className="muted">{busy ? 'A job is already running — wait for it to finish.' : governed ? 'Run DQ = single stage · Run all stages = BRONZE→SILVER→GOLD chained.' : 'Spark runs take 15–120 s. Live progress streams automatically.'}</span>
       </div>
     </div>
 

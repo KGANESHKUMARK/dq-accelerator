@@ -12,6 +12,13 @@ set "VENV_PY=%ROOT%\.venv\Scripts\python.exe"
 set "LOGDIR=%ROOT%\logs"
 set "MISSING=0"
 
+rem Load local secrets/config (DATABRICKS_TOKEN etc.) if .env exists — gitignored
+if exist "%ROOT%\.env" (
+    for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%ROOT%\.env") do (
+        if not defined %%a set "%%a=%%b"
+    )
+)
+
 title DQ Accelerator - Startup
 cls
 echo ============================================================

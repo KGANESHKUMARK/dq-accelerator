@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: SW_EMPLOYEES_PIPELINE
+  pipeline_name: Sw Employees Pipeline
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: OBSERVE_ONLY
+  owner: test@gmail.com
+  description: Onboarded via UI wizard from sw_employees.csv (303 rows profiled)
+  policy: ../policies/default.yaml
+  datasets:
+  - dataset_id: sw_employees
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    rulesets:
+      SILVER: ../rulesets/sw_employees_v1.yaml
+    test_data: ../../data/uploads/sw_employees.csv
+    test_data_format: CSV

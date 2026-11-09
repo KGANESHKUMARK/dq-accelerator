@@ -1,0 +1,441 @@
+ruleset:
+  ruleset_id: sw_employees_silver
+  dataset: sw_employees
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates sw_employees_silver@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_SW_EMPLOYEES_001
+    name: employee_id_not_null
+    description: employee_id is populated in 100.0% of rows
+    dataset: sw_employees
+    column: employee_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_003
+    name: employee_id_regex
+    description: employee_id follows the structural pattern AAA-9999
+    dataset: sw_employees
+    column: employee_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{3}\-[0-9]{4}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA-9999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_005
+    name: full_name_not_null
+    description: full_name is populated in 100.0% of rows
+    dataset: sw_employees
+    column: full_name
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_008
+    name: work_email_regex
+    description: work_email contains e-mail addresses
+    dataset: sw_employees
+    column: work_email
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        email_match_percentage: 100.0
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_009
+    name: department_not_null
+    description: department is populated in 100.0% of rows
+    dataset: sw_employees
+    column: department
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_011
+    name: role_not_null
+    description: role is populated in 100.0% of rows
+    dataset: sw_employees
+    column: role
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_013
+    name: annual_salary_not_null
+    description: annual_salary is populated in 100.0% of rows
+    dataset: sw_employees
+    column: annual_salary
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_014
+    name: annual_salary_data_type
+    description: annual_salary holds whole numbers stored as text
+    dataset: sw_employees
+    column: annual_salary
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_017
+    name: hire_date_date_format
+    description: hire_date is a date in yyyy-MM-dd
+    dataset: sw_employees
+    column: hire_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9181
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 91.81
+          dd/MM/yyyy: 5.46
+          MM/dd/yyyy: 3.07
+        date_min: '2018-01-04'
+        date_max: '2024-12-14'
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_018
+    name: project_id_not_null
+    description: project_id is populated in 100.0% of rows
+    dataset: sw_employees
+    column: project_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_020
+    name: is_active_not_null
+    description: is_active is populated in 100.0% of rows
+    dataset: sw_employees
+    column: is_active
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_022
+    name: manager_id_not_null
+    description: manager_id is populated in 100.0% of rows
+    dataset: sw_employees
+    column: manager_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_023
+    name: manager_id_regex
+    description: manager_id follows the structural pattern AAA-9999
+    dataset: sw_employees
+    column: manager_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{3}\-[0-9]{4}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA-9999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_025
+    name: skills_not_null
+    description: skills is populated in 100.0% of rows
+    dataset: sw_employees
+    column: skills
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_027
+    name: phone_not_null
+    description: phone is populated in 100.0% of rows
+    dataset: sw_employees
+    column: phone
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 303
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_028
+    name: phone_data_type
+    description: phone holds whole numbers stored as text
+    dataset: sw_employees
+    column: phone
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_030
+    name: sw_employees_duplicate
+    description: exact duplicate records were found
+    dataset: sw_employees
+    column: null
+    rule_type: DUPLICATE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      keys: ALL_COLUMNS
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        duplicate_rows: 3
+        duplicate_groups: 3
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  - rule_id: GEN_SW_EMPLOYEES_031
+    name: sw_employees_schema_validation
+    description: schema observed at profiling time
+    dataset: sw_employees
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: employee_id
+        type: string
+      - name: full_name
+        type: string
+      - name: work_email
+        type: string
+      - name: department
+        type: string
+      - name: role
+        type: string
+      - name: annual_salary
+        type: string
+      - name: hire_date
+        type: string
+      - name: project_id
+        type: string
+      - name: is_active
+        type: string
+      - name: manager_id
+        type: string
+      - name: skills
+        type: string
+      - name: phone
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 12
+      profiled_at: '2026-11-09T16:25:39Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-09T16:29:52Z'
+  change_log:
+  - approved 18 of 31 candidate rules

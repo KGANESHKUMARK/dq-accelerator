@@ -37,6 +37,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+# Job threads do not survive a backend restart — any QUEUED/RUNNING row still
+# present at process start is a dead worker. Mark it failed so the UI never
+# shows a zombie "running" job.
+_conn.execute("UPDATE jobs SET status='FAILED', finished_at=?, progress='interrupted', "
+              "error='job interrupted — backend restarted before it finished' "
+              "WHERE status IN ('QUEUED','RUNNING')", (_now(),))
+_conn.commit()
+
+
+class JobConflict(Exception):
+    """Raised when a job is submitted while another job is still active."""
+
+
 def _emit(job_id: str, event: str, data: dict[str, Any]) -> None:
     with _econd:
         _events.setdefault(job_id, []).append({"event": event, "data": data})
@@ -54,6 +67,16 @@ def _update(job_id: str, **fields: Any) -> None:
 def submit(kind: str, fn: Callable[[], dict[str, Any]]) -> str:
     job_id = f"JOB-{uuid.uuid4().hex[:10].upper()}"
     with _lock:
+        # One Spark-backed job at a time — concurrent runs share a single
+        # local SparkSession and would contend for driver memory. Reject
+        # double/triple submits instead of queueing silently.
+        active = _conn.execute(
+            "SELECT job_id, kind, status FROM jobs WHERE status IN ('QUEUED','RUNNING') "
+            "ORDER BY submitted_at DESC LIMIT 1").fetchone()
+        if active:
+            raise JobConflict(
+                f"{active[0]} ({active[1]}) is still {active[2].lower()} — "
+                "wait for it to finish before starting another job")
         _conn.execute("INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?)",
                       (job_id, kind, "QUEUED", _now(), None, None, "queued", None, None))
         _conn.commit()

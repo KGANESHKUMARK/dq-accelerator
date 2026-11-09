@@ -8,7 +8,7 @@ standalone Spark applications and any other PySpark-compatible runtime.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from pyspark.sql import DataFrame
 
@@ -90,7 +90,8 @@ class DataQualityEngine:
     def run(self, dataframe: DataFrame, ruleset: RuleSet | str | Path,
             policy: RemediationPolicyConfig | str | Path | None = None, context: PipelineContext | None = None, *,
             mode: IntegrationMode | str | None = None, reference_data: Mapping[str, DataFrame] | None = None,
-            profile: bool = False, confidence_threshold: float | str | None = None) -> DQResult:
+            profile: bool = False, confidence_threshold: float | str | None = None,
+            on_phase: Callable[[str], None] | None = None) -> DQResult:
         """Run profiling (optional), validation and - depending on the mode - enforcement or remediation."""
         rules = self.load_ruleset(ruleset)
         policy_cfg = self.load_policy(policy)
@@ -122,7 +123,7 @@ class DataQualityEngine:
                           note="running without lifecycle governance")
         runtime = inspect_runtime(get_spark(dataframe)).to_dict()
         result = runner.run(dataframe, rules, policy_cfg, context, resolved_mode, reference_data=reference_data,
-                            profile=profile, ruleset_published=published, runtime=runtime)
+                            profile=profile, ruleset_published=published, runtime=runtime, on_phase=on_phase)
         if self.pipeline_registry is not None and self.pipeline_registry.exists(context.pipeline_id):
             m = result.execution_metrics
             self.pipeline_registry.record_execution(context.pipeline_id, {

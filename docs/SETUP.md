@@ -28,13 +28,17 @@ Stop: close the two service windows.
 
 Core deps are in `requirements.txt` — LLM deps are in **`requirements-llm.txt`** and are installed **automatically by `DQ_start.bat` only when `DATABRICKS_TOKEN` is set**. Without them the app runs with MockAI (no external LLM).
 
-Set env vars **before** running `DQ_start.bat`:
+Create a `.env` file in the project root (gitignored — never commit it):
 
 ```
-DATABRICKS_HOST   = https://<workspace>.cloud.databricks.com
-DATABRICKS_TOKEN  = <personal-access-token>
-DQX_MODEL_ENDPOINT= databricks-meta-llama-3-3-70b-instruct
+DATABRICKS_HOST=https://<workspace>.cloud.databricks.com
+DATABRICKS_TOKEN=<personal-access-token>
+DQX_MODEL_ENDPOINT=databricks-meta-llama-3-3-70b-instruct
 ```
+
+`.env` is loaded automatically by `DQ_start.bat` **and** by the backend on startup — so the token survives restarts and works however the app is launched. Real env vars still take precedence if both are set.
+
+Or set env vars manually **before** running `DQ_start.bat` (same three variables as above).
 
 Or install LLM deps manually: `pip install -r requirements-llm.txt`
 

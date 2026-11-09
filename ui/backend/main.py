@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,21 @@ from pydantic import BaseModel
 import jobs as J
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dotenv(path: Path) -> None:
+    """Load KEY=VALUE pairs from a .env file into os.environ (no override)."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_dotenv(ROOT / ".env")
 
 from dq_core.runtime.config import EngineConfig
 from dq_core.runtime.logging import configure_logging
@@ -151,6 +167,23 @@ def onboard(body: ManifestIn) -> dict[str, Any]:
         return {"ok": True, "pipeline_id": mf.pipeline_id, "state": entry["state"]}
     except Exception as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+class PipelineRunIn(BaseModel):
+    dataset_id: str | None = None
+    mode: str | None = None                 # defaults to manifest dq_mode
+    halt_on_gate_failure: bool = False      # stop downstream stages if a gate fails
+
+
+# NOTE: must stay ABOVE /api/pipelines/{pid}/{action} — Starlette matches in
+# registration order and "{action}" would otherwise swallow "run".
+@app.post("/api/pipelines/{pid}/run")
+def pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, str]:
+    try:
+        jid = J.submit("pipeline_run", lambda: _do_pipeline_run(pid, body))
+    except J.JobConflict as e:
+        raise HTTPException(409, str(e))
+    return {"job_id": jid}
 
 
 @app.post("/api/pipelines/{pid}/{action}")
@@ -298,6 +331,49 @@ def ruleset_diff(rid: str, from_: str = "", to: str = "") -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ datasets / runs
+def _prog(msg: str) -> None:
+    """Emit a granular progress update for the job running on this thread.
+    Messages may carry a 'phase=<key> |' prefix the UI maps to phase chips."""
+    import threading as _t
+    name = _t.current_thread().name
+    if not name.startswith("dq-job-"):
+        return
+    J.progress_cb(name.replace("dq-job-", ""), msg)
+
+
+def _spark_engine() -> tuple[Any, Any]:
+    """Start/reuse Spark + engine, reporting each step. Returns (spark, engine)."""
+    t0 = time.monotonic()
+    _prog("phase=spark | starting Spark session (first run after boot can take ~30–60s)")
+    spark = J.get_spark()
+    _prog("phase=spark | loading engine + AI provider")
+    engine = J.get_engine()
+    _prog(f"phase=spark | Spark + engine ready in {time.monotonic() - t0:.1f}s")
+    return spark, engine
+
+
+def _read_source(spark: Any, src: Path):
+    from dq_core.io.sources import CsvSource, ParquetSource
+    size_mb = src.stat().st_size / (1024 * 1024) if src.exists() else 0.0
+    _prog(f"phase=read | reading {src.name} ({size_mb:.1f} MB)")
+    df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
+          else CsvSource(str(src)).read(spark))
+    cols = df.columns
+    shown = ", ".join(cols[:8]) + ("…" if len(cols) > 8 else "")
+    _prog(f"phase=read | loaded {len(cols)} columns: {shown}")
+    return df
+
+
+_RUN_PHASE_LABELS = {
+    "profiling": "phase=profile | profiling dataset statistics",
+    "validation": "phase=validate | validating all rules against the data",
+    "remediation_deterministic": "phase=remediate | applying deterministic fixes",
+    "remediation_ai": "phase=ai | AI corrections via LLM provider",
+    "revalidation": "phase=revalidate | re-validating corrected rows",
+    "quarantine": "phase=quarantine | building quarantine + quality gate",
+}
+
+
 @app.get("/api/datasets")
 def datasets() -> list[dict[str, str]]:
     d = ROOT / "sample_data" / "bronze"
@@ -317,12 +393,11 @@ class RunIn(BaseModel):
 
 def _do_run(body: RunIn) -> dict[str, Any]:
     from dq_core.context import PipelineContext
-    from dq_core.io.sources import CsvSource, ParquetSource
-    spark, engine = J.get_spark(), J.get_engine()
+    t0 = time.monotonic()
+    spark, engine = _spark_engine()
     rs = engine.load_ruleset(str(ROOT / body.ruleset))
     src = ROOT / body.source
-    df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
-          else CsvSource(str(src)).read(spark))
+    df = _read_source(spark, src)
     # Auto-sample large files using config thresholds (engine.yaml -> validation.*)
     val_cfg = engine.config.validation
     threshold_mb = val_cfg.large_file_threshold_mb
@@ -335,14 +410,18 @@ def _do_run(body: RunIn) -> dict[str, Any]:
         fraction = min(0.01, max(0.0001, target_rows / max(est_rows, 1)))
         df = df.sample(withReplacement=False, fraction=fraction, seed=42)
         sampled = True
+        _prog(f"phase=read | sampling large file → ~{target_rows:,} rows")
     ctx = PipelineContext(pipeline_id=body.pipeline_id, pipeline_run_id=body.run_id,
                           dataset=body.dataset or rs.dataset, stage=rs.stage, platform="LOCAL")
-    import jobs as _j, threading as _t
-    _jid = _t.current_thread().name.replace("dq-job-", "")
+    try:
+        n_rules = len(rs.executable_rules())
+    except Exception:
+        n_rules = len(getattr(rs, "rules", []) or [])
     sample_note = f" (sampled {file_size_mb:.0f}MB -> ~{target_rows:,} rows)" if sampled else ""
-    _j.progress_cb(_jid, f"validating {rs.ref} on {src.name}{sample_note} — mode={body.mode}")
-    res = engine.run(df, rs, str(ROOT / body.policy) if body.policy else None, ctx, mode=body.mode)
-    _j.progress_cb(_jid, "writing report")
+    _prog(f"phase=validate | validating {rs.ref} on {src.name}{sample_note} — mode={body.mode}, {n_rules} rules")
+    res = engine.run(df, rs, str(ROOT / body.policy) if body.policy else None, ctx, mode=body.mode,
+                     on_phase=lambda k: _prog(_RUN_PHASE_LABELS.get(k, f"phase=validate | {k}")))
+    _prog(f"phase=report | engine finished in {time.monotonic() - t0:.1f}s — writing report")
     out = ROOT / "reports"
     out.mkdir(parents=True, exist_ok=True)
     rep = out / f"{body.dataset or rs.dataset}_{res.run_id}.json"
@@ -359,15 +438,112 @@ def _do_run(body: RunIn) -> dict[str, Any]:
             "report_path": str(rep.relative_to(ROOT)).replace("\\", "/"),
             "rules": rules,
             "quarantine_by_status": res.execution_metrics.quarantine_status_breakdown if hasattr(
-                res.execution_metrics, "quarantine_status_breakdown") else None}
+                res.execution_metrics, "quarantine_status_breakdown") else None,
+            "phases": getattr(res.execution_metrics, "phase_durations_ms", None)}
     _ingest_anomalies(result, body.pipeline_id)
     return result
 
 
 @app.post("/api/dq/run")
 def dq_run(body: RunIn) -> dict[str, str]:
-    jid = J.submit("dq_run", lambda: _do_run(body))
+    try:
+        jid = J.submit("dq_run", lambda: _do_run(body))
+    except J.JobConflict as e:
+        raise HTTPException(409, str(e))
     return {"job_id": jid}
+
+
+# ------------------------------------------------------------------ medallion pipeline run
+_STAGE_ORDER = {"BRONZE": 0, "SILVER": 1, "GOLD": 2}
+
+
+def _load_pipeline_manifest(pid: str):
+    from dq_core.pipelines.manifest import PipelineManifest
+    mdir = ROOT / "config" / "pipelines"
+    direct = mdir / f"{pid}.yaml"
+    if direct.exists():
+        return PipelineManifest.load(direct)
+    for p in sorted(mdir.glob("*.yaml")):
+        try:
+            mf = PipelineManifest.load(p)
+            if mf.pipeline_id == pid:
+                return mf
+        except Exception:
+            continue
+    raise HTTPException(404, f"pipeline manifest not found for {pid}")
+
+
+def _stage_prog(stage: str, key: str) -> None:
+    tag, _, text = _RUN_PHASE_LABELS.get(key, "phase=validate | step").partition(" | ")
+    _prog(f"{tag} | [{stage}] {text}")
+
+
+def _do_pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, Any]:
+    """Medallion execution: run each stage's ruleset in BRONZE→SILVER→GOLD order,
+    chaining each stage's accepted output into the next. Stages without a ruleset
+    pass through. Per-stage reports are written; the pipeline registry records
+    each execution automatically via engine.run."""
+    from dq_core.context import PipelineContext, Stage
+    t0 = time.monotonic()
+    spark, engine = _spark_engine()
+    mf = _load_pipeline_manifest(pid)
+    if not mf.datasets:
+        raise HTTPException(400, f"manifest {pid} declares no datasets")
+    ds = next((d for d in mf.datasets
+               if d.dataset_id == (body.dataset_id or mf.datasets[0].dataset_id)), None)
+    if ds is None:
+        raise HTTPException(400, f"dataset '{body.dataset_id}' not in manifest {pid}")
+    src = Path(ds.test_data)
+    df = _read_source(spark, src)
+    mode = body.mode or getattr(mf.dq_mode, "value", str(mf.dq_mode))
+    policy = str(mf.policy) if mf.policy else str(ROOT / "config" / "policies" / "default.yaml")
+    pipe_run_id = f"{pid}-{int(t0)}"
+    platform = getattr(mf.platform, "value", mf.platform) if mf.platform else "LOCAL"
+
+    stages_out: list[dict[str, Any]] = []
+    halted = False
+    ordered = sorted(ds.stages, key=lambda s: _STAGE_ORDER.get(s.value if isinstance(s, Stage) else str(s), 9))
+    for st in ordered:
+        sname = st.value if isinstance(st, Stage) else str(st)
+        rs_path = ds.rulesets.get(sname) or ds.rulesets.get(sname.upper())
+        if not rs_path:
+            stages_out.append({"stage": sname, "status": "SKIPPED", "reason": "no ruleset defined"})
+            _prog(f"phase=validate | [{sname}] no ruleset — pass-through")
+            continue
+        rs = engine.load_ruleset(rs_path)
+        _prog(f"phase=validate | [{sname}] {rs.ref} on {src.name} — mode={mode}")
+        ctx = PipelineContext(pipeline_id=pid, pipeline_run_id=pipe_run_id, dataset=ds.dataset_id,
+                              stage=st, platform=str(platform))
+        res = engine.run(df, rs, policy, ctx, mode=mode,
+                         on_phase=lambda k, _s=sname: _stage_prog(_s, k))
+        m = res.execution_metrics
+        rep = ROOT / "reports" / f"{pid}_{ds.dataset_id}_{sname}_{res.run_id}.json"
+        rep.parent.mkdir(parents=True, exist_ok=True)
+        res.write_report(rep)
+        stages_out.append({
+            "stage": sname, "status": "COMPLETED", "run_id": res.run_id,
+            "ruleset": f"{rs.ruleset_id}@{rs.version}",
+            "input": m.input_records, "accepted": m.accepted_records,
+            "quarantined": m.quarantined_records,
+            "gate_passed": res.quality_gate.passed,
+            "duration_ms": m.duration_ms,
+            "report_path": str(rep.relative_to(ROOT)).replace("\\", "/"),
+        })
+        df = res.accepted_dataframe  # medallion hand-off: next stage sees accepted rows only
+        if body.halt_on_gate_failure and not res.quality_gate.passed:
+            halted = True
+            _prog(f"phase=quarantine | [{sname}] gate FAILED — halting downstream stages")
+            break
+    gate_all = all(s.get("gate_passed", True) for s in stages_out if s["status"] == "COMPLETED")
+    return {
+        "pipeline_id": pid, "dataset": ds.dataset_id, "mode": mode,
+        "pipeline_run_id": pipe_run_id, "stages": stages_out, "halted": halted,
+        "gate_passed": gate_all,
+        "duration_ms": round((time.monotonic() - t0) * 1000, 2),
+        "summary": (f"Pipeline {pid} / {ds.dataset_id} [{mode}] — {len(stages_out)} stage(s), "
+                    f"gate={'PASS' if gate_all else 'FAIL'}{' (halted)' if halted else ''}, "
+                    f"{time.monotonic() - t0:.1f}s"),
+    }
 
 
 class ProfileIn(BaseModel):
@@ -393,13 +569,13 @@ def _profile_mode_for(src: Path, requested: str, engine=None) -> str:
 
 
 def _do_profile(body: ProfileIn) -> dict[str, Any]:
-    from dq_core.io.sources import CsvSource, ParquetSource
-    spark, engine = J.get_spark(), J.get_engine()
+    spark, engine = _spark_engine()
     src = ROOT / body.source
-    df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
-          else CsvSource(str(src)).read(spark))
+    df = _read_source(spark, src)
     mode = _profile_mode_for(src, body.mode, engine)
-    rep = engine.profile(df, body.dataset or src.stem, mode=mode)
+    ds = body.dataset or src.stem
+    _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
+    rep = engine.profile(df, ds, mode=mode)
     out = ROOT / "reports"
     out.mkdir(exist_ok=True)
     p = out / f"ui_profile_{src.stem}.json"
@@ -423,7 +599,10 @@ def _do_profile(body: ProfileIn) -> dict[str, Any]:
 
 @app.post("/api/profile")
 def profile(body: ProfileIn) -> dict[str, str]:
-    jid = J.submit("profile", lambda: _do_profile(body))
+    try:
+        jid = J.submit("profile", lambda: _do_profile(body))
+    except J.JobConflict as e:
+        raise HTTPException(409, str(e))
     return {"job_id": jid}
 
 
@@ -1050,21 +1229,16 @@ class PreviewIn(BaseModel):
 def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     """Profile + candidate rules for the wizard — same path as `dqctl bootstrap`."""
     from dq_core.generation.generator import CandidateRuleGenerator
-    from dq_core.io.sources import CsvSource, ParquetSource
-    spark, engine = J.get_spark(), J.get_engine()
+    spark, engine = _spark_engine()
     src = (ROOT / body.source).resolve()
     if not str(src).startswith(str(ROOT.resolve())) or not src.exists():
         raise HTTPException(400, f"source not found under repo: {body.source}")
-    import threading as _t
-    _jid = _t.current_thread().name.replace("dq-job-", "")
-    J.progress_cb(_jid, f"reading {src.name}")
-    df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
-          else CsvSource(str(src)).read(spark))
+    df = _read_source(spark, src)
     ds = body.dataset or src.stem
     mode = _profile_mode_for(src, "FULL", engine)
-    J.progress_cb(_jid, f"profiling {ds} ({mode})")
+    _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
     rep = engine.profile(df, ds, mode=mode)
-    J.progress_cb(_jid, "generating candidate rules")
+    _prog("phase=profile | generating candidate rules from profile")
     ruleset_id = f"{ds}_{body.stage.lower()}"
     candidates = CandidateRuleGenerator().generate(rep, ruleset_id=ruleset_id,
                                                    version="1.0", stage=body.stage)
@@ -1085,7 +1259,10 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
 
 @app.post("/api/onboard/preview")
 def onboard_preview(body: PreviewIn) -> dict[str, str]:
-    jid = J.submit("bootstrap_preview", lambda: _do_bootstrap_preview(body))
+    try:
+        jid = J.submit("bootstrap_preview", lambda: _do_bootstrap_preview(body))
+    except J.JobConflict as e:
+        raise HTTPException(409, str(e))
     return {"job_id": jid}
 
 
