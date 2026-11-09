@@ -26,11 +26,25 @@ def is_enabled() -> bool:
 
 
 def set_enabled(enabled: bool) -> None:
-    import yaml
+    """Toggle assistant.enabled WITHOUT rewriting the file — preserves comments."""
+    import re
     p = ROOT / "config" / "engine.yaml"
-    doc = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
-    doc.setdefault("engine", {}).setdefault("assistant", {})["enabled"] = bool(enabled)
-    p.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    text = p.read_text(encoding="utf-8")
+    val = "true" if enabled else "false"
+    if re.search(r"(?m)^\s+enabled:\s*(true|false)", text):
+        # replace the enabled: line that lives under the assistant: block
+        def _repl(m):
+            head = m.group(0)
+            return re.sub(r"(?m)^(\s+)enabled:\s*(true|false)", rf"\1enabled: {val}", head)
+        m = re.search(r"(?ms)^  assistant:.*?(?=^  \w|\Z)", text)
+        if m:
+            block = _repl(m)
+            text = text[:m.start()] + block + text[m.end():]
+        else:
+            text = re.sub(r"(?m)^(\s+)enabled:\s*(true|false)", rf"\1enabled: {val}", text, count=1)
+    else:
+        text += f"\n  assistant:\n    enabled: {val}\n"
+    p.write_text(text, encoding="utf-8")
 
 
 def _log(question: str, answer_text: str, source: str) -> None:

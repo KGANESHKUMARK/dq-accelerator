@@ -1319,19 +1319,17 @@ export function Settings() {
         <button style={{ padding: '6px 14px' }}
           onClick={() => api.chatLog().then(r => setChatLog(r.entries ?? []))}>Refresh log</button>
       </div>
-      {chatLog.length > 0 && <div style={{ maxHeight: 200, overflowY: 'auto', fontSize: 11 }}>
-        <table>
-          <thead><tr><th>Time</th><th>Question</th><th>Source</th></tr></thead>
-          <tbody>
-            {chatLog.slice(0, 15).map((e: any, i: number) => (
-              <tr key={i}>
-                <td className="muted">{(e.ts ?? '').slice(11, 19)}</td>
-                <td>{e.q}</td>
-                <td><span className={`badge ${e.source === 'llm' ? 'COMPLETED' : 'PENDING'}`}>{e.source}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {chatLog.length > 0 && <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+        {chatLog.slice(0, 10).map((e: any, i: number) => (
+          <details key={i} style={{ borderBottom: '1px solid var(--border)', padding: '8px 0' }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12 }}>
+              <span className={`badge ${e.source === 'llm' ? 'COMPLETED' : 'PENDING'}`} style={{ marginRight: 8 }}>{e.source}</span>
+              {e.q}
+              <span className="muted" style={{ float: 'right', fontSize: 10 }}>{(e.ts ?? '').slice(11, 19)}</span>
+            </summary>
+            <div style={{ fontSize: 11, whiteSpace: 'pre-wrap', padding: '8px 4px', color: 'var(--muted)' }}>{e.a}</div>
+          </details>
+        ))}
       </div>}
       <div className="info-box" style={{ marginTop: 10 }}>
         The Assistant answers questions about this app only — pipelines, rulesets, jobs, anomalies, reports,
