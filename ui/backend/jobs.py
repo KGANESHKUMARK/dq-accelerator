@@ -134,9 +134,14 @@ def progress_cb(job_id: str, msg: str) -> None:
 def get_spark():
     if not hasattr(get_spark, "_session"):
         from dq_core.runtime.local_spark import LocalSparkSettings, create_local_spark_session
+        from dq_core.runtime.config import EngineConfig
+        cfg = EngineConfig.from_yaml(ROOT / "config" / "engine.yaml")
+        rt = cfg.runtime
         get_spark._session = create_local_spark_session(LocalSparkSettings(
-            app_name="dq-accelerator-ui", master="local[8]",
-            driver_memory="2g", shuffle_partitions=8,
+            app_name="dq-accelerator-ui",
+            master=rt.spark_master,
+            driver_memory=rt.driver_memory,
+            shuffle_partitions=rt.shuffle_partitions,
             scratch_dir=str(ROOT / ".tmp")))
         get_spark._session.sparkContext.setLogLevel("ERROR")
     return get_spark._session

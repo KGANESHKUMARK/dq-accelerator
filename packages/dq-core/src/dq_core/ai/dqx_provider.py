@@ -45,7 +45,9 @@ def _check_dqx() -> bool:
 
 
 def _check_credentials() -> bool:
-    return bool(os.environ.get("DATABRICKS_HOST") and os.environ.get("DATABRICKS_TOKEN"))
+    host = os.environ.get("DATABRICKS_HOST", "")
+    token = os.environ.get("DATABRICKS_TOKEN") or os.environ.get("DATABRICKS_API_KEY", "")
+    return bool(host and token)
 
 
 class DQXProvider(AIRemediationProvider):
@@ -117,15 +119,17 @@ class DQXProvider(AIRemediationProvider):
             self._ready = False
             return False
         try:
-            from databricks.labs.dqx.llm.llm_engine import DQLLMEngine  # type: ignore[import]
-            from databricks.labs.dqx.llm.models import LLMModelConfig     # type: ignore[import]
-            cfg = LLMModelConfig(endpoint_name=self.model_endpoint)
-            self._dqx_engine = DQLLMEngine(model_config=cfg)
+            # We use LiteLLM directly for value correction (more appropriate than
+            # DQX's rule detection which generates rules, not corrections).
+            # DQX package provides LiteLLM as a dependency.
+            import litellm  # noqa: F401
+            self._dqx_engine = True  # Marker that LLM is available
             self.model_version = f"dqx-llm-{self.model_endpoint}"
-            _logger.info("DQXProvider initialised — endpoint=%s", self.model_endpoint)
+            host = os.environ.get("DATABRICKS_HOST", "")
+            _logger.info("DQXProvider initialised — endpoint=%s host=%s", self.model_endpoint, host)
             self._ready = True
         except Exception as exc:
-            _logger.warning("DQXProvider init failed: %s — falling back to MockAIProvider", exc)
+            _logger.warning("DQXProvider init failed: %s — falling back to MockAIProvider", exc, exc_info=True)
             self._ready = False
         return self._ready
 
@@ -136,34 +140,34 @@ class DQXProvider(AIRemediationProvider):
         try:
             return self._propose_via_dqx(requests)
         except Exception as exc:
-            _logger.warning("DQX proposal failed: %s — falling back to MockAIProvider", exc)
+            _logger.warning("DQX proposal failed: %s — falling back to MockAIProvider", exc, exc_info=True)
             if self.fallback_on_error:
                 return self._get_fallback().propose(requests)
             raise
 
     def _propose_via_dqx(self, requests: Sequence[ProposalRequest]) -> list[AIProposal]:
         """
-        Map ProposalRequests → DQX LLM calls → AIProposals.
+        Map ProposalRequests → Databricks LLM calls → AIProposals.
 
-        DQX's LLM engine is designed for *rule generation* from natural language,
-        not direct value correction. We adapt it as follows:
-          - Build a natural-language description of each unique (column, rule_type,
-            allowed_values) combination.
-          - Ask DQX which correction it would apply to invalid values.
-          - Parse the returned rule candidates to extract ALLOWED_VALUES or REGEX
-            corrections and map them to concrete proposed_value strings.
-          - For values without a DQX match, fall back to string-similarity from MockAI.
+        Uses LiteLLM to call the Databricks Model Serving endpoint directly
+        for value correction. This is more appropriate than DQX's rule
+        detection which is designed for generating data quality rules, not
+        correcting individual values.
 
-        This keeps DQX doing what it does best (business-rule understanding) while
-        our engine handles the row-level application and governance.
+        Strategy:
+          - Group requests by (column, rule_type) for batched LLM calls.
+          - Build a prompt asking the LLM to suggest corrected values.
+          - Parse JSON response and map to AIProposal format.
+          - Fall back to MockAI for values the LLM can't correct.
         """
         from dq_core.ai.mock import MockAIProvider
+        from collections import defaultdict
+        import json as _json
 
         proposals: list[AIProposal] = []
         fallback = MockAIProvider.from_file(self._mock_responses_path)
 
         # Group by (column, rule_type) for batched LLM calls
-        from collections import defaultdict
         groups: dict[tuple[str, str], list[ProposalRequest]] = defaultdict(list)
         for req in requests:
             groups[(req.column, req.rule_type)].append(req)
@@ -171,63 +175,146 @@ class DQXProvider(AIRemediationProvider):
         for (column, rule_type), group_reqs in groups.items():
             unique_values = list({r.original_value for r in group_reqs if r.original_value})
             allowed = group_reqs[0].context.get("allowed_values") or []
+            failure_reason = group_reqs[0].failure_reason
 
-            # Build natural-language prompt for DQX
-            prompt = (
-                f"Column '{column}' (rule type: {rule_type}). "
-                f"Invalid values found: {unique_values[:10]}. "
-                + (f"Allowed values are: {allowed}. " if allowed else "")
-                + "For each invalid value, suggest the correct replacement if one exists."
+            # Build prompt for LLM value correction
+            prompt = self._build_correction_prompt(
+                column, rule_type, unique_values, allowed, failure_reason
             )
-            schema_info = f'{{"column_name": "{column}", "type": "string"}}'
 
             try:
-                result = self._dqx_engine.detect_business_rules_with_llm(
-                    user_input=prompt, schema_info=schema_info
-                )
-                # DQX returns a Prediction with quality_rules — we parse it
-                dqx_rules = getattr(result, "quality_rules", None) or []
-                # Build a correction map from DQX rules
-                correction_map: dict[str, tuple[str, float]] = {}
-                for rule in (dqx_rules if isinstance(dqx_rules, list) else []):
-                    # DQX rules may specify allowed_values or regex corrections
-                    if isinstance(rule, dict):
-                        for bad_val in unique_values:
-                            av = rule.get("allowed_values") or rule.get("config", {}).get("values") or []
-                            import difflib
-                            if av:
-                                match = difflib.get_close_matches(
-                                    str(bad_val).upper(),
-                                    [str(v).upper() for v in av], n=1, cutoff=0.7
-                                )
-                                if match:
-                                    # Map back to original case
-                                    matched = next(v for v in av if str(v).upper() == match[0])
-                                    ratio = difflib.SequenceMatcher(None, str(bad_val).upper(), match[0]).ratio()
-                                    correction_map[str(bad_val)] = (str(matched), round(min(ratio, 1.0) * 0.95, 4))
-
+                corrections = self._call_llm_for_corrections(prompt, unique_values)
+                _logger.info("LLM returned %d corrections for %s/%s", len(corrections), column, rule_type)
+                
                 for req in group_reqs:
-                    if req.original_value in correction_map:
-                        corrected, conf = correction_map[req.original_value]
+                    if req.original_value in corrections:
+                        corrected, conf, reason = corrections[req.original_value]
                         proposals.append(AIProposal(
                             request_id=req.request_id, record_id=req.record_id,
                             rule_id=req.rule_id, column=req.column,
                             original_value=req.original_value, proposed_value=corrected,
                             confidence=conf,
-                            reason=f"DQX LLM correction via {self.model_endpoint}",
-                            evidence={"source": "dqx_llm", "model": self.model_endpoint,
-                                      "prompt_tokens": len(prompt)},
+                            reason=reason,
+                            evidence={"source": "databricks_llm", "model": self.model_endpoint,
+                                      "prompt": prompt[:200]},
                             provider=self.name, model_version=self.model_version, simulated=False,
                         ))
                     else:
-                        # No DQX match — use similarity fallback
+                        # No LLM correction — use similarity fallback
                         fb = fallback.propose([req])
                         proposals.extend(fb)
             except Exception as exc:
-                _logger.debug("DQX group %s/%s failed: %s — using fallback", column, rule_type, exc)
+                _logger.warning("LLM group %s/%s failed: %s — using fallback", column, rule_type, exc, exc_info=True)
                 proposals.extend(fallback.propose(group_reqs))
 
         return proposals
+
+    def _build_correction_prompt(
+        self, column: str, rule_type: str, values: list[str], 
+        allowed: list[str], failure_reason: str
+    ) -> str:
+        """Build a prompt for LLM-based value correction."""
+        allowed_str = f"Allowed values are: {allowed}. " if allowed else ""
+        return (
+            f"You are a data quality expert. A data column failed validation.\n\n"
+            f"Column: {column}\n"
+            f"Rule type: {rule_type}\n"
+            f"Failure reason: {failure_reason}\n"
+            f"{allowed_str}\n"
+            f"Invalid values found: {values[:10]}\n\n"
+            f"For each invalid value, suggest the correct replacement if one exists. "
+            f"Respond ONLY with a JSON object mapping each invalid value to its correction. "
+            f"Format: {{\"invalid_value\": {{\"correction\": \"corrected_value\", \"confidence\": 0.95}}}}\n"
+            f"If no correction is possible, omit that value from the response."
+        )
+
+    def _call_llm_for_corrections(
+        self, prompt: str, values: list[str]
+    ) -> dict[str, tuple[str, float, str]]:
+        """Call Databricks LLM for value corrections. Returns {value: (correction, confidence, reason)}."""
+        import litellm
+        import json as _json
+
+        host = os.environ.get("DATABRICKS_HOST", "").rstrip("/")
+        token = os.environ.get("DATABRICKS_TOKEN") or os.environ.get("DATABRICKS_API_KEY", "")
+        
+        if not host or not token:
+            raise ValueError("DATABRICKS_HOST and DATABRICKS_TOKEN required")
+
+        # LiteLLM Databricks provider configuration
+        model = f"databricks/{self.model_endpoint}"
+        api_base = f"{host}/serving-endpoints"
+        
+        response = litellm.completion(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            api_key=token,
+            api_base=api_base,
+            max_tokens=1000,
+            temperature=0.0,
+            timeout=60,
+        )
+        
+        content = response.choices[0].message.content.strip()
+        
+        # Parse JSON response — try multiple extraction strategies
+        parsed = self._extract_json_from_response(content)
+        if parsed is None:
+            _logger.warning("LLM returned invalid JSON: %s", content[:200])
+            return {}
+        
+        # Convert to our format
+        corrections = {}
+        for invalid_val, correction_data in parsed.items():
+            if isinstance(correction_data, dict):
+                corrected = correction_data.get("correction")
+                conf = float(correction_data.get("confidence", 0.8))
+                if corrected:
+                    corrections[invalid_val] = (str(corrected), conf, f"LLM correction via {self.model_endpoint}")
+        
+        return corrections
+
+    def _extract_json_from_response(self, content: str) -> dict | None:
+        """Extract JSON from LLM response, handling various formats."""
+        import re
+        import json as _json
+        
+        # Strategy 1: Extract from markdown code blocks
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        
+        # Try parsing the full content first (most common case)
+        try:
+            return _json.loads(content)
+        except _json.JSONDecodeError:
+            pass
+        
+        # Strategy 2: Find outer JSON object containing corrections
+        # Look for {"key": {"correction": "value", ...}} pattern
+        json_match = re.search(r'\{[^{}]*\{[^{}]*\}[^{}]*\}', content)
+        if json_match:
+            try:
+                return _json.loads(json_match.group(0))
+            except _json.JSONDecodeError:
+                pass
+        
+        # Strategy 3: Find any JSON object in text
+        json_match = re.search(r'\{[^{}]*\}', content)
+        if json_match:
+            try:
+                return _json.loads(json_match.group(0))
+            except _json.JSONDecodeError:
+                pass
+        
+        # Strategy 4: Try to build JSON from natural language response
+        corrections = {}
+        for value in re.findall(r"correct\s+['\"]([^'\"]+)['\"]\s+to\s+['\"]([^'\"]+)['\"]", content, re.IGNORECASE):
+            corrections[value[0]] = {"correction": value[1], "confidence": 0.85}
+        if corrections:
+            return corrections
+        return None
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -238,4 +325,5 @@ class DQXProvider(AIRemediationProvider):
             "simulated": not self._ready,
             "dqx_available": _check_dqx(),
             "credentials_set": _check_credentials(),
+            "workspace_host": os.environ.get("DATABRICKS_HOST", "")[:50],
         }

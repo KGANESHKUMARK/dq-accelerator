@@ -1,15 +1,25 @@
 approvals:
-- column: patient_name
+- dataset: patients
+  column: patient_name
   original_value: J0hn Smith
-  corrected_value: John Smith
+  approved_value: John Smith
   rule_id: PAT_006
   approved_by: clinical-steward@health.example
   approved_at: '2026-11-08T09:40:25Z'
   reason: approved via UI
-- column: patient_name
+- dataset: patients
+  column: patient_name
   original_value: J0hn Smith
-  corrected_value: John Smith
+  approved_value: John Smith
   rule_id: PAT_006
   approved_by: e2e-test-steward
   approved_at: '2026-11-08T09:46:42Z'
+  reason: approved via UI
+- dataset: patients
+  column: patient_name
+  original_value: J0hn Smith
+  approved_value: John Smith
+  rule_id: PAT_006
+  approved_by: ui-steward
+  approved_at: '2026-11-09T07:39:08Z'
   reason: approved via UI

@@ -143,6 +143,45 @@ def pipeline_detail(pid: str) -> dict[str, Any]:
         raise HTTPException(404, "pipeline not found") from exc
 
 
+# ------------------------------------------------------------------ config / settings
+@app.get("/api/config")
+def get_config() -> dict[str, Any]:
+    """Return current engine config (sanitised — no secrets)."""
+    from dq_core.runtime.config import EngineConfig
+    cfg = EngineConfig.from_yaml(ROOT / "config" / "engine.yaml")
+    return {
+        "engine": {
+            "name": cfg.name,
+            "default_mode": cfg.default_mode.value,
+            "include_dq_columns": cfg.include_dq_columns_in_accepted,
+        },
+        "registry": {
+            "backend": cfg.registry.backend,
+            "rulesets_path": cfg.registry.rulesets_path,
+            "pipelines_path": cfg.registry.pipelines_path,
+        },
+        "profiling": {
+            "mode": cfg.profiling.mode,
+            "sample_fraction": cfg.profiling.sample_fraction,
+            "max_allowed_values": cfg.profiling.max_allowed_values,
+        },
+        "validation": {
+            "large_file_threshold_mb": cfg.validation.large_file_threshold_mb,
+            "large_file_sample_rows": cfg.validation.large_file_sample_rows,
+        },
+        "runtime": {
+            "spark_master": cfg.runtime.spark_master,
+            "driver_memory": cfg.runtime.driver_memory,
+            "executor_memory": cfg.runtime.executor_memory,
+            "shuffle_partitions": cfg.runtime.shuffle_partitions,
+        },
+        "ai": {
+            "provider": cfg.ai.provider,
+            "has_dqx_endpoint": bool(cfg.ai.dqx_model_endpoint),
+        },
+    }
+
+
 # ------------------------------------------------------------------ rulesets
 @app.get("/api/rulesets")
 def rulesets() -> list[dict[str, Any]]:
@@ -242,11 +281,24 @@ def _do_run(body: RunIn) -> dict[str, Any]:
     src = ROOT / body.source
     df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
           else CsvSource(str(src)).read(spark))
+    # Auto-sample large files using config thresholds (engine.yaml -> validation.*)
+    val_cfg = engine.config.validation
+    threshold_mb = val_cfg.large_file_threshold_mb
+    target_rows = val_cfg.large_file_sample_rows
+    file_size_mb = src.stat().st_size / (1024 * 1024) if src.exists() else 0
+    sampled = False
+    if threshold_mb > 0 and file_size_mb > threshold_mb:
+        # Estimate rows from file size (~150 bytes/row for typical CSV)
+        est_rows = int(file_size_mb * 1024 * 1024 / 150)
+        fraction = min(0.01, max(0.0001, target_rows / max(est_rows, 1)))
+        df = df.sample(withReplacement=False, fraction=fraction, seed=42)
+        sampled = True
     ctx = PipelineContext(pipeline_id=body.pipeline_id, pipeline_run_id=body.run_id,
                           dataset=body.dataset or rs.dataset, stage=rs.stage, platform="LOCAL")
     import jobs as _j, threading as _t
     _jid = _t.current_thread().name.replace("dq-job-", "")
-    _j.progress_cb(_jid, f"validating {rs.ref} on {src.name} — mode={body.mode}")
+    sample_note = f" (sampled {file_size_mb:.0f}MB -> ~{target_rows:,} rows)" if sampled else ""
+    _j.progress_cb(_jid, f"validating {rs.ref} on {src.name}{sample_note} — mode={body.mode}")
     res = engine.run(df, rs, str(ROOT / body.policy) if body.policy else None, ctx, mode=body.mode)
     _j.progress_cb(_jid, "writing report")
     out = ROOT / "reports"
@@ -282,12 +334,16 @@ class ProfileIn(BaseModel):
     mode: str = "FULL"
 
 
-_BIG_FILE = 50 * 1024 * 1024      # FULL profile above this risks OOM on the 2g local driver
+_BIG_FILE = 50 * 1024 * 1024      # FULL profile above this risks OOM on the local driver
+# Configurable via engine.yaml -> validation.large_file_threshold_mb
 
 
-def _profile_mode_for(src: Path, requested: str) -> str:
+def _profile_mode_for(src: Path, requested: str, engine=None) -> str:
     try:
-        if requested.upper() == "FULL" and src.stat().st_size > _BIG_FILE:
+        threshold = _BIG_FILE
+        if engine is not None:
+            threshold = engine.config.validation.large_file_threshold_mb * 1024 * 1024
+        if requested.upper() == "FULL" and src.stat().st_size > threshold:
             return "SAMPLE"
     except OSError:
         pass
@@ -300,7 +356,7 @@ def _do_profile(body: ProfileIn) -> dict[str, Any]:
     src = ROOT / body.source
     df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
           else CsvSource(str(src)).read(spark))
-    mode = _profile_mode_for(src, body.mode)
+    mode = _profile_mode_for(src, body.mode, engine)
     rep = engine.profile(df, body.dataset or src.stem, mode=mode)
     out = ROOT / "reports"
     out.mkdir(exist_ok=True)
@@ -832,6 +888,7 @@ class ApprovalAction(BaseModel):
     original_value: str
     corrected_value: str
     rule_id: str
+    dataset: str = "unknown"
     approved_by: str = "ui-steward"
     reason: str = "approved via UI"
 
@@ -847,8 +904,9 @@ def approve_correction(body: ApprovalAction) -> dict[str, Any]:
             doc = _yaml.safe_load(f) or {}
     approvals = doc.setdefault("approvals", [])
     approvals.append({
-        "column": body.column, "original_value": body.original_value,
-        "corrected_value": body.corrected_value, "rule_id": body.rule_id,
+        "dataset": body.dataset, "column": body.column,
+        "original_value": body.original_value,
+        "approved_value": body.corrected_value, "rule_id": body.rule_id,
         "approved_by": body.approved_by, "approved_at": utc_now_iso(),
         "reason": body.reason,
     })
@@ -904,7 +962,7 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     df = (ParquetSource(str(src)).read(spark) if src.suffix == ".parquet"
           else CsvSource(str(src)).read(spark))
     ds = body.dataset or src.stem
-    mode = _profile_mode_for(src, "FULL")
+    mode = _profile_mode_for(src, "FULL", engine)
     J.progress_cb(_jid, f"profiling {ds} ({mode})")
     rep = engine.profile(df, ds, mode=mode)
     J.progress_cb(_jid, "generating candidate rules")

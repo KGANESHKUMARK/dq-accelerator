@@ -32,6 +32,7 @@ export const api = {
   anomalies: (params?: { status?: string; pipeline_id?: string }) => { const q = new URLSearchParams(params as any).toString(); return fetch(`${B}/anomalies${q ? '?' + q : ''}`).then(j) },
   anomalyStats: () => fetch(`${B}/anomalies/stats`).then(j),
   patchAnomaly: (id: string, body: any) => fetch(`${B}/anomalies/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
+  getConfig: () => fetch(`${B}/config`).then(j),
   quarantinePending: () => fetch(`${B}/quarantine/pending`).then(j),
   approveCorrection: (body: any) => fetch(`${B}/quarantine/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   rejectCorrection: (body: any) => fetch(`${B}/quarantine/reject`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),

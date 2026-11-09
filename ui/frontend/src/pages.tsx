@@ -948,7 +948,7 @@ export function Approvals() {
   const approve = async (rec: any) => {
     setMsg(''); setErr('')
     try {
-      await api.approveCorrection({ column: rec.column, original_value: rec.original_value ?? '', corrected_value: rec.proposed_value ?? '', rule_id: rec.rule_id ?? '', approved_by: 'ui-steward' })
+      await api.approveCorrection({ column: rec.column, original_value: rec.original_value ?? '', corrected_value: rec.proposed_value ?? '', rule_id: rec.rule_id ?? '', dataset: rec.dataset ?? 'unknown', approved_by: 'ui-steward' })
       setMsg(`Approved: ${rec.column} "${rec.original_value}" → "${rec.proposed_value}"`)
       load()
     } catch (e: any) { setErr(e.message) }
@@ -1190,12 +1190,15 @@ export function Reports() {
 export function Settings() {
   const [health, setHealth] = useState<any>(null)
   const [ai, setAi] = useState<any>(null)
+  const [cfg, setCfg] = useState<any>(null)
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
+    api.getConfig().then(setCfg).catch(() => {})
   }, [])
 
-  const dqxReady = ai && !ai.simulated && ai.provider === 'DQXProvider'
+  const dqxReady = ai && ai.provider === 'DQXProvider' && !ai.simulated
+  const mockReady = ai && ai.provider === 'MockAIProvider'
 
   return <>
     <div className="section-title">Settings &amp; Configuration</div>
@@ -1205,34 +1208,59 @@ export function Settings() {
       <div className="form-grid">
         <div className="kv"><span>Engine</span><b>{health?.engine ?? '—'}</b></div>
         <div className="kv"><span>Root</span><code style={{ fontSize: 11, wordBreak: 'break-all' }}>{health?.root ?? '—'}</code></div>
-        <div className="kv"><span>Runtime</span><b>Spark local[8] · 2g driver</b></div>
-        <div className="kv"><span>Registry</span><b>File + SQLite · anomalies.db · jobs.db</b></div>
+        <div className="kv"><span>Runtime</span><b>{cfg?.runtime?.spark_master ?? '—'} · {cfg?.runtime?.driver_memory ?? '—'} driver</b></div>
+        <div className="kv"><span>Registry</span><b>{cfg?.registry?.backend ?? 'file'} · anomalies.db · jobs.db</b></div>
+        <div className="kv"><span>Default mode</span><b>{cfg?.engine?.default_mode ?? '—'}</b></div>
+        <div className="kv"><span>Profiling</span><b>{cfg?.profiling?.mode ?? '—'} · {((cfg?.profiling?.sample_fraction ?? 0) * 100).toFixed(0)}% sample</b></div>
       </div>
     </div>
 
     <div className="card">
       <h3>AI remediation provider</h3>
       {ai && <>
-        <div className={dqxReady ? 'success-box' : 'warn-box'} style={{ marginBottom: 14 }}>
+        <div className={dqxReady ? 'success-box' : mockReady ? 'warn-box' : 'info-box'} style={{ marginBottom: 14 }}>
           <b>Provider: {ai.provider ?? '—'}</b> · model: {ai.model_version ?? '—'} ·{' '}
           {dqxReady
             ? '✓ Connected to Databricks Model Serving — real LLM corrections active'
-            : ai.simulated
+            : mockReady
               ? '⚠ SIMULATED (MockAIProvider) — deterministic YAML lookup, not a real LLM'
-              : '⚠ Fallback active — see setup below'
+              : ai.provider === 'DQXProvider'
+                ? '⏳ DQX configured but not yet initialised — first LLM call will verify connection'
+                : '⚠ Provider not configured'
           }
-          {ai.dqx_available === false && <div style={{ marginTop: 6 }}>databricks-labs-dqx[llm] not installed</div>}
           {ai.credentials_set === false && <div style={{ marginTop: 6 }}>DATABRICKS_HOST / DATABRICKS_TOKEN not set</div>}
+          {ai.dqx_available === false && <div style={{ marginTop: 6 }}>databricks-labs-dqx[llm] not installed</div>}
+          {ai.workspace_host && <div style={{ marginTop: 6, fontSize: 11 }}>Workspace: <code>{ai.workspace_host}</code></div>}
+          {ai.model_endpoint && <div style={{ marginTop: 2, fontSize: 11 }}>Endpoint: <code>{ai.model_endpoint}</code></div>}
         </div>
       </>}
-      <h4>Phase C — Enable DQX LLM provider</h4>
+      {!ai && <div className="warn-box">Could not load AI provider status</div>}
+
+      <h4>How to switch AI provider</h4>
+      <div className="form-grid" style={{ marginBottom: 12 }}>
+        <div className="kv"><span>Current config</span><code>ai.provider: {cfg?.ai?.provider ?? '—'}</code></div>
+        <div className="kv"><span>DQX endpoint</span><code>{cfg?.ai?.has_dqx_endpoint ? 'set' : 'not set'}</code></div>
+      </div>
+
+      <h4>Option A — Real LLM (Databricks Model Serving) — CURRENT</h4>
       <div className="gstep"><span className="n">1</span><span>Install: <code>pip install 'databricks-labs-dqx[llm]'</code></span></div>
-      <div className="gstep"><span className="n">2</span><span>Set environment: <code>DATABRICKS_HOST=https://&lt;workspace&gt;.azuredatabricks.net</code></span></div>
-      <div className="gstep"><span className="n">3</span><span>Set environment: <code>DATABRICKS_TOKEN=&lt;personal-access-token&gt;</code></span></div>
-      <div className="gstep"><span className="n">4</span><span>Set environment: <code>DQX_MODEL_ENDPOINT=databricks-meta-llama-3-3-70b-instruct</code></span></div>
-      <div className="gstep"><span className="n">5</span><span>Edit <code>config/engine.yaml</code> → <code>ai.provider: dqx</code> + uncomment <code>dqx_model_endpoint</code></span></div>
-      <div className="gstep"><span className="n">6</span><span>Restart the backend — DQXProvider auto-falls back to mock if credentials are absent</span></div>
-      <div className="info-box" style={{ marginTop: 12 }}>MockAI uses a deterministic lookup table (<code>config/ai/mock_ai_responses.yaml</code>) — confidence is real but corrections are pre-scripted. DQX uses a live LLM via Databricks Model Serving for genuine NLP corrections. Both go through the same 90% confidence gate and sensitive-column policy.</div>
+      <div className="gstep"><span className="n">2</span><span>Set env: <code>DATABRICKS_HOST=https://&lt;your-workspace&gt;.cloud.databricks.com</code></span></div>
+      <div className="gstep"><span className="n">3</span><span>Set env: <code>DATABRICKS_TOKEN=&lt;personal-access-token&gt;</code></span></div>
+      <div className="gstep"><span className="n">4</span><span>Set env: <code>DQX_MODEL_ENDPOINT=databricks-meta-llama-3-3-70b-instruct</code></span></div>
+      <div className="gstep"><span className="n">5</span><span>Edit <code>config/engine.yaml</code> → <code>ai.provider: dqx</code> (already done)</span></div>
+      <div className="gstep"><span className="n">6</span><span>Restart backend — Settings shows <b>DQXProvider</b> when connected</span></div>
+
+      <h4 style={{ marginTop: 16 }}>Option B — Mock AI (no external calls)</h4>
+      <div className="gstep"><span className="n">1</span><span>Edit <code>config/engine.yaml</code> → <code>ai.provider: mock</code></span></div>
+      <div className="gstep"><span className="n">2</span><span>Restart backend — Settings shows <b>MockAIProvider</b> with simulated=true</span></div>
+      <div className="gstep"><span className="n">3</span><span>Edit <code>config/ai/mock_ai_responses.yaml</code> to add your corrections</span></div>
+
+      <div className="info-box" style={{ marginTop: 12 }}>
+        <b>How it works:</b> DQXProvider calls Databricks Model Serving via LiteLLM for genuine NLP corrections.
+        MockAIProvider uses a deterministic YAML lookup table — confidence is real but corrections are pre-scripted.
+        Both go through the same 90% confidence gate and sensitive-column policy.
+        DQX auto-falls back to MockAI if credentials are absent or the endpoint is unreachable.
+      </div>
     </div>
 
     <div className="card">

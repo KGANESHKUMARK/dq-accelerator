@@ -203,7 +203,7 @@ Review anomalies → Fix / quarantine → Audit trail
 
 | Gap | Detail |
 |---|---|
-| **DQX integration not done** | Original intent was `databricks-labs-dqx[llm]`; we built a parallel MockAIProvider instead. DQX has 80+ check types, real LLM via DSPy + Databricks Model Serving, Isolation Forest anomaly detection, MCP server |
+| **DQX uses LiteLLM, not DQX rule detection** | We use LiteLLM directly for value correction (more appropriate than DQX's `detect_business_rules_with_llm` which generates rules, not corrections). DQX package is installed but we bypass its rule-gen API. |
 | **No real Databricks run** | Engine + adapter are contract-ready; needs workspace URL + token |
 | **No anomaly lifecycle** | Anomalies are fire-and-forget — no open/acknowledged/resolved workflow |
 | **No cross-run trends** | Each run is isolated; no sparkline history across runs |
@@ -273,25 +273,30 @@ Review anomalies → Fix / quarantine → Audit trail
 
 ## ✅ DONE — Phase C: DQX provider integration
 
-### C1 · DQXProvider ✅
-- [x] `packages/dq-core/src/dq_core/ai/dqx_provider.py` (241 lines)
+### C1 · DQXProvider — real LLM working ✅
+- [x] `packages/dq-core/src/dq_core/ai/dqx_provider.py`
   - Implements `AIRemediationProvider` interface — engine uses it identically to MockAI
-  - Lazy-initialises DQX on first `propose()` call
-  - Auto-fallback to MockAI when: dqx not installed, credentials absent, endpoint not set, call fails
-  - `describe()` reports: provider, model_version, dqx_available, credentials_set, simulated
-  - Bridges `ProposalRequest` → DQX `DQLLMEngine.detect_business_rules_with_llm()` → `AIProposal`
+  - Uses **LiteLLM directly** for value correction (not DQX's `detect_business_rules_with_llm`
+    which generates rules, not corrections)
+  - Calls `databricks/{endpoint}` on Databricks Model Serving via LiteLLM
   - Batches requests by (column, rule_type) — not one LLM call per row
+  - Auto-fallback to MockAI when: credentials absent, endpoint unreachable, call fails
+  - `describe()` reports: provider, model_version, dqx_available, credentials_set, simulated
 - [x] `create_provider('dqx', ...)` in `ai/__init__.py`
 - [x] `AISettings.dqx_model_endpoint` + `dqx_fallback_on_error` in `runtime/config.py`
-- [x] `config/engine.yaml` — `provider: mock` default with DQX config commented in-place
+- [x] `config/engine.yaml` — `provider: dqx` with `dqx_model_endpoint` set
 - [x] `GET /api/ai/status` backend endpoint + Settings page live provider status
-- [x] **E2E verified**: `dqx_available=False, credentials_set=False` → clean fallback to mock
+- [x] **Real LLM verified**: `actve` → `active` (conf=0.95), `  John  ` → `John` (conf=0.95),
+  `hihg` → `high`, `medim` → `medium` — all real Databricks Model Serving responses
+- [x] **E2E verified**: Settings page shows `provider: DQXProvider, simulated: false`
 
-### C1 · To activate DQX (needs Databricks workspace)
-1. `pip install 'databricks-labs-dqx[llm]'`
-2. Set env: `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DQX_MODEL_ENDPOINT`
-3. Edit `config/engine.yaml` → `ai.provider: dqx`, uncomment `dqx_model_endpoint`
-4. Restart backend — Settings page shows green "Connected to Databricks Model Serving"
+### C1 · DQX activation status — WORKING ✅
+- [x] `pip install 'databricks-labs-dqx[llm]'` — installed (v0.17.2)
+- [x] `DATABRICKS_HOST`, `DATABRICKS_TOKEN`, `DQX_MODEL_ENDPOINT` — env vars configured
+- [x] `config/engine.yaml` → `ai.provider: dqx` + `dqx_model_endpoint` set
+- [x] Real LLM verified — `databricks-meta-llama-3-3-70b-instruct` returning corrections
+- [x] Backend restart — Settings page shows green with `DQXProvider, simulated: false`
+- [x] **Note**: `databricks-connect` must NOT be installed (breaks local PySpark 4.x)
 
 ## 🔨 DOING NOW — Phase A: UI redesign (client-attractive)
 

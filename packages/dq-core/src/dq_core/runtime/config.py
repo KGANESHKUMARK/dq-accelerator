@@ -41,6 +41,8 @@ class ProfilingSettings:
 class ValidationSettings:
     cache_intermediate: bool = True
     collect_failure_examples: bool = True
+    large_file_threshold_mb: float = 50.0   # files above this are auto-sampled
+    large_file_sample_rows: int = 100_000   # target rows after sampling
 
 
 @dataclass
@@ -73,6 +75,15 @@ class OutputSettings:
 
 
 @dataclass
+class RuntimeSettings:
+    """Local Spark runtime tuning (ignored on managed platforms like Databricks)."""
+    spark_master: str = "local[4]"
+    driver_memory: str = "3g"
+    executor_memory: str = "2g"
+    shuffle_partitions: int = 16
+
+
+@dataclass
 class EngineConfig:
     name: str = "dq-accelerator"
     default_mode: IntegrationMode = IntegrationMode.OBSERVE_ONLY
@@ -82,6 +93,7 @@ class EngineConfig:
     validation: ValidationSettings = field(default_factory=ValidationSettings)
     ai: AISettings = field(default_factory=AISettings)
     outputs: OutputSettings = field(default_factory=OutputSettings)
+    runtime: RuntimeSettings = field(default_factory=RuntimeSettings)
     logging_level: str = "INFO"
     logging_json: bool = True
     config_path: str | None = None
@@ -111,6 +123,15 @@ class EngineConfig:
             outputs = dict(data.get("outputs") or {})
             for key in ("base_path", "reports_path"):
                 outputs[key] = resolve_path(outputs.get(key), base_dir)
+            runtime = dict(data.get("runtime") or {})
+            # Env var overrides for Spark tuning (highest precedence)
+            import os
+            if os.environ.get("DQ_DRIVER_MEMORY"):
+                runtime["driver_memory"] = os.environ["DQ_DRIVER_MEMORY"]
+            if os.environ.get("DQ_SPARK_MASTER"):
+                runtime["spark_master"] = os.environ["DQ_SPARK_MASTER"]
+            if os.environ.get("DQ_SHUFFLE_PARTITIONS"):
+                runtime["shuffle_partitions"] = int(os.environ["DQ_SHUFFLE_PARTITIONS"])
             logging_cfg = data.get("logging") or {}
             return cls(
                 name=data.get("name", "dq-accelerator"),
@@ -121,6 +142,7 @@ class EngineConfig:
                 validation=ValidationSettings(**(data.get("validation") or {})),
                 ai=AISettings(**ai),
                 outputs=OutputSettings(**outputs),
+                runtime=RuntimeSettings(**runtime),
                 logging_level=str(logging_cfg.get("level", "INFO")),
                 logging_json=bool(logging_cfg.get("json", True)),
                 config_path=config_path,

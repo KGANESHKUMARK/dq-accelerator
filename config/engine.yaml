@@ -30,24 +30,38 @@ engine:
   validation:
     cache_intermediate: true
     collect_failure_examples: true
+    # Large-file auto-sampling: files above this size (MB) are sampled for DQ runs.
+    # Set to 0 to disable. Override per-run via UI or env DQ_SAMPLE_THRESHOLD_MB.
+    large_file_threshold_mb: 50
+    large_file_sample_rows: 100000   # target row count after sampling
 
   ai:
-    provider: mock             # mock | dqx
-    # mock  : MockAIProvider - SIMULATED outputs, no external calls, no credentials needed (default)
-    # dqx   : DQXProvider - real LLM via databricks-labs-dqx[llm]; requires:
+    provider: dqx              # mock | dqx
+    # mock  : MockAIProvider - SIMULATED outputs, no external calls, no credentials needed
+    # dqx   : DQXProvider - real LLM via Databricks Model Serving; requires:
     #           pip install 'databricks-labs-dqx[llm]'
     #           env: DATABRICKS_HOST, DATABRICKS_TOKEN, DQX_MODEL_ENDPOINT
     #         auto-falls back to mock if package not installed or credentials absent
     mock_responses_path: ai/mock_ai_responses.yaml
     similarity_fallback: true
-    # dqx_model_endpoint: databricks-meta-llama-3-3-70b-instruct   # uncomment for DQX
-    # dqx_fallback_on_error: true
+    dqx_model_endpoint: databricks-meta-llama-3-3-70b-instruct
+    dqx_fallback_on_error: true
 
   outputs:
     base_path: ../data
     reports_path: ../reports
     format: parquet
     write_mode: overwrite
+
+  # Local Spark runtime tuning (used by UI backend + CLI local harness).
+  # On Databricks/Fabric/EMR these are ignored — the cluster provides Spark.
+  # Override any value via env var: DQ_DRIVER_MEMORY, DQ_SPARK_MASTER, DQ_SHUFFLE_PARTITIONS
+  runtime:
+    spark_master: local[4]
+    driver_memory: 3g
+    shuffle_partitions: 16
+    # Executor memory only applies to standalone/cluster mode, not local[*]
+    executor_memory: 2g
 
   logging:
     level: INFO

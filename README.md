@@ -3,15 +3,18 @@
 A working Proof of Concept for an **Enterprise Data Quality Accelerator**: a reusable
 Apache Spark (PySpark) core engine that plugs into existing Databricks-style pipelines
 with a handful of lines, profiles data, generates candidate rules, executes
-metadata-driven validation, remediates deterministically and via a **mock AI provider**,
-quarantines uncertain records, revalidates corrections, and drives a
-**Bronze → Silver → Gold** medallion flow with quality gates, metrics and audit reports.
+metadata-driven validation, remediates deterministically and via **real LLM calls
+(Databricks Model Serving)** or a mock AI fallback, quarantines uncertain records,
+revalidates corrections, and drives a **Bronze → Silver → Gold** medallion flow with
+quality gates, metrics and audit reports.
 
-> **Status: working local POC.** Everything in this repository was executed on a local
-> Apache Spark 4.1.3 / Java 21 / Python 3.12 harness on Windows 11. No real Databricks
-> workspace was used; Databricks integration is provided as a runnable notebook-style
-> script and contract-tested adapter. See `docs/testing_report.md` for exactly what was
-> verified and how.
+> **Status: working local POC with real Databricks LLM integration.** The engine has
+> been verified on a local Apache Spark 4.1.3 / Java 21 / Python 3.12 harness on
+> Windows 11, including a **1 GB / 6.3M-row CDR dataset** processed end-to-end.
+> **Real Databricks Model Serving LLM calls are working** — DQXProvider uses LiteLLM
+> to call `databricks-meta-llama-3-3-70b-instruct` for value correction with confidence
+> scoring. MockAI remains as automatic fallback when credentials are absent.
+> See `docs/testing_report.md` for exactly what was verified and how.
 
 ## What is in the box
 
@@ -23,15 +26,17 @@ quarantines uncertain records, revalidates corrections, and drives a
 | RuleSet models, versioning, registry, diff, rollback | `dq_core.metadata`, `dq_core.rules` | Implemented & tested |
 | Native PySpark validation engine | `dq_core.validation` | Implemented & tested |
 | Deterministic remediation | `dq_core.remediation.deterministic` | Implemented & tested |
-| Mock AI remediation + confidence policy (90 % default) | `dq_core.ai`, `dq_core.policies` | Implemented & tested |
+| **Real LLM remediation (Databricks Model Serving)** | `dq_core.ai.dqx_provider` | **Implemented & verified** |
+| Mock AI fallback + confidence policy (90 % default) | `dq_core.ai`, `dq_core.policies` | Implemented & tested |
 | Quarantine + post-correction revalidation | `dq_core.quarantine`, `dq_core.revalidation` | Implemented & tested |
 | Bronze/Silver/Gold medallion runner | `dq_core.orchestration.medallion` | Implemented & tested |
 | Pipeline lifecycle registry (onboard→offboard) | `dq_core.pipelines` | Implemented & tested |
 | `dqctl` CLI | `dq_core.cli.main` | Implemented & verified |
+| **React + FastAPI UI** (dashboard, anomalies, approvals, trends) | `ui/` | Implemented & verified |
 | Databricks PySpark integration example | `integrations/databricks/` | Runnable script, **not executed on Databricks** |
 | Portability adapter contracts | `integrations/contracts/` | Contract-tested |
-| Synthetic banking sample data + expected results | `sample_data/` | Deterministic |
-| Automated test suite | `packages/dq-core/tests/` | See `docs/testing_report.md` |
+| Synthetic sample data (banking, healthcare, telecom, retail, finance) | `sample_data/` | Deterministic, includes 1GB CDR |
+| Automated test suite | `packages/dq-core/tests/` | 130 tests (65 unit + 65 integration) |
 
 ## Quick start (Windows / PowerShell)
 
@@ -39,11 +44,12 @@ All artefacts stay on the **D: drive inside this project** — virtualenv, pip c
 Spark scratch and temp files. Nothing is written to C:.
 
 ```powershell
-# 1. Environment (creates .venv, redirects TEMP/TMP/pip cache to .tmp on D:)
-.\scripts\setup.ps1
+# 1. New machine: run the automated setup (Python 3.12 + JDK 21 required)
+.\setup_new_machine.bat
 
-# 2. Activate env for the session
-. .\scripts\env.ps1
+# 2. Or manual setup (if you prefer):
+.\scripts\setup.ps1        # creates .venv, redirects TEMP/TMP/pip cache to .tmp on D:
+. .\scripts\env.ps1         # activate env for the session
 
 # 3. Verify the Spark runtime (Python / Spark / Java / Parquet round-trip)
 & $VenvPython scripts\check_runtime.py
@@ -51,8 +57,23 @@ Spark scratch and temp files. Nothing is written to C:.
 # 4. Regenerate the deterministic synthetic data if needed
 & $VenvPython scripts\generate_sample_data.py
 
-# 5. Run the test suite (~8 min; starts a local Spark session)
+# 5. Start the full application (backend + frontend)
+.\start_ui.bat
+
+# 6. Run the test suite (~8 min; starts a local Spark session)
 & $VenvPython -m pytest packages\dq-core\tests\ -v
+```
+
+**Optional: Enable real Databricks LLM remediation**
+
+```powershell
+# Set your Databricks credentials (get PAT from workspace → User Settings → Developer)
+set DATABRICKS_HOST=https://your-workspace.cloud.databricks.com
+set DATABRICKS_TOKEN=your-pat-token
+set DQX_MODEL_ENDPOINT=databricks-meta-llama-3-3-70b-instruct
+
+# Edit config/engine.yaml → ai.provider: dqx (already done by default)
+# Restart backend → Settings page shows green "Connected to Databricks Model Serving"
 ```
 
 ## Minimal integration example
@@ -132,11 +153,15 @@ everything (tests, CLI, examples, API).
 ## Honest scope statement
 
 - **Executed locally:** profiling, rule generation, validation, all three modes,
-  deterministic + mock-AI remediation, quarantine/revalidation, medallion flow,
+  deterministic + real-LLM remediation, quarantine/revalidation, medallion flow,
   metrics/reports, pipeline lifecycle, CLI — all on local Spark 4.1.3.
-- **Not executed on Databricks:** no workspace, cluster or credentials were used. The
-  Databricks integration is a notebook-style script plus contract-tested adapter;
-  it requires a real workspace run to be fully validated there.
-- **Not built (by design):** UI, REST/FastAPI service, PostgreSQL governance,
-  authentication, multi-tenancy, real LLM calls, production Airflow/ADF/dbt/Flink
-  connectors.
+- **Real Databricks LLM:** DQXProvider uses LiteLLM to call `databricks-meta-llama-3-3-70b-instruct`
+  on Databricks Model Serving for value correction. MockAI auto-fallback when credentials absent.
+- **Large file support:** 1 GB / 6.3M-row CDR file processed end-to-end (auto-sampling,
+  memory tuning via `config/engine.yaml` runtime section).
+- **Full UI:** React 18 + FastAPI dashboard with real data — health scores, pipeline
+  trends, anomaly lifecycle, approval inbox, governed Run DQ, onboarding wizard.
+- **Not executed on Databricks cluster:** the engine runs on local Spark; the
+  Databricks integration is a notebook-style script plus contract-tested adapter.
+- **Not built (by design):** PostgreSQL governance backend, authentication/SSO,
+  multi-tenancy, production Airflow/ADF/dbt/Flink connectors.
