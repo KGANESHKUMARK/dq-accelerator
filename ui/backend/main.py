@@ -351,7 +351,7 @@ def _do_run(body: RunIn) -> dict[str, Any]:
               "column": r.column, "status": r.status, "total": r.total_records,
               "passed": r.passed_records, "failed": r.failed_records,
               "pass_pct": r.pass_percentage} for r in res.validation_results.results] if res.validation_results else []
-    result = {"run_id": res.run_id, "summary": res.summary_text(),
+    result = {"run_id": res.run_id, "pipeline_id": body.pipeline_id, "summary": res.summary_text(),
             "accepted": res.execution_metrics.accepted_records,
             "quarantined": res.execution_metrics.quarantined_records,
             "input": res.execution_metrics.input_records,
@@ -506,6 +506,14 @@ def chat_log(limit: int = 100) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ AI provider status
+@app.post("/api/engine/reload")
+def engine_reload(restart_spark: bool = False) -> dict[str, Any]:
+    """Hot-reload engine.yaml without restarting the backend process.
+    Use after editing config (provider, memory, thresholds). Spark restart is
+    optional — required only when changing runtime.* settings."""
+    return J.reload_engine(restart_spark=restart_spark)
+
+
 @app.get("/api/ai/status")
 def ai_status() -> dict[str, Any]:
     """Current AI provider info — tells UI whether DQX or mock is active."""
@@ -749,6 +757,14 @@ def pipeline_metrics(pid: str) -> dict[str, Any]:
 def pipeline_trend(pid: str) -> list[dict[str, Any]]:
     """Return last 30 dq_run job summaries for a pipeline (for sparkline charts)."""
     rows = J.list_jobs(limit=200)
+    # Map run_id -> pipeline_id from reports on disk (fallback for old jobs
+    # that didn't store pipeline_id in the job result)
+    run2pid: dict[str, str] = {}
+    for rep in _read_reports_index():
+        m = rep.get("execution_metrics") or {}
+        rid = m.get("dq_run_id") or m.get("run_id")
+        if rid and m.get("pipeline_id"):
+            run2pid[rid] = m["pipeline_id"]
     out = []
     for r in rows:
         if r.get("kind") != "dq_run" or r.get("status") != "COMPLETED":
@@ -757,17 +773,20 @@ def pipeline_trend(pid: str) -> list[dict[str, Any]]:
         if not j:
             continue
         res = j.get("result") or {}
-        if res.get("run_id", "").startswith("DQRUN") or True:  # include all, filter by pid below
-            inp = res.get("input", 0)
-            acc = res.get("accepted", 0)
-            out.append({
-                "job_id": r["job_id"],
-                "ran_at": r.get("finished_at") or r.get("submitted_at"),
-                "pass_rate": round(acc / inp * 100, 1) if inp else None,
-                "accepted": acc, "quarantined": res.get("quarantined", 0),
-                "input": inp, "gate_passed": res.get("gate_passed"),
-                "run_id": res.get("run_id"),
-            })
+        run_id = res.get("run_id", "")
+        job_pid = res.get("pipeline_id") or run2pid.get(run_id, "")
+        if job_pid != pid:                       # ← filter to THIS pipeline only
+            continue
+        inp = res.get("input", 0)
+        acc = res.get("accepted", 0)
+        out.append({
+            "job_id": r["job_id"],
+            "ran_at": r.get("finished_at") or r.get("submitted_at"),
+            "pass_rate": round(acc / inp * 100, 1) if inp else None,
+            "accepted": acc, "quarantined": res.get("quarantined", 0),
+            "input": inp, "gate_passed": res.get("gate_passed"),
+            "run_id": run_id,
+        })
         if len(out) >= 30:
             break
     return list(reversed(out))

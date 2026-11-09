@@ -10,7 +10,7 @@ type Page = {
   label: string
   icon: string
   section?: string
-  component: React.FC
+  component: React.FC<any>
   badge?: () => number | null
 }
 
@@ -28,6 +28,8 @@ const PAGES: Page[] = [
 
 export default function App() {
   const [pageId, setPageId] = useState('dashboard')
+  const [pipeFocus, setPipeFocus] = useState<string | null>(null)
+  const openPipeline = (id: string) => { setPipeFocus(id); setPageId('pipelines') }
   const [health, setHealth] = useState<string>('')
   const [pendingCount, setPendingCount] = useState(0)
 
@@ -87,7 +89,7 @@ export default function App() {
           </div>
         </div>
         <div className="page-content">
-          <PageComponent />
+          <PageComponent onOpenPipeline={openPipeline} focusPipeline={pageId === 'pipelines' ? pipeFocus : null} />
         </div>
       </div>
       <ChatPanel />

@@ -38,6 +38,7 @@ export const api = {
   assistantEnabled: () => fetch(`${B}/assistant/enabled`).then(j),
   setAssistantEnabled: (enabled: boolean) => fetch(`${B}/assistant/enabled`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) }).then(j),
   chatLog: () => fetch(`${B}/chat/log`).then(j),
+  reloadEngine: (restartSpark = false) => fetch(`${B}/engine/reload?restart_spark=${restartSpark}`, { method: 'POST' }).then(j),
   quarantinePending: () => fetch(`${B}/quarantine/pending`).then(j),
   approveCorrection: (body: any) => fetch(`${B}/quarantine/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   rejectCorrection: (body: any) => fetch(`${B}/quarantine/reject`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),

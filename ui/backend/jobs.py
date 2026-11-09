@@ -154,3 +154,21 @@ def get_engine():
         get_engine._engine = DataQualityEngine(
             EngineConfig.from_yaml(ROOT / "config" / "engine.yaml"))
     return get_engine._engine
+
+
+def reload_engine(restart_spark: bool = False) -> dict:
+    """Drop the cached engine (and optionally the Spark session) so next call
+    re-reads config/engine.yaml — enables hot config reload from Settings."""
+    if hasattr(get_engine, "_engine"):
+        delattr(get_engine, "_engine")
+    spark_restarted = False
+    if restart_spark and hasattr(get_spark, "_session"):
+        try:
+            get_spark._session.stop()
+        except Exception:
+            pass
+        delattr(get_spark, "_session")
+        spark_restarted = True
+    # warm the new engine so callers get a ready provider
+    return {"reloaded": True, "spark_restarted": spark_restarted,
+            "provider": type(get_engine().ai_provider).__name__}

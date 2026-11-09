@@ -35,15 +35,40 @@ const usePoll = (jobId: string | null, ms = 2500) => {
   return job
 }
 
+const PHASES: Array<[RegExp, string]> = [
+  [/submit|queue/i, 'Queued'],
+  [/spark|engine/i, 'Starting Spark'],
+  [/read|load/i, 'Reading data'],
+  [/profil/i, 'Profiling'],
+  [/validat/i, 'Validating'],
+  [/remediat|ai|llm/i, 'AI remediation'],
+  [/revalidat/i, 'Revalidating'],
+  [/report|writ/i, 'Writing report'],
+  [/done|complet/i, 'Done'],
+]
+
 const JobStatus = ({ job }: { job: Job | null }) => !job ? null : (
-  <div className="card">
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span className={`badge ${job.status}`}>{job.status}</span>
-      {job.status !== 'COMPLETED' && job.status !== 'FAILED' && <span className="spin" />}
-      <span className="muted" style={{ flex: 1 }}>{job.progress}</span>
-      <span className="muted">{job.job_id}</span>
+  <div className="card" style={{ borderLeft: '4px solid var(--info)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+      <span className={`badge ${job.status}`} style={{ fontSize: 12 }}>{job.status}</span>
+      {(job.status === 'RUNNING' || job.status === 'QUEUED') && <span className="spin" />}
+      <b style={{ flex: 1, fontSize: 13 }}>{job.progress || 'waiting…'}</b>
+      <span className="muted" style={{ fontSize: 11 }}>{job.job_id}</span>
     </div>
-    {(job.status === 'RUNNING' || job.status === 'QUEUED') && <div className="progress-bar"><div className="progress-fill" style={{ width: '60%' }} /></div>}
+    {(job.status === 'RUNNING' || job.status === 'QUEUED') && <>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+        {PHASES.map(([re, label]) => {
+          const active = re.test(job.progress || '')
+          return <span key={label} className="badge" style={{
+            fontSize: 10, opacity: active ? 1 : 0.35,
+            background: active ? 'var(--info)' : 'var(--border)',
+            color: active ? '#fff' : 'var(--muted)' }}>{label}</span>
+        })}
+      </div>
+      <div className="progress-bar" style={{ height: 8 }}>
+        <div className="progress-fill" style={{ width: '60%', animation: 'pulse 1.2s infinite' }} />
+      </div>
+    </>}
     {job.error && <pre className="err" style={{ marginTop: 8 }}>{job.error}</pre>}
     {job.result?.summary && <pre style={{ marginTop: 8 }}>{job.result.summary}</pre>}
   </div>
@@ -197,7 +222,7 @@ const DonutBar = ({ label, value, total, color }: { label: string; value: number
   )
 }
 
-export function Dashboard() {
+export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) => void } = {}) {
   const [summary, setSummary] = useState<any>(null)
   const [pipes, setPipes] = useState<any[]>([])
   const [jobs, setJobs] = useState<Job[]>([])
@@ -347,7 +372,10 @@ export function Dashboard() {
           const last = trd[trd.length - 1]
           const dsRow = (summary?.by_dataset ?? []).find((d: any) => d.dataset === p.pipeline_id?.split('_')[0]?.toLowerCase())
           return (
-            <div className="pipe-card" key={p.pipeline_id}>
+            <div className="pipe-card" key={p.pipeline_id}
+              style={{ cursor: onOpenPipeline ? 'pointer' : 'default' }}
+              title={onOpenPipeline ? 'Open pipeline detail' : undefined}
+              onClick={() => onOpenPipeline?.(p.pipeline_id)}>
               <div className="pipe-card-header">
                 <div>
                   <div className="pipe-card-name">{p.pipeline_name ?? p.pipeline_id}</div>
@@ -439,7 +467,7 @@ export function Dashboard() {
 /* ============================================================
    PIPELINES
    ============================================================ */
-export function Pipelines() {
+export function Pipelines({ focusPipeline }: { focusPipeline?: string | null } = {}) {
   const [pipes, setPipes] = useState<any[]>([])
   const [sel, setSel] = useState<any>(null)
   const [metrics, setMetrics] = useState<any>(null)
@@ -465,6 +493,7 @@ export function Pipelines() {
     api.pipelineTrend(id).then(setTrend).catch(() => setTrend([]))
     api.pipelineMetrics(id).then(setMetrics).catch(() => setMetrics(null))
   }
+  useEffect(() => { if (focusPipeline) open(focusPipeline) }, [focusPipeline])
 
   const ACTIONS: Record<string, string[]> = {
     REGISTERED: ['test', 'offboard'],
@@ -1194,6 +1223,7 @@ export function Settings() {
   const [sys, setSys] = useState<any>(null)
   const [assistantOn, setAssistantOn] = useState<boolean>(true)
   const [chatLog, setChatLog] = useState<any[]>([])
+  const [reloadMsg, setReloadMsg] = useState<string>('')
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
@@ -1253,6 +1283,21 @@ export function Settings() {
         <div className="kv"><span>Registry</span><b>{cfg?.registry?.backend ?? 'file'} · anomalies.db · jobs.db</b></div>
         <div className="kv"><span>Default mode</span><b>{cfg?.engine?.default_mode ?? '—'}</b></div>
         <div className="kv"><span>Profiling</span><b>{cfg?.profiling?.mode ?? '—'} · {((cfg?.profiling?.sample_fraction ?? 0) * 100).toFixed(0)}% sample</b></div>
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
+        <button className="primary" style={{ padding: '6px 14px' }}
+          onClick={() => api.reloadEngine(false).then(r => { api.aiStatus().then(setAi); api.getConfig().then(setCfg); setReloadMsg(`Engine reloaded — provider: ${r.provider}`) }).catch((e: any) => setReloadMsg(`Reload failed: ${e.message}`))}>
+          Apply config changes (no restart)
+        </button>
+        <button style={{ padding: '6px 14px' }}
+          onClick={() => api.reloadEngine(true).then(r => { api.aiStatus().then(setAi); api.getConfig().then(setCfg); setReloadMsg(`Engine + Spark reloaded — provider: ${r.provider}`) }).catch((e: any) => setReloadMsg(`Reload failed: ${e.message}`))}>
+          Reload + restart Spark
+        </button>
+        {reloadMsg && <span className="muted" style={{ fontSize: 11 }}>{reloadMsg}</span>}
+      </div>
+      <div className="info-box" style={{ marginTop: 10, fontSize: 11 }}>
+        Use <b>Apply</b> after editing <code>config/engine.yaml</code> (provider, thresholds) — no backend restart needed.
+        Use <b>Reload + restart Spark</b> only when changing <code>runtime.*</code> (memory, master, partitions) — takes ~30 s.
       </div>
     </div>
 
@@ -1410,9 +1455,10 @@ export function ChatPanel() {
 
   return <>
     {!open && <button onClick={() => setOpen(true)} title="DQ Assistant"
-      style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, width: 52, height: 52,
-               borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: 22,
-               background: 'var(--info)', color: '#fff', boxShadow: '0 4px 14px rgba(0,0,0,.4)' }}>?</button>}
+      style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, height: 40, padding: '0 16px',
+               borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+               letterSpacing: '.5px',
+               background: 'var(--info)', color: '#fff', boxShadow: '0 4px 14px rgba(0,0,0,.4)' }}>✦ DQ Assistant</button>}
 
     {open && <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, width: 360,
         maxHeight: 500, display: 'flex', flexDirection: 'column',
