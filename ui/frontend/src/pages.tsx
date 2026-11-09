@@ -1191,17 +1191,54 @@ export function Settings() {
   const [health, setHealth] = useState<any>(null)
   const [ai, setAi] = useState<any>(null)
   const [cfg, setCfg] = useState<any>(null)
+  const [sys, setSys] = useState<any>(null)
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
     api.getConfig().then(setCfg).catch(() => {})
+    api.systemStatus().then(setSys).catch(() => {})
   }, [])
 
   const dqxReady = ai && ai.provider === 'DQXProvider' && !ai.simulated
   const mockReady = ai && ai.provider === 'MockAIProvider'
 
+  const SYS_CHECK: Record<string, {label: string; url?: string}> = {
+    python: {label: 'Python 3.12+', url: 'https://www.python.org/downloads/'},
+    java: {label: 'Java JDK 21+', url: 'https://learn.microsoft.com/en-us/java/openjdk/download'},
+    node: {label: 'Node.js 18+', url: 'https://nodejs.org/en/download'},
+    pyspark: {label: 'PySpark'},
+    databricks_dqx: {label: 'databricks-labs-dqx'},
+    litellm: {label: 'litellm'},
+    fastapi: {label: 'FastAPI'},
+    uvicorn: {label: 'Uvicorn'},
+  }
+
   return <>
     <div className="section-title">Settings &amp; Configuration</div>
+
+    {sys && <div className="card">
+      <h3>System status {sys.all_ok ? <span className="badge COMPLETED">all ok</span> : <span className="badge FAILED">issues</span>}</h3>
+      <table>
+        <thead><tr><th>Component</th><th>Status</th><th>Detected</th><th>Install</th></tr></thead>
+        <tbody>
+          {Object.entries(sys.checks ?? {}).map(([k, c]: [string, any]) => (
+            <tr key={k}>
+              <td>{SYS_CHECK[k]?.label ?? k}</td>
+              <td><span className={`badge ${c.ok ? 'COMPLETED' : 'FAILED'}`}>{c.ok ? 'OK' : 'MISSING'}</span></td>
+              <td className="muted" style={{ fontSize: 11 }}>{String(c.version ?? '—').slice(0, 60)}</td>
+              <td>{!c.ok && SYS_CHECK[k]?.url && <a href={SYS_CHECK[k].url} target="_blank" rel="noreferrer">download</a>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h4 style={{ marginTop: 12 }}>LLM environment variables</h4>
+      <div style={{ display: 'flex', gap: 16, fontSize: 12, flexWrap: 'wrap' }}>
+        {Object.entries(sys.env_vars ?? {}).map(([k, v]: [string, any]) => (
+          <span key={k}><code>{k}</code>: <b style={{ color: v ? 'var(--success)' : 'var(--danger)' }}>{v ? 'set' : 'not set'}</b></span>
+        ))}
+      </div>
+      <div className="info-box" style={{ marginTop: 10 }}>Set env vars before running <code>DQ_start.bat</code> to enable the real LLM. One-time setup guide: <code>docs/SETUP.md</code></div>
+    </div>}
 
     <div className="card">
       <h3>Engine</h3>

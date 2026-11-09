@@ -78,6 +78,48 @@ def health() -> dict[str, Any]:
     return {"status": "ok", "engine": "dq-core", "root": str(ROOT)}
 
 
+# ------------------------------------------------------------------ system status
+@app.get("/api/system/status")
+def system_status() -> dict[str, Any]:
+    """Environment checks for the Settings page — Python, Java, Node, packages."""
+    import shutil, subprocess, sys as _sys
+
+    def _ver(cmd: list[str]) -> str | None:
+        try:
+            out = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            return (out.stdout or out.stderr).splitlines()[0].strip() if (out.stdout or out.stderr) else "?"
+        except Exception:
+            return None
+
+    def _pkg(name: str) -> bool:
+        try:
+            __import__(name)
+            return True
+        except Exception:
+            return False
+
+    checks = {
+        "python": {"ok": _sys.version_info >= (3, 12), "version": _sys.version.split()[0], "required": ">=3.12"},
+        "java": {"ok": bool(_ver(["java", "-version"])), "version": _ver(["java", "-version"]), "required": "JDK 21+"},
+        "node": {"ok": bool(_ver(["node", "--version"])), "version": _ver(["node", "--version"]), "required": ">=18"},
+        "pyspark": {"ok": _pkg("pyspark"), "version": "4.1.3 expected"},
+        "databricks_dqx": {"ok": _pkg("databricks.labs.dqx"), "version": "optional - LLM"},
+        "litellm": {"ok": _pkg("litellm"), "version": "optional - LLM"},
+        "fastapi": {"ok": _pkg("fastapi"), "version": "backend"},
+        "uvicorn": {"ok": _pkg("uvicorn"), "version": "backend"},
+    }
+    return {
+        "venv": str(ROOT / ".venv" / "Scripts" / "python.exe"),
+        "checks": checks,
+        "all_ok": all(c["ok"] for c in checks.values() if c.get("required") or c["version"] != "optional - LLM"),
+        "env_vars": {
+            "DATABRICKS_HOST": bool(os.environ.get("DATABRICKS_HOST")),
+            "DATABRICKS_TOKEN": bool(os.environ.get("DATABRICKS_TOKEN")),
+            "DQX_MODEL_ENDPOINT": bool(os.environ.get("DQX_MODEL_ENDPOINT")),
+        },
+    }
+
+
 # ------------------------------------------------------------------ pipelines
 @app.get("/api/pipelines")
 def pipelines() -> list[dict[str, Any]]:
