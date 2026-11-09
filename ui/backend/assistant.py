@@ -13,6 +13,35 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+LOG_FILE = ROOT / "logs" / "assistant" / "chat_log.jsonl"
+
+
+def is_enabled() -> bool:
+    try:
+        import yaml
+        doc = yaml.safe_load((ROOT / "config" / "engine.yaml").read_text(encoding="utf-8")) or {}
+        return bool((doc.get("engine", {}).get("assistant") or {}).get("enabled", True))
+    except Exception:
+        return True
+
+
+def set_enabled(enabled: bool) -> None:
+    import yaml
+    p = ROOT / "config" / "engine.yaml"
+    doc = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    doc.setdefault("engine", {}).setdefault("assistant", {})["enabled"] = bool(enabled)
+    p.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def _log(question: str, answer_text: str, source: str) -> None:
+    try:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        from dq_core.runtime.utils import utc_now_iso
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": utc_now_iso(), "q": question,
+                                "a": answer_text[:4000], "source": source}) + "\n")
+    except Exception:
+        pass
 
 
 def gather_context() -> dict[str, Any]:
@@ -152,6 +181,16 @@ def _fallback_answer(question: str, context: dict[str, Any]) -> str:
         lines = [f"- {j.get('job_id')} · {j.get('kind')} · {j.get('status')}" for j in jobs[:5]]
         return "Recent jobs:\n" + "\n".join(lines)
 
+    if any(w in q for w in ("why", "fail", "gate", "quality", "report", "metric")):
+        m = context.get("latest_report") or {}
+        if not m:
+            return "No reports yet — run a DQ job first (Run DQ tab)."
+        failed = m.get("rules_failed", "?"); total = m.get("rules_evaluated", "?")
+        return (f"Latest run: {m.get('dataset', '?')} · input={m.get('input_records', 0):,} · "
+                f"accepted={m.get('accepted_records', 0):,} · quarantined={m.get('quarantined_records', 0):,} · "
+                f"rules_failed={failed}/{total} · gate={'PASSED' if m.get('quality_gate_passed') else 'FAILED'}. "
+                "Open the Reports tab for the full JSON breakdown per rule.")
+
     if "step" in q or "how" in q or "next" in q or "roadmap" in q or "future" in q:
         return ("Suggested flow: 1) Onboard a dataset (Onboard tab) → 2) Profile it → "
                 "3) Approve generated rules → 4) Publish ruleset → 5) Activate pipeline → "
@@ -165,9 +204,21 @@ def _fallback_answer(question: str, context: dict[str, Any]) -> str:
 
 
 def answer(question: str) -> dict[str, Any]:
+    if not is_enabled():
+        return {"answer": "DQ Assistant is disabled. Enable it in Settings → DQ Assistant.",
+                "source": "disabled", "provider": "none"}
     ctx = gather_context()
     llm = _llm_answer(question, ctx)
     if llm:
+        _log(question, llm, "llm")
         return {"answer": llm, "source": "llm", "provider": "DQXProvider"}
-    return {"answer": _fallback_answer(question, ctx), "source": "builtin",
-            "provider": "builtin-faq"}
+    fb = _fallback_answer(question, ctx)
+    _log(question, fb, "builtin")
+    return {"answer": fb, "source": "builtin", "provider": "builtin-faq"}
+
+
+def history(limit: int = 100) -> list[dict[str, Any]]:
+    if not LOG_FILE.exists():
+        return []
+    rows = [json.loads(l) for l in LOG_FILE.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return list(reversed(rows[-limit:]))

@@ -481,6 +481,30 @@ def chat(body: ChatIn) -> dict[str, Any]:
     return A.answer(body.message.strip())
 
 
+@app.get("/api/assistant/enabled")
+def assistant_enabled() -> dict[str, bool]:
+    import assistant as A
+    return {"enabled": A.is_enabled()}
+
+
+class AssistantToggle(BaseModel):
+    enabled: bool
+
+
+@app.put("/api/assistant/enabled")
+def assistant_set_enabled(body: AssistantToggle) -> dict[str, bool]:
+    import assistant as A
+    A.set_enabled(body.enabled)
+    return {"enabled": A.is_enabled()}
+
+
+@app.get("/api/chat/log")
+def chat_log(limit: int = 100) -> dict[str, Any]:
+    import assistant as A
+    rows = A.history(limit)
+    return {"total": len(rows), "entries": rows}
+
+
 # ------------------------------------------------------------------ AI provider status
 @app.get("/api/ai/status")
 def ai_status() -> dict[str, Any]:

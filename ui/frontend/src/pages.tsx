@@ -1192,11 +1192,15 @@ export function Settings() {
   const [ai, setAi] = useState<any>(null)
   const [cfg, setCfg] = useState<any>(null)
   const [sys, setSys] = useState<any>(null)
+  const [assistantOn, setAssistantOn] = useState<boolean>(true)
+  const [chatLog, setChatLog] = useState<any[]>([])
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
     api.getConfig().then(setCfg).catch(() => {})
     api.systemStatus().then(setSys).catch(() => {})
+    api.assistantEnabled().then(r => setAssistantOn(r.enabled)).catch(() => {})
+    api.chatLog().then(r => setChatLog(r.entries ?? [])).catch(() => {})
   }, [])
 
   const dqxReady = ai && ai.provider === 'DQXProvider' && !ai.simulated
@@ -1301,6 +1305,41 @@ export function Settings() {
     </div>
 
     <div className="card">
+      <h3>DQ Assistant (chatbot)</h3>
+      <div className="form-grid" style={{ marginBottom: 12 }}>
+        <div className="kv"><span>Status</span>
+          <b style={{ color: assistantOn ? 'var(--success)' : 'var(--danger)' }}>{assistantOn ? 'ENABLED' : 'DISABLED'}</b></div>
+        <div className="kv"><span>Log</span><code>logs/assistant/chat_log.jsonl</code></div>
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+        <button className="primary" style={{ padding: '6px 14px' }}
+          onClick={() => api.setAssistantEnabled(!assistantOn).then(r => setAssistantOn(r.enabled))}>
+          {assistantOn ? 'Disable' : 'Enable'}
+        </button>
+        <button style={{ padding: '6px 14px' }}
+          onClick={() => api.chatLog().then(r => setChatLog(r.entries ?? []))}>Refresh log</button>
+      </div>
+      {chatLog.length > 0 && <div style={{ maxHeight: 200, overflowY: 'auto', fontSize: 11 }}>
+        <table>
+          <thead><tr><th>Time</th><th>Question</th><th>Source</th></tr></thead>
+          <tbody>
+            {chatLog.slice(0, 15).map((e: any, i: number) => (
+              <tr key={i}>
+                <td className="muted">{(e.ts ?? '').slice(11, 19)}</td>
+                <td>{e.q}</td>
+                <td><span className={`badge ${e.source === 'llm' ? 'COMPLETED' : 'PENDING'}`}>{e.source}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>}
+      <div className="info-box" style={{ marginTop: 10 }}>
+        The Assistant answers questions about this app only — pipelines, rulesets, jobs, anomalies, reports,
+        setup, and roadmap. Uses the same Databricks LLM as remediation; falls back to built-in answers offline.
+      </div>
+    </div>
+
+    <div className="card">
       <h3>DQ modes</h3>
       {[
         ['OBSERVE_ONLY', 'All rows pass through untouched. Violations flagged only. Zero data risk — safe start for all new pipelines.'],
@@ -1338,6 +1377,7 @@ export function Settings() {
 type ChatMsg = { role: 'user' | 'bot'; text: string; source?: string }
 
 export function ChatPanel() {
+  const [enabled, setEnabled] = useState(true)
   const [open, setOpen] = useState(false)
   const [msgs, setMsgs] = useState<ChatMsg[]>([
     { role: 'bot', text: "Hi! I'm DQ Assistant. Ask me about onboarded pipelines, rulesets, jobs, anomalies, how to run DQ, or the roadmap." },
@@ -1347,6 +1387,11 @@ export function ChatPanel() {
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, open])
+  useEffect(() => {
+    const poll = () => api.assistantEnabled().then(r => setEnabled(r.enabled)).catch(() => {})
+    poll(); const t = setInterval(poll, 15000); return () => clearInterval(t)
+  }, [])
+  if (!enabled) return null
 
   const send = async () => {
     const text = input.trim()

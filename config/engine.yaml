@@ -47,6 +47,11 @@ engine:
     dqx_model_endpoint: databricks-meta-llama-3-3-70b-instruct
     dqx_fallback_on_error: true
 
+  # DQ Assistant chatbot — enable/disable from Settings page (writes this value)
+  assistant:
+    enabled: true
+    log_path: ../logs/assistant/chat_log.jsonl   # one JSON per conversation turn
+
   outputs:
     base_path: ../data
     reports_path: ../reports
