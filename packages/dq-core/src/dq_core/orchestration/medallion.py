@@ -19,6 +19,7 @@ from pyspark.sql import functions as F
 
 from dq_core.context import IntegrationMode, PipelineContext, Stage
 from dq_core.engine import DataQualityEngine
+from dq_core.io.ingestion import write_ingest_manifest
 from dq_core.io.sinks import StoragePaths, StorageSink
 from dq_core.metadata.models import RuleSet
 from dq_core.orchestration.result import DQResult
@@ -93,8 +94,10 @@ class MedallionRunner:
             silver_mode: IntegrationMode | str = IntegrationMode.REMEDIATE,
             gold_ruleset: RuleSet | str | Path | None = None,
             gold_reference_data: Mapping[str, DataFrame] | None = None,
+            source_path: str | Path | None = None,
             profile: bool = True, write_bronze: bool = True, write_silver: bool = True,
-            write_gold: bool = True, write_quarantine: bool = True, write_reports: bool = True) -> MedallionResult:
+            write_gold: bool = True, write_quarantine: bool = True, write_reports: bool = True,
+            platform: str = "LOCAL") -> MedallionResult:
         started = utc_now_iso()
         phases: dict[str, float] = {}
         written: dict[str, str] = {}
@@ -107,13 +110,15 @@ class MedallionRunner:
             if write_bronze:
                 self.sink.write(raw_df, bronze_path)
                 written["bronze"] = bronze_path
+                receipt = write_ingest_manifest(dataset, source_path or bronze_path, bronze_path, raw_df)
+                written["bronze_ingest_manifest"] = receipt.manifest_path
         phases["bronze_write"] = sw.elapsed_ms
         log_event(_logger, "bronze_complete", dataset=dataset, rows=bronze_rows, path=bronze_path)
 
         # --- SILVER ---------------------------------------------------------------
         with Stopwatch() as sw:
             silver_ctx = PipelineContext(pipeline_id=pipeline_id, pipeline_run_id=pipeline_run_id,
-                                         dataset=dataset, stage=Stage.SILVER, platform="LOCAL")
+                                         dataset=dataset, stage=Stage.SILVER, platform=platform)
             silver_rs = self.engine.load_ruleset(silver_ruleset)
             silver_pol = self.engine.load_policy(policy)
             profile_report = self.engine.profile(raw_df, dataset) if profile else None
@@ -148,7 +153,7 @@ class MedallionRunner:
         if gold_ruleset is not None:
             with Stopwatch() as sw:
                 gold_ctx = PipelineContext(pipeline_id=pipeline_id, pipeline_run_id=pipeline_run_id,
-                                           dataset=dataset, stage=Stage.GOLD, platform="LOCAL")
+                                           dataset=dataset, stage=Stage.GOLD, platform=platform)
                 gold_rs = self.engine.load_ruleset(gold_ruleset)
                 gold_pol = self.engine.load_policy(policy)
                 ref = dict(gold_reference_data or {})

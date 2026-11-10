@@ -1,0 +1,22 @@
+pipeline:
+  pipeline_id: GOAT_HERD_PIPELINE
+  pipeline_name: Goat Herd Animals Pipeline
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: livestock-ops@example.com
+  description: Synthetic goat farming herd dataset onboarded via UI wizard API (63 rows, seeded defects).
+  policy: ../policies/default.yaml
+  datasets:
+  - dataset_id: goat_herd_animals
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    - GOLD
+    rulesets:
+      SILVER: ../rulesets/goat_herd_animals_v1_2.yaml
+      GOLD: ../rulesets/goat_herd_animals_gold_v1.yaml
+    test_data: ../../sample_data/bronze/goat_herd_animals.csv
+    test_data_format: CSV

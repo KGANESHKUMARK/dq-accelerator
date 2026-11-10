@@ -4,10 +4,11 @@ Decision order (first match wins):
 
 1. no proposal / unchanged value / invalid confidence      -> NO_PROPOSAL / REJECTED_*
 2. matching human approval on file                         -> APPROVED_BY_HUMAN (applied)
-3. confidence  < threshold                                 -> BELOW_THRESHOLD (quarantine)
-4. sensitive column (identity, account, amount, regulatory) -> REQUIRES_APPROVAL (quarantine)
-5. rule policy does not allow auto-apply / AI auto-apply off -> REQUIRES_APPROVAL (quarantine)
-6. otherwise                                               -> AUTO_APPLY (then revalidated)
+3. matching human rejection on file                        -> REJECTED_BY_HUMAN (withheld)
+4. confidence  < threshold                                 -> BELOW_THRESHOLD (quarantine)
+5. sensitive column (identity, account, amount, regulatory) -> REQUIRES_APPROVAL (quarantine)
+6. rule policy does not allow auto-apply / AI auto-apply off -> REQUIRES_APPROVAL (quarantine)
+7. otherwise                                               -> AUTO_APPLY (then revalidated)
 
 Comparisons use ``Decimal`` so 0.8999 < 0.90 <= 0.90 exactly (no binary float surprises).
 A high confidence alone is never treated as proof of correctness: every applied correction is
@@ -22,7 +23,7 @@ from enum import Enum
 from typing import Any
 
 from dq_core.metadata.models import RuleDefinition
-from dq_core.policies.approvals import ApprovalStore
+from dq_core.policies.approvals import ApprovalStore, RejectionStore
 from dq_core.policies.models import RemediationPolicyConfig
 
 
@@ -34,6 +35,7 @@ class Decision(str, Enum):
     NO_PROPOSAL = "NO_PROPOSAL"
     REJECTED_NO_CHANGE = "REJECTED_NO_CHANGE"
     REJECTED_INVALID_CONFIDENCE = "REJECTED_INVALID_CONFIDENCE"
+    REJECTED_BY_HUMAN = "REJECTED_BY_HUMAN"
     BLOCKED_SENSITIVE_DATA_EGRESS = "BLOCKED_SENSITIVE_DATA_EGRESS"
     NOT_EVALUATED_LIMIT = "NOT_EVALUATED_LIMIT"
 
@@ -51,9 +53,11 @@ class PolicyDecision:
 
 
 class ConfidencePolicyEngine:
-    def __init__(self, policy: RemediationPolicyConfig, approvals: ApprovalStore | None = None) -> None:
+    def __init__(self, policy: RemediationPolicyConfig, approvals: ApprovalStore | None = None,
+                 rejections: RejectionStore | None = None) -> None:
         self.policy = policy
         self.approvals = approvals or ApprovalStore()
+        self.rejections = rejections or RejectionStore()
 
     @property
     def threshold(self) -> Decimal:
@@ -79,6 +83,11 @@ class ConfidencePolicyEngine:
         if approval is not None:
             return PolicyDecision(Decision.APPROVED_BY_HUMAN, f"approved by {approval.approved_by} {approval.ticket}".strip(),
                                   category, approval.approved_by)
+        rejection = self.rejections.find(dataset, column, original_value, proposed_value)
+        if rejection is not None:
+            return PolicyDecision(Decision.REJECTED_BY_HUMAN,
+                                  f"rejected by {rejection.rejected_by or 'steward'}"
+                                  + (f" — {rejection.reason}" if rejection.reason else ""), category)
         if conf < self.threshold:
             return PolicyDecision(Decision.BELOW_THRESHOLD,
                                   f"confidence {conf} below threshold {self.threshold}", category)

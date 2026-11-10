@@ -21,12 +21,13 @@ from dq_core.context import ExecutionContext, IntegrationMode, PipelineContext
 from dq_core.metadata.models import RuleSet
 from dq_core.orchestration.gate import QualityGateResult, evaluate_quality_gate
 from dq_core.orchestration.result import DQResult, RemediationResults
-from dq_core.policies.approvals import ApprovalStore
+from dq_core.policies.approvals import ApprovalStore, RejectionStore
 from dq_core.policies.confidence import ConfidencePolicyEngine, Decision
 from dq_core.policies.models import RemediationPolicyConfig
 from dq_core.profiling.profiler import DataProfiler
 from dq_core.quarantine.builder import build_quarantine, empty_quarantine_like
 from dq_core.remediation.ai_remediation import AIRemediator
+from dq_core.remediation.outcomes import remediation_outcomes
 from dq_core.remediation.deterministic import DeterministicRemediator
 from dq_core.reporting.metrics import ExecutionMetrics
 from dq_core.revalidation.revalidator import Revalidator
@@ -147,7 +148,8 @@ class DQRunner:
                 deterministic = DeterministicRemediator(policy).apply(candidates, ruleset)
                 intermediate = self.validation.validate(deterministic.dataframe, ruleset, reference_data=reference_data)
                 persisted.append(intermediate)
-                policy_engine = ConfidencePolicyEngine(policy, ApprovalStore.load(policy.approvals_path))
+                policy_engine = ConfidencePolicyEngine(policy, ApprovalStore.load(policy.approvals_path),
+                                                        RejectionStore.load(policy.rejections_path))
                 _ph("remediation_ai")
                 ai = AIRemediator(self.provider, policy_engine, policy).apply(intermediate.annotated, ruleset, run_id)
             phases["remediation"] = sw.elapsed_ms
@@ -184,6 +186,7 @@ class DQRunner:
                         "records_remediated_but_quarantined": fix_stats["corrected_failed"],
                     },
                     ai_decisions=ai.decisions, blocked_by_policy=deterministic.blocked + ai.blocked,
+                    outcome_audit=remediation_outcomes(report, set(deterministic.applied_rules), ai.decisions, deterministic.blocked + ai.blocked),
                     dataframe=_remediation_log(final.annotated, deterministic.removed, run_id, context.dataset),
                     removed_duplicates=deterministic.removed)
             phases["quarantine"] = sw.elapsed_ms

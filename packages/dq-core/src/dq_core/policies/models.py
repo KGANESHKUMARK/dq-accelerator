@@ -62,6 +62,7 @@ class RemediationPolicyConfig:
     permitted_sensitive_deterministic_actions: tuple[str, ...] = DEFAULT_PERMITTED_SENSITIVE_ACTIONS
     quality_gate: QualityGatePolicy = field(default_factory=QualityGatePolicy)
     approvals_path: str | None = None
+    rejections_path: str | None = None
     source_path: str | None = None
 
     def sensitive_category(self, column: str | None) -> str | None:
@@ -101,6 +102,7 @@ class RemediationPolicyConfig:
             "permitted_sensitive_deterministic_actions": list(self.permitted_sensitive_deterministic_actions),
             "quality_gate": self.quality_gate.__dict__,
             "approvals_path": self.approvals_path,
+            "rejections_path": self.rejections_path,
         }
 
     @classmethod
@@ -110,7 +112,18 @@ class RemediationPolicyConfig:
         confidence = data.get("confidence") or {}
         sensitive = data.get("sensitive_data") or {}
         categories = sensitive.get("categories")
-        approvals = (data.get("approvals") or {}).get("file")
+        approvals_cfg = data.get("approvals") or {}
+        approvals = approvals_cfg.get("file")
+        approvals_path = resolve_path(approvals, base_dir) if approvals else None
+        rejections = approvals_cfg.get("rejections_file")
+        if rejections:
+            rejections_path = resolve_path(rejections, base_dir)
+        elif approvals_path:
+            # Default: rejected_corrections.yaml beside the approvals file —
+            # the UI backend writes steward decisions to config/approvals/.
+            rejections_path = str(Path(approvals_path).parent / "rejected_corrections.yaml")
+        else:
+            rejections_path = None
         mode = data.get("default_integration_mode")
         try:
             return cls(
@@ -124,7 +137,8 @@ class RemediationPolicyConfig:
                 permitted_sensitive_deterministic_actions=tuple(
                     a.upper() for a in sensitive.get("permitted_deterministic_actions", DEFAULT_PERMITTED_SENSITIVE_ACTIONS)),
                 quality_gate=QualityGatePolicy(**(data.get("quality_gate") or {})),
-                approvals_path=resolve_path(approvals, base_dir) if approvals else None,
+                approvals_path=approvals_path,
+                rejections_path=rejections_path,
                 source_path=source_path,
             )
         except TypeError as exc:

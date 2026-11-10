@@ -478,12 +478,22 @@ def _stage_prog(stage: str, key: str) -> None:
     _prog(f"{tag} | [{stage}] {text}")
 
 
+def _output_base() -> Path:
+    from dq_core.runtime.config import EngineConfig
+    raw = Path(EngineConfig.from_yaml(ROOT / "config" / "engine.yaml").outputs.base_path or "data")
+    return raw if raw.is_absolute() else (ROOT / "config" / raw).resolve()
+
+
 def _do_pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, Any]:
-    """Medallion execution: run each stage's ruleset in BRONZE→SILVER→GOLD order,
-    chaining each stage's accepted output into the next. Stages without a ruleset
-    pass through. Per-stage reports are written; the pipeline registry records
-    each execution automatically via engine.run."""
-    from dq_core.context import PipelineContext, Stage
+    """Medallion execution with physical persistence.
+
+    Raw input is always written to Bronze. Silver and Gold use the existing
+    MedallionRunner so accepted, quarantine, audit, and report outputs are
+    written before the API returns. Gold remains optional when no Gold ruleset
+    is configured.
+    """
+    from dq_core.io.sinks import StoragePaths, StorageSink
+    from dq_core.orchestration.medallion import MedallionRunner
     t0 = time.monotonic()
     spark, engine = _spark_engine()
     mf = _load_pipeline_manifest(pid)
@@ -500,49 +510,51 @@ def _do_pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, Any]:
     pipe_run_id = f"{pid}-{int(t0)}"
     platform = getattr(mf.platform, "value", mf.platform) if mf.platform else "LOCAL"
 
-    stages_out: list[dict[str, Any]] = []
-    halted = False
-    ordered = sorted(ds.stages, key=lambda s: _STAGE_ORDER.get(s.value if isinstance(s, Stage) else str(s), 9))
-    for st in ordered:
-        sname = st.value if isinstance(st, Stage) else str(st)
-        rs_path = ds.rulesets.get(sname) or ds.rulesets.get(sname.upper())
-        if not rs_path:
-            stages_out.append({"stage": sname, "status": "SKIPPED", "reason": "no ruleset defined"})
-            _prog(f"phase=validate | [{sname}] no ruleset — pass-through")
-            continue
-        rs = engine.load_ruleset(rs_path)
-        _prog(f"phase=validate | [{sname}] {rs.ref} on {src.name} — mode={mode}")
-        ctx = PipelineContext(pipeline_id=pid, pipeline_run_id=pipe_run_id, dataset=ds.dataset_id,
-                              stage=st, platform=str(platform))
-        res = engine.run(df, rs, policy, ctx, mode=mode,
-                         on_phase=lambda k, _s=sname: _stage_prog(_s, k))
-        m = res.execution_metrics
-        rep = ROOT / "reports" / f"{pid}_{ds.dataset_id}_{sname}_{res.run_id}.json"
-        rep.parent.mkdir(parents=True, exist_ok=True)
-        res.write_report(rep)
-        stages_out.append({
-            "stage": sname, "status": "COMPLETED", "run_id": res.run_id,
-            "ruleset": f"{rs.ruleset_id}@{rs.version}",
-            "input": m.input_records, "accepted": m.accepted_records,
-            "quarantined": m.quarantined_records,
-            "gate_passed": res.quality_gate.passed,
-            "duration_ms": m.duration_ms,
-            "report_path": str(rep.relative_to(ROOT)).replace("\\", "/"),
-        })
-        df = res.accepted_dataframe  # medallion hand-off: next stage sees accepted rows only
-        if body.halt_on_gate_failure and not res.quality_gate.passed:
-            halted = True
-            _prog(f"phase=quarantine | [{sname}] gate FAILED — halting downstream stages")
-            break
+    paths = StoragePaths(str(_output_base()))
+    sink = StorageSink()
+    silver_ruleset = ds.rulesets.get("SILVER")
+    if not silver_ruleset:
+        raise HTTPException(400, f"{pid}/{ds.dataset_id} has no SILVER ruleset")
+    gold_ruleset = ds.rulesets.get("GOLD")
+    _prog(f"phase=read | landing raw data and running persisted medallion stages under {paths.base_path}")
+    result = MedallionRunner(engine, paths, sink).run(
+        df, ds.dataset_id, pipeline_id=pid, pipeline_run_id=pipe_run_id,
+        silver_ruleset=silver_ruleset, policy=policy, silver_mode=mode,
+        gold_ruleset=gold_ruleset, source_path=src, profile=False, platform=str(platform))
+    stages_out = [
+        {"stage": "BRONZE", "status": "PERSISTED", "rows": result.bronze_rows,
+         "written_paths": {"raw": result.written_paths.get("bronze", paths.bronze(ds.dataset_id))}},
+        _stage_payload("SILVER", result.silver_result, result.written_paths, "silver"),
+    ]
+    if result.gold_result:
+        stages_out.append(_stage_payload("GOLD", result.gold_result, result.written_paths, "gold"))
     gate_all = all(s.get("gate_passed", True) for s in stages_out if s["status"] == "COMPLETED")
     return {
         "pipeline_id": pid, "dataset": ds.dataset_id, "mode": mode,
-        "pipeline_run_id": pipe_run_id, "stages": stages_out, "halted": halted,
-        "gate_passed": gate_all,
+        "pipeline_run_id": pipe_run_id, "stages": stages_out, "halted": False,
+        "gate_passed": gate_all, "written_paths": result.written_paths,
         "duration_ms": round((time.monotonic() - t0) * 1000, 2),
-        "summary": (f"Pipeline {pid} / {ds.dataset_id} [{mode}] — {len(stages_out)} stage(s), "
-                    f"gate={'PASS' if gate_all else 'FAIL'}{' (halted)' if halted else ''}, "
-                    f"{time.monotonic() - t0:.1f}s"),
+        "summary": (f"Pipeline {pid} / {ds.dataset_id} [{mode}] — physical medallion outputs written, "
+                    f"gate={'PASS' if gate_all else 'FAIL'}, {time.monotonic() - t0:.1f}s"),
+    }
+
+
+def _stage_payload(stage: str, result, written: dict[str, str], prefix: str) -> dict[str, Any]:
+    m = result.execution_metrics
+    pillars = result.quality_pillars()
+    outcomes = (result.remediation_results.outcome_audit or {}).get("counts", {})
+    return {
+        "stage": stage, "status": "COMPLETED", "run_id": result.run_id,
+        "ruleset": f"{m.ruleset_id}@{m.ruleset_version}",
+        "input": m.input_records, "accepted": m.accepted_records,
+        "quarantined": m.quarantined_records, "gate_passed": result.quality_gate.passed,
+        "duration_ms": m.duration_ms,
+        "quality_score": pillars.get("overall_score"),
+        "weak_pillars": [k for k, v in (pillars.get("pillars") or {}).items()
+                         if v.get("status") == "MEASURED" and v.get("score", 100) < 90],
+        "recommendation": pillars.get("domain_recommendation"),
+        "outcome_counts": outcomes,
+        "written_paths": {k.removeprefix(prefix + "_"): v for k, v in written.items() if k.startswith(prefix + "_")},
     }
 
 
@@ -1099,6 +1111,45 @@ def patch_anomaly(aid: str, body: AnomalyPatch) -> dict[str, Any]:
 
 # ------------------------------------------------------------------ human approval inbox
 _APPROVALS_FILE = ROOT / "config" / "approvals" / "approved_corrections.yaml"
+_REJECTIONS_FILE = ROOT / "config" / "approvals" / "rejected_corrections.yaml"
+
+
+def _load_yaml_list(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    import yaml as _yaml
+    with open(path, encoding="utf-8") as f:
+        return (_yaml.safe_load(f) or {}).get("rejections" if "rejected" in path.name else "approvals") or []
+
+
+def _actioned_keys() -> tuple[set[tuple[str, str, str, str]], set[tuple[str, str, str]]]:
+    """(strict, loose) keys for corrections already approved or rejected.
+
+    strict = (dataset, column, original_value, proposed/approved_value)
+    loose  = (column, original_value, proposed/approved_value) — used when the
+             pending row's dataset is unknown."""
+    strict: set[tuple[str, str, str, str]] = set()
+    loose: set[tuple[str, str, str]] = set()
+    for path, value_key in ((_APPROVALS_FILE, "approved_value"), (_REJECTIONS_FILE, "proposed_value")):
+        for item in _load_yaml_list(path):
+            ds = str(item.get("dataset") or "")
+            col = str(item.get("column") or "")
+            orig = str(item.get("original_value") or "")
+            val = str(item.get(value_key) or item.get("corrected_value") or "")
+            if col and orig:
+                strict.add((ds, col, orig, val))
+                loose.add((col, orig, val))
+    return strict, loose
+
+
+def _is_actioned(rec: dict[str, Any], strict: set, loose: set) -> bool:
+    col = str(rec.get("column") or "")
+    orig = str(rec.get("original_value") or "")
+    prop = str(rec.get("proposed_value") or "")
+    ds = str(rec.get("dataset") or "")
+    if (ds, col, orig, prop) in strict:
+        return True
+    return ds in ("", "unknown") and (col, orig, prop) in loose
 
 
 def _load_quarantine_pending() -> list[dict[str, Any]]:
@@ -1108,6 +1159,7 @@ def _load_quarantine_pending() -> list[dict[str, Any]]:
     runs = [r for r in rows if r.get("kind") == "dq_run" and r.get("status") == "COMPLETED"][:10]
     pending: list[dict[str, Any]] = []
     seen: set[str] = set()
+    strict_keys, loose_keys = _actioned_keys()
     for r in runs:
         j = J.get(r["job_id"])
         if not j:
@@ -1132,7 +1184,7 @@ def _load_quarantine_pending() -> list[dict[str, Any]]:
                 if key in seen:
                     continue
                 seen.add(key)
-                pending.append({
+                rec = {
                     "job_id": r["job_id"],
                     "run_id": res.get("run_id"),
                     "dataset": (data.get("execution_metrics") or {}).get("dataset", "unknown"),
@@ -1148,7 +1200,10 @@ def _load_quarantine_pending() -> list[dict[str, Any]]:
                     "decision_reason": d.get("decision_reason"),
                     "provider":       d.get("provider"),
                     "simulated":      d.get("simulated"),
-                })
+                }
+                if _is_actioned(rec, strict_keys, loose_keys):
+                    continue
+                pending.append(rec)
         except Exception:
             pending.append({"job_id": r["job_id"], "count": qbs["PENDING_HUMAN_APPROVAL"],
                             "summary_only": True})
@@ -1159,6 +1214,20 @@ def _load_quarantine_pending() -> list[dict[str, Any]]:
 def quarantine_pending() -> dict[str, Any]:
     rows = _load_quarantine_pending()
     return {"total": sum(r.get("count", 1) for r in rows), "records": rows[:200]}
+
+
+@app.get("/api/quarantine/decisions")
+def quarantine_decisions() -> dict[str, Any]:
+    """Audit trail of steward decisions — approved corrections + rejections."""
+    approvals = [{k: item.get(k) for k in
+                  ("dataset", "column", "original_value", "approved_value", "rule_id",
+                   "approved_by", "approved_at", "reason")}
+                 for item in _load_yaml_list(_APPROVALS_FILE)]
+    rejections = [{k: item.get(k) for k in
+                   ("dataset", "column", "original_value", "proposed_value", "rule_id",
+                    "rejected_by", "rejected_at", "reason")}
+                  for item in _load_yaml_list(_REJECTIONS_FILE)]
+    return {"approvals": approvals[::-1], "rejections": rejections[::-1]}
 
 
 class ApprovalAction(BaseModel):
@@ -1195,6 +1264,23 @@ def approve_correction(body: ApprovalAction) -> dict[str, Any]:
 
 @app.post("/api/quarantine/reject")
 def reject_correction(body: ApprovalAction) -> dict[str, Any]:
+    import yaml as _yaml
+    from dq_core.runtime.utils import utc_now_iso
+    _REJECTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    doc: dict[str, Any] = {}
+    if _REJECTIONS_FILE.exists():
+        with open(_REJECTIONS_FILE, encoding="utf-8") as f:
+            doc = _yaml.safe_load(f) or {}
+    rejections = doc.setdefault("rejections", [])
+    rejections.append({
+        "dataset": body.dataset, "column": body.column,
+        "original_value": body.original_value,
+        "proposed_value": body.corrected_value, "rule_id": body.rule_id,
+        "rejected_by": body.approved_by, "rejected_at": utc_now_iso(),
+        "reason": body.reason,
+    })
+    with open(_REJECTIONS_FILE, "w", encoding="utf-8") as f:
+        _yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
     return {"ok": True, "status": "REJECTED", "column": body.column,
             "original_value": body.original_value}
 

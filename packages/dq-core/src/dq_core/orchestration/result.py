@@ -22,12 +22,14 @@ from dq_core.validation.models import ValidationReport
 class RemediationResults:
     summary: dict[str, Any] = field(default_factory=dict)
     ai_decisions: list[dict[str, Any]] = field(default_factory=list)
+    outcome_audit: dict[str, Any] = field(default_factory=dict)
     blocked_by_policy: list[dict[str, Any]] = field(default_factory=list)
     dataframe: DataFrame | None = None            # per-record audit log of corrections / proposals
     removed_duplicates: DataFrame | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {"summary": self.summary, "ai_decisions": self.ai_decisions, "blocked_by_policy": self.blocked_by_policy,
+        return {"summary": self.summary, "outcome_audit": self.outcome_audit,
+                "ai_decisions": self.ai_decisions, "blocked_by_policy": self.blocked_by_policy,
                 "ai_outputs_are_simulated": any(d.get("simulated") for d in self.ai_decisions)}
 
 
@@ -77,6 +79,7 @@ class DQResult:
             "quality_gate": self.quality_gate.to_dict(),
             "validation_results": self.validation_results.to_dict() if self.validation_results else None,
             "final_validation_results": self.final_validation_results.to_dict() if self.final_validation_results else None,
+            "quality_pillars": self.quality_pillars(),
             "remediation_results": self.remediation_results.to_dict(),
             "profile_summary": ({"row_count": self.profile.row_count, "anomalies": self.profile.anomalies,
                                  "primary_key_candidates": self.profile.primary_key_candidates}
@@ -91,6 +94,11 @@ class DQResult:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(self.to_json(), encoding="utf-8")
         return path
+
+    def quality_pillars(self) -> dict[str, Any]:
+        from dq_core.reporting.pillars import score_pillars
+        report = self.final_validation_results or self.validation_results
+        return score_pillars(report, self.execution_context.pipeline.dataset)
 
     def summary_text(self) -> str:
         m = self.execution_metrics

@@ -37,10 +37,28 @@ Dataproc, EMR, and standalone Spark.
   registries, CLI, and UI are implemented.
 - Rule versioning, lifecycle governance, and confidence policy are implemented.
 - Real Databricks Model Serving calls have been verified.
-- Cross-platform support is currently **code-portable and contract-tested**,
-  not executed on real Fabric, EMR, Dataproc, or Databricks Spark compute.
-- Bronze/Silver/Gold stage execution exists, but physical stage persistence is
-  not yet complete.
+- **P0 done:** `MedallionRunner` + `POST /api/pipelines/{id}/run` physically
+  persist Bronze, Silver, Gold, quarantine, audit, and report outputs.
+- **P1 done:** managed Bronze ingestion writes a lineage manifest (source
+  checksum, schema, row count, timestamp).
+- **P2 done:** `RemediationResults.outcome_audit` assigns a terminal outcome to
+  every failed rule example; counts ship in every JSON report.
+- **P3 done:** `quality_pillars` adds seven-pillar scores and a domain
+  recommendation to every `DQResult` report.
+- **P4 partial:** identical engine outcomes verified on local Spark under
+  DATABRICKS / FABRIC / STANDALONE_SPARK / LOCAL labels, and
+  `engine.databricks.yaml` loads via `${DQ_ROOT}`. **No real cloud Spark
+  cluster has been executed** — that remains the only open P4 item.
+- **Second domain verified:** `GOAT_HERD_PIPELINE` (agriculture, 63 rows)
+  onboarded via wizard API → silver v1.1 with mixed deterministic/AI
+  remediation → gold ruleset → medallion REMEDIATE run with outcome spectrum
+  (deterministic fix, blocked-sensitive, below-threshold real-LLM proposals,
+  no-safe-proposal) and pillar scores in UI.
+- **UI surfaces P0–P3:** pipeline-run view shows per-stage quality scores,
+  remediation outcome badges, domain recommendations, and written output
+  paths.
+- Cross-platform support is **code-portable and contract-tested**, not executed
+  on real Fabric, EMR, Dataproc, or Databricks Spark compute.
 
 ## Ordered priorities
 
@@ -50,7 +68,7 @@ Dataproc, EMR, and standalone Spark.
 | P1 | Managed Bronze ingestion | Upload/source landing includes schema, checksum, count, and timestamp |
 | P2 | Complete remediation outcomes | Every eligible violation has an auditable terminal outcome |
 | P3 | Seven-pillar score and domain recommendations | Scores and recommendations appear in reports and UI |
-| P4 | Real cross-platform evidence | At minimum one real Databricks Spark run; other platforms clearly evidenced or marked unverified |
+| P4 | Real cross-platform evidence | Contract + config + identical-results evidence done; a real Databricks Spark run remains the only open item and must not be claimed until executed |
 | P5 | Production platform | Auth, scheduling, orchestration adapters, alerting channels, external registry, Kubernetes |
 
 No P5 work starts while P0–P4 remains open.

@@ -178,6 +178,10 @@ everything (tests, CLI, examples, API).
 | `docs/pipeline_adapters.md` | Portability matrix and adapter contracts |
 | `docs/testing_report.md` | Executed tests and evidence |
 | `docs/poc_demo_script.md` | 21-step repeatable demo with expected output |
+| `docs/ui_demo_guide.md` | **Client-facing UI onboarding + demo walkthrough** |
+| `docs/end_to_end_demo.md` | **Fresh-machine → live demo runbook (start here to present)** |
+| `docs/POC.md` | POC use case + P0–P4 verification status |
+| `docs/POC_CONTEXT.md` | Authoritative POC guardrails and priorities |
 
 ## Honest scope statement
 

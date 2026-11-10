@@ -113,3 +113,61 @@ class TestParseThreshold:
         from dq_core.runtime.errors import PolicyError
         with pytest.raises(PolicyError):
             parse_threshold(1.5)
+
+
+class TestRejectionStore:
+    def test_rejection_suppresses_matching_proposal(self):
+        from dq_core.policies.approvals import Rejection, RejectionStore
+
+        rule = RuleDefinition.from_dict({"rule_id": "R1", "name": "n", "rule_type": "NOT_NULL",
+                                         "dataset": "ds", "column": "status"})
+        store = RejectionStore([Rejection(dataset="ds", column="status",
+                                          original_value="OK", proposed_value="HEALTHY",
+                                          rejected_by="steward@x", reason="wrong semantics")])
+        engine = ConfidencePolicyEngine(RemediationPolicyConfig(), rejections=store)
+        d = engine.evaluate(rule=rule, column="status", original_value="OK",
+                            proposed_value="HEALTHY", confidence="0.99", dataset="ds")
+        assert d.decision == Decision.REJECTED_BY_HUMAN
+        assert "steward@x" in d.reason
+
+    def test_rejection_does_not_block_different_proposal(self):
+        from dq_core.policies.approvals import Rejection, RejectionStore
+        from dq_core.metadata.models import AIRemediationSettings, RemediationPolicy
+
+        rule = RuleDefinition.from_dict({"rule_id": "R1", "name": "n", "rule_type": "ALLOWED_VALUES",
+                                         "dataset": "ds", "column": "status",
+                                         "config": {"values": ["ACTIVE"]},
+                                         "remediation": {"ai_assisted": {"enabled": True, "auto_apply": True}}})
+        store = RejectionStore([Rejection(dataset="ds", column="status",
+                                          original_value="OK", proposed_value="HEALTHY")])
+        engine = ConfidencePolicyEngine(RemediationPolicyConfig(), rejections=store)
+        d = engine.evaluate(rule=rule, column="status", original_value="ACTVE",
+                            proposed_value="ACTIVE", confidence="0.97", dataset="ds")
+        assert d.decision == Decision.AUTO_APPLY
+
+    def test_approval_wins_over_rejection(self):
+        from dq_core.policies.approvals import Approval, ApprovalStore, Rejection, RejectionStore
+
+        rule = RuleDefinition.from_dict({"rule_id": "R1", "name": "n", "rule_type": "NOT_NULL",
+                                         "dataset": "ds", "column": "status"})
+        approvals = ApprovalStore([Approval(dataset="ds", column="status", original_value="OK",
+                                            approved_value="HEALTHY", approved_by="boss@x")])
+        rejections = RejectionStore([Rejection(dataset="ds", column="status", original_value="OK",
+                                               proposed_value="HEALTHY", rejected_by="steward@x")])
+        engine = ConfidencePolicyEngine(RemediationPolicyConfig(), approvals, rejections)
+        d = engine.evaluate(rule=rule, column="status", original_value="OK",
+                            proposed_value="HEALTHY", confidence="0.50", dataset="ds")
+        assert d.decision == Decision.APPROVED_BY_HUMAN
+
+    def test_rejection_store_load_from_yaml(self, tmp_path):
+        import yaml
+        from dq_core.policies.approvals import RejectionStore
+
+        f = tmp_path / "rejected_corrections.yaml"
+        f.write_text(yaml.safe_dump({"rejections": [
+            {"dataset": "ds", "column": "c", "original_value": "a",
+             "proposed_value": "b", "rejected_by": "s", "rejected_at": "t", "reason": "r"}]}))
+        store = RejectionStore.load(f)
+        assert len(store) == 1
+        assert store.find("ds", "c", "a", "b") is not None
+        assert store.find("ds", "c", "a", "other") is None

@@ -1,0 +1,23 @@
+lookup:
+  name: goat_breeds
+  version: "1.0"
+  description: Approved mapping of breed aliases / case variants to canonical goat breed names.
+  approved: true
+  approved_by: livestock-ops@example.com
+  approved_at: "2026-11-10T00:00:00Z"
+  mapping:
+    boer: Boer
+    BOER: Boer
+    Boer: Boer
+    jamunapari: Jamunapari
+    JAMUNAPARI: Jamunapari
+    Jamunapari: Jamunapari
+    barbari: Barbari
+    BARBARI: Barbari
+    Barbari: Barbari
+    saanen: Saanen
+    SAANEN: Saanen
+    Saanen: Saanen
+    osmanabadi: Osmanabadi
+    OSMANABADI: Osmanabadi
+    Osmanabadi: Osmanabadi

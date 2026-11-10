@@ -1,0 +1,38 @@
+ruleset:
+  ruleset_id: goat_herd_animals_gold
+  dataset: goat_herd_animals
+  version: "1.0"
+  stage: GOLD
+  status: DRAFT
+  description: Gold publication rules for the goat herd POC — verified after Silver remediation.
+  owner: livestock-ops-domain
+  record_key: [animal_id]
+  created_by: dq.engineer@livestock.example
+  created_at: "2026-11-10T00:00:00Z"
+  rules:
+    - rule_id: GOATG_001
+      name: gold_animal_id_not_null
+      description: Published herd rows must retain an animal identifier.
+      column: animal_id
+      rule_type: NOT_NULL
+      severity: ERROR
+    - rule_id: GOATG_002
+      name: gold_animal_id_unique
+      description: Published animal identifiers must be unique.
+      column: animal_id
+      rule_type: UNIQUE
+      severity: ERROR
+    - rule_id: GOATG_003
+      name: gold_weight_plausible
+      description: Published weights must stay within a plausible herd range.
+      column: weight_kg
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 2, max: 150}
+    - rule_id: GOATG_004
+      name: gold_health_status_allowed
+      description: Published rows must carry a recognized health status.
+      column: health_status
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [HEALTHY, SICK, QUARANTINE, DECEASED]}

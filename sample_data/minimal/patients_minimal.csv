@@ -1,0 +1,4 @@
+patient_id,patient_name,mrn,dob,gender,blood_type,admission_date,ward,diagnosis_code,insurance_status,contact_email,admission_status
+P0001, Ananya Iyer ,MRN100234,1985-04-12,F,A+,2024-01-05,GENERAL,J45.9,COVERED,ananya.iyer@mail.example,ADMITTED
+P0002,Rahul Verma,MRN100235,1978-11-30,M,O+,2024-01-06,EMERGENCY,I10,COVERED,rahul.verma@mail.example,DISCHARGED
+P0003,Sara Thomas,MRN100236,1992-07-22,F,B+,2024-01-08,MATERNITY,O80,COVERED,bad-email,DISCHARGED

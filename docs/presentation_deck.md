@@ -32,42 +32,56 @@ slides.
 - Dataset profiling and candidate-rule generation.
 - Human review, customization, publishing, activation, and rollback.
 - Deterministic repairs plus real Databricks Model Serving proposals.
-- 90% confidence threshold, sensitive-data approval, and quarantine.
+- 90% confidence threshold, sensitive-data approval gates, and quarantine.
+- **Physical medallion persistence** — Bronze/Silver/Gold, quarantine, audit
+  logs, and reports written to configurable storage with lineage manifests.
+- **Terminal outcome audit** — every failed value classified
+  (deterministic / AI-applied / below-threshold / blocked-sensitive /
+  no-safe-proposal).
+- **Seven-pillar quality scores** + domain recommendations in every report
+  and the pipeline-run UI.
 - Reports, metrics, anomaly inbox, pipeline lifecycle, and live progress.
 - Local Spark validation, including the large CDR benchmark.
+- Two verified domains end-to-end: healthcare patients and goat-herd
+  agriculture (onboarded live through the UI wizard API).
 
-## 5. Demo flow
+## 5. Demo flow (UI-first — see `docs/ui_demo_guide.md`)
 
-1. Show the original pipeline.
-2. Show the few lines added to call the engine.
-3. Upload or select data and land it in Bronze.
-4. Profile, review, and publish a versioned ruleset.
-5. Run Silver and Gold.
-6. Show accepted outputs, quarantine, AI decisions, and audit report.
-7. Show the same result in the UI.
+1. Onboard wizard: upload CSV → profile → review candidate rules → publish +
+   register → test → activate.
+2. Run DQ → **Run all stages** → watch live phase progress.
+3. Show the stage table with per-stage quality scores.
+4. Show remediation outcome badges — deterministic fixes, blocked sensitive
+   data, below-90% AI proposals withheld.
+5. Expand **Written outputs** — physical Bronze/Silver/Gold/quarantine/audit
+   paths on disk.
+6. Open the JSON report — pillars, outcome audit, AI decisions (`simulated`
+   flag proves real vs mock LLM).
 
 ## 6. Honest boundaries
 
-- Cloud portability is implemented and contract-tested, but real cloud Spark
-  execution is not yet verified.
-- Physical Bronze/Silver/Gold persistence is the next development priority.
-- Seven-pillar scoring and domain recommendations are planned, not complete.
+- Cloud portability is implemented and contract-tested; identical engine
+  outcomes verified under DATABRICKS/FABRIC/STANDALONE_SPARK/LOCAL labels on
+  local Spark — **a real cloud Spark cluster run is still open (P4)**.
+- Databricks Model Serving LLM calls are real (`simulated=false` in reports);
+  one fallback-to-mock decision is flagged honestly in the audit.
 - Authentication, scheduling, external orchestration, and alert delivery are
-  intentionally deferred.
+  intentionally deferred (P5).
 
 ## 7. Delivery sequence
 
-| Order | Message |
-|---|---|
-| P0 | Persist raw, accepted, quarantine, and audit data per stage |
-| P1 | Make Bronze a managed landing, not just an uploaded file |
-| P2 | Account for every remediation outcome |
-| P3 | Add formal quality-pillar scores and domain recommendations |
-| P4 | Prove the same code on real Databricks Spark |
-| P5 | Add production security, scheduling, and operations |
+| Order | Message | Status |
+|---|---|---|
+| P0 | Persist raw, accepted, quarantine, and audit data per stage | ✅ Done |
+| P1 | Make Bronze a managed landing, not just an uploaded file | ✅ Done |
+| P2 | Account for every remediation outcome | ✅ Done |
+| P3 | Add formal quality-pillar scores and domain recommendations | ✅ Done |
+| P4 | Prove the same code on real Databricks Spark | ◐ Contract evidence done; cluster run open |
+| P5 | Add production security, scheduling, and operations | Deferred |
 
 ## 8. Close
 
-“The POC proves the reusable Spark quality engine and user workflow. The next
-sprint completes physical medallion persistence and ingestion so the demo
-shows data actually moving from Bronze to Gold with a full audit trail.”
+“The POC proves the reusable Spark quality engine end-to-end: onboard a dataset
+through the UI, land raw data in Bronze with lineage, approve versioned rules,
+run Silver and Gold with physical outputs, and watch every AI decision —
+applied, withheld, or blocked — land in quarantine with a full audit trail.”

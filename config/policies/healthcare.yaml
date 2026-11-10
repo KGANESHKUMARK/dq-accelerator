@@ -31,3 +31,4 @@ policy:
 
   approvals:
     file: ../approvals/approved_corrections.yaml
+    rejections_file: ../approvals/rejected_corrections.yaml

@@ -1,0 +1,19 @@
+pipeline:
+  pipeline_id: HEALTHCARE_MINIMAL_POC
+  pipeline_name: Healthcare Minimal POC
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: poc@example.com
+  description: Three-row healthcare dataset used to verify each POC phase.
+  policy: ../policies/healthcare.yaml
+  datasets:
+    - dataset_id: patients_minimal
+      format: CSV
+      stages: [BRONZE, SILVER, GOLD]
+      rulesets:
+        SILVER: ../rulesets/patients_v1.yaml
+        GOLD: ../rulesets/patients_gold_v1.yaml
+      test_data: ../../sample_data/minimal/patients_minimal.csv
+      test_data_format: CSV

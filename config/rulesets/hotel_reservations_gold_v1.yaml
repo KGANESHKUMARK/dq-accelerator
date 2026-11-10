@@ -1,0 +1,52 @@
+ruleset:
+  ruleset_id: hotel_reservations_gold
+  dataset: hotel_reservations
+  version: "1.0"
+  stage: GOLD
+  status: DRAFT
+  description: Gold publication rules for hotel reservations — verified after Silver remediation.
+  owner: hospitality-data-domain
+  record_key: [reservation_id]
+  created_by: dq.engineer@hotel.example
+  created_at: "2026-11-10T00:00:00Z"
+  rules:
+    - rule_id: HOTG_001
+      name: gold_reservation_id_not_null
+      description: Published reservations must retain an identifier.
+      column: reservation_id
+      rule_type: NOT_NULL
+      severity: ERROR
+    - rule_id: HOTG_002
+      name: gold_reservation_id_unique
+      description: Published reservation identifiers must be unique.
+      column: reservation_id
+      rule_type: UNIQUE
+      severity: ERROR
+    - rule_id: HOTG_003
+      name: gold_total_amount_plausible
+      description: Published booking totals must stay within a plausible range.
+      column: total_amount
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 50, max: 60000}
+    - rule_id: HOTG_004
+      name: gold_num_guests_plausible
+      description: Published party sizes must be between 1 and 8 guests.
+      column: num_guests
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 1, max: 8}
+    - rule_id: HOTG_005
+      name: gold_feedback_score_valid
+      description: Published feedback scores must be within 1-5.
+      column: feedback_score
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 1, max: 5}
+    - rule_id: HOTG_006
+      name: gold_payment_status_allowed
+      description: Published rows must carry a recognized payment status.
+      column: payment_status
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config: {values: [PAID, PENDING, REFUNDED]}

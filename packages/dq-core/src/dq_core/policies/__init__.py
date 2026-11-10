@@ -1,6 +1,6 @@
 """Confidence thresholds, sensitive-column rules, human approvals and quality gates."""
 
-from dq_core.policies.approvals import Approval, ApprovalStore
+from dq_core.policies.approvals import Approval, ApprovalStore, Rejection, RejectionStore
 from dq_core.policies.confidence import ConfidencePolicyEngine, Decision, PolicyDecision
 from dq_core.policies.models import (
     DEFAULT_CONFIDENCE_THRESHOLD,
@@ -11,6 +11,7 @@ from dq_core.policies.models import (
 )
 
 __all__ = [
-    "Approval", "ApprovalStore", "ConfidencePolicyEngine", "Decision", "PolicyDecision",
+    "Approval", "ApprovalStore", "Rejection", "RejectionStore",
+    "ConfidencePolicyEngine", "Decision", "PolicyDecision",
     "DEFAULT_CONFIDENCE_THRESHOLD", "AIPolicy", "QualityGatePolicy", "RemediationPolicyConfig", "parse_threshold",
 ]

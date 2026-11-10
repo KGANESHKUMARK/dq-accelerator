@@ -187,17 +187,25 @@ const RulesView = ({ rules }: { rules: any[] }) => !rules?.length ? null : (
   </div>
 )
 
-const PipelineRunView = ({ r, jid }: { r: any; jid?: string }) => (
+const PipelineRunView = ({ r, jid }: { r: any; jid?: string }) => {
+  const scores = (r.stages || []).map((s: any) => s.quality_score).filter((v: any) => v != null)
+  const avgScore = scores.length ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : null
+  const outcomeBadges = (r.stages || []).flatMap((s: any) =>
+    Object.entries(s.outcome_counts || {}).map(([k, v]: any) => `${s.stage} · ${k}: ${v}`))
+  const recs: string[] = [...new Set((r.stages || []).map((s: any) => s.recommendation).filter(Boolean))] as string[]
+  const paths = Object.entries(r.written_paths || {})
+  return (
   <div className="card">
     <h3>Pipeline run <span className="muted">— {jid} · {r.pipeline_id} / {r.dataset} [{r.mode}]</span></h3>
     <div className="stat-grid" style={{ marginBottom: 12 }}>
       <div className="stat-tile"><div className="num">{r.stages?.length ?? 0}</div><div className="lbl">Stages</div></div>
       <div className="stat-tile"><div className={`num ${r.gate_passed ? 'ok' : 'bad'}`}>{r.gate_passed ? 'PASS' : 'FAIL'}</div><div className="lbl">Overall gate</div></div>
+      <div className="stat-tile"><div className={`num ${avgScore != null && avgScore >= 90 ? 'ok' : avgScore != null && avgScore >= 70 ? 'warn' : 'bad'}`}>{avgScore != null ? avgScore.toFixed(1) : '—'}</div><div className="lbl">Avg quality score</div></div>
       <div className="stat-tile"><div className="num">{r.halted ? 'HALTED' : 'DONE'}</div><div className="lbl">Flow</div></div>
       <div className="stat-tile"><div className="num">{((r.duration_ms ?? 0) / 1000).toFixed(1)}s</div><div className="lbl">Duration</div></div>
     </div>
     <table className="tbl">
-      <thead><tr><th>Stage</th><th>Status</th><th>Ruleset</th><th>Input</th><th>Accepted</th><th>Quarantined</th><th>Gate</th><th>Time</th></tr></thead>
+      <thead><tr><th>Stage</th><th>Status</th><th>Ruleset</th><th>Input</th><th>Accepted</th><th>Quarantined</th><th>Gate</th><th>Score</th><th>Time</th></tr></thead>
       <tbody>
         {(r.stages || []).map((s: any) => (
           <tr key={s.stage}>
@@ -208,14 +216,35 @@ const PipelineRunView = ({ r, jid }: { r: any; jid?: string }) => (
             <td className="ok">{s.accepted?.toLocaleString() ?? '—'}</td>
             <td className="bad">{s.quarantined?.toLocaleString() ?? '—'}</td>
             <td>{s.gate_passed == null ? '—' : s.gate_passed ? <span className="ok">PASS</span> : <span className="bad">FAIL</span>}</td>
+            <td>{s.quality_score != null ? <span className={s.quality_score >= 90 ? 'ok' : 'warn'}>{s.quality_score.toFixed(1)}</span> : '—'}</td>
             <td className="muted">{s.duration_ms ? `${(s.duration_ms / 1000).toFixed(1)}s` : '—'}</td>
           </tr>
         ))}
       </tbody>
     </table>
+    {outcomeBadges.length > 0 && (
+      <div style={{ marginTop: 10 }}>
+        <h4>Remediation outcomes</h4>
+        {outcomeBadges.map((b: string) => <span key={b} className="tag" style={{ marginRight: 6, marginBottom: 4 }}>{b}</span>)}
+      </div>
+    )}
+    {recs.map((rec: string, i: number) => <div key={i} className="muted" style={{ marginTop: 6, fontSize: 12 }}>Recommendation — {rec}</div>)}
+    {paths.length > 0 && (
+      <details style={{ marginTop: 10 }}>
+        <summary className="muted" style={{ cursor: 'pointer' }}>Written outputs ({paths.length})</summary>
+        <table className="tbl" style={{ marginTop: 6 }}>
+          <tbody>
+            {paths.map(([k, v]: any) => (
+              <tr key={k}><td className="muted" style={{ width: 220 }}>{k}</td><td style={{ fontSize: 11, wordBreak: 'break-all' }}>{String(v)}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    )}
     {r.summary && <pre style={{ marginTop: 10 }}>{r.summary}</pre>}
   </div>
-)
+  )
+}
 
 const JobResult = ({ job }: { job: Job | null }) => {
   const r = job?.result
@@ -1062,8 +1091,12 @@ export function Anomalies() {
    ============================================================ */
 export function Approvals() {
   const [data, setData] = useState<any>(null)
+  const [decisions, setDecisions] = useState<any>(null)
   const [msg, setMsg] = useState(''); const [err, setErr] = useState('')
-  const load = () => api.quarantinePending().then(setData).catch(() => {})
+  const load = () => {
+    api.quarantinePending().then(setData).catch(() => {})
+    api.quarantineDecisions().then(setDecisions).catch(() => {})
+  }
   useEffect(() => { load() }, [])
 
   const approve = async (rec: any) => {
@@ -1077,8 +1110,9 @@ export function Approvals() {
   const reject = async (rec: any) => {
     setErr(''); setMsg('')
     try {
-      await api.rejectCorrection({ column: rec.column, original_value: rec.original_value ?? '', corrected_value: rec.proposed_value ?? '', rule_id: rec.rule_id ?? '' })
+      await api.rejectCorrection({ column: rec.column, original_value: rec.original_value ?? '', corrected_value: rec.proposed_value ?? '', rule_id: rec.rule_id ?? '', dataset: rec.dataset ?? 'unknown', approved_by: 'ui-steward' })
       setMsg(`Rejected: ${rec.column} "${rec.original_value}"`)
+      load()
     } catch (e: any) { setErr(e.message) }
   }
 
@@ -1119,8 +1153,28 @@ export function Approvals() {
       {err && <div className="warn-box" style={{ marginTop: 12 }}>{err}</div>}
     </div>
     <div className="card">
-      <h3>Approved corrections history</h3>
-      <p className="muted">Stored in <code>config/approvals/approved_corrections.yaml</code>. Approved corrections are applied on the next REMEDIATE run.</p>
+      <h3>Decision history</h3>
+      <p className="muted">Approvals stored in <code>config/approvals/approved_corrections.yaml</code>, rejections in <code>rejected_corrections.yaml</code>. Approved corrections apply as <code>HUMAN_APPROVED_AI</code> on the next REMEDIATE run; actioned rows leave this inbox.</p>
+      {decisions && (decisions.approvals?.length || decisions.rejections?.length) ? <>
+        {decisions.approvals?.slice(0, 10).map((a: any, i: number) => (
+          <div key={`a${i}`} className="approval-row" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
+            <span style={{ color: 'var(--success)', fontWeight: 700 }}>✓ APPROVED</span>
+            <span className="muted">{a.dataset} · {a.column}</span>
+            <span className="val-orig">{a.original_value}</span>
+            <span className="val-new">{a.approved_value}</span>
+            <span className="muted" style={{ fontSize: 11 }}>{a.approved_by} · {String(a.approved_at ?? '').slice(0, 10)}</span>
+          </div>
+        ))}
+        {decisions.rejections?.slice(0, 10).map((rj: any, i: number) => (
+          <div key={`r${i}`} className="approval-row" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
+            <span style={{ color: 'var(--danger)', fontWeight: 700 }}>✗ REJECTED</span>
+            <span className="muted">{rj.dataset} · {rj.column}</span>
+            <span className="val-orig">{rj.original_value}</span>
+            <span className="val-new">{rj.proposed_value}</span>
+            <span className="muted" style={{ fontSize: 11 }}>{rj.rejected_by} · {String(rj.rejected_at ?? '').slice(0, 10)}</span>
+          </div>
+        ))}
+      </> : <p className="muted" style={{ marginTop: 8 }}>No decisions recorded yet.</p>}
     </div>
   </>
 }
@@ -1275,6 +1329,53 @@ export function Reports() {
                 <div className="stat-tile"><div className={`num ${sel.quality_gate?.passed ? 'ok' : 'bad'}`}>{sel.quality_gate?.passed ? 'PASS' : 'FAIL'}</div><div className="lbl">Gate</div></div>
               </div>
             </div>
+            {sel.quality_pillars?.pillars && (() => {
+              const PILLAR_ORDER = ['completeness', 'uniqueness', 'validity', 'consistency', 'accuracy', 'timeliness', 'integrity']
+              const qp = sel.quality_pillars
+              return <>
+                <h4>Quality pillars {qp.overall_score != null && <span className="badge ACTIVE" style={{ marginLeft: 8 }}>overall {qp.overall_score}</span>}</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8, marginBottom: 6 }}>
+                  {PILLAR_ORDER.map(name => {
+                    const p = qp.pillars[name]
+                    if (!p) return null
+                    const measured = p.status === 'MEASURED' && p.score != null
+                    const cls = !measured ? 'muted' : p.score >= 90 ? 'ok' : p.score >= 70 ? 'warn-text' : 'err'
+                    return (
+                      <div key={name} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                          <b style={{ textTransform: 'capitalize' }}>{name}</b>
+                          <span className={cls} style={{ fontWeight: 700 }}>{measured ? p.score : '—'}</span>
+                        </div>
+                        <div className="muted" style={{ fontSize: 10, marginTop: 2 }}>{p.status === 'MEASURED' ? `${p.rules ?? 0} rules` : p.status}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {qp.domain_recommendation && <div className="info-box" style={{ fontSize: 12, marginBottom: 10 }}>💡 {qp.domain_recommendation}</div>}
+              </>
+            })()}
+            {(() => {
+              const oa = sel.remediation_results?.outcome_audit
+              if (!oa?.counts || !Object.keys(oa.counts).length) return null
+              const COLORS: Record<string, string> = {
+                AI_APPLIED: 'var(--success)', HUMAN_APPROVED_AI: 'var(--success)',
+                DETERMINISTIC_FIX: 'var(--info)', BELOW_CONFIDENCE_THRESHOLD: '#f59e0b',
+                PENDING_HUMAN_APPROVAL: '#f59e0b', BLOCKED_SENSITIVE_DATA: '#a855f7',
+                REJECTED_BY_HUMAN: '#f97316',
+                NO_SAFE_PROPOSAL: 'var(--danger)', REVALIDATION_FAILED: 'var(--danger)',
+                NOT_EVALUATED_LIMIT: '#94a3b8',
+              }
+              return <>
+                <h4>Remediation outcomes {oa.all_terminal && <span className="badge COMPLETED" style={{ marginLeft: 8 }}>all terminal</span>}</h4>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                  {Object.entries(oa.counts).map(([k, v]: any) => (
+                    <span key={k} className="tag" style={{ borderColor: COLORS[k] ?? 'var(--border)', color: COLORS[k] ?? 'var(--text)' }}>
+                      {k.replace(/_/g, ' ')}: <b>{v}</b>
+                    </span>
+                  ))}
+                </div>
+              </>
+            })()}
             {topFail.length > 0 && <>
               <h4>Top failing rules</h4>
               {topFail.map((r: any) => (

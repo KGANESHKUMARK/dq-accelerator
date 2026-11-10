@@ -23,3 +23,27 @@ approvals:
   approved_by: ui-steward
   approved_at: '2026-11-09T07:39:08Z'
   reason: approved via UI
+- dataset: goat_herd_animals
+  column: health_status
+  original_value: OK
+  approved_value: HEALTHY
+  rule_id: GEN_GOAT_HERD_ANIMALS_018
+  approved_by: livestock-steward@example.com
+  approved_at: '2026-11-10T06:10:00Z'
+  reason: steward confirmed OK means healthy animal
+- dataset: goat_herd_animals
+  column: vaccine_status
+  original_value: done
+  approved_value: VACCINATED
+  rule_id: GEN_GOAT_HERD_ANIMALS_020
+  approved_by: livestock-steward@example.com
+  approved_at: '2026-11-10T06:10:00Z'
+  reason: steward confirmed done means vaccination completed
+- dataset: patients
+  column: contact_email
+  original_value: r.khan@hospital-mail
+  approved_value: r.khan@hospital-mail.com
+  rule_id: PAT_016
+  approved_by: ui-steward
+  approved_at: '2026-11-10T07:51:12Z'
+  reason: approved via UI

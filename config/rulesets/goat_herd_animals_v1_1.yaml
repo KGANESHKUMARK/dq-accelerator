@@ -1,0 +1,765 @@
+ruleset:
+  ruleset_id: goat_herd_animals_silver
+  dataset: goat_herd_animals
+  version: '1.1'
+  stage: SILVER
+  description: Approved from candidates goat_herd_animals_silver@1.0
+  owner: ''
+  record_key: []
+  lookups:
+    goat_breeds: ../rules/lookups/goat_breeds.yaml
+  parent_version: '1.0'
+  rules:
+  - rule_id: GEN_GOAT_HERD_ANIMALS_001
+    name: animal_id_not_null
+    description: animal_id is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: animal_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_002
+    name: animal_id_unique
+    description: animal_id looks like an identifier (95.2% unique)
+    dataset: goat_herd_animals
+    column: animal_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 0.9524
+        duplicate_value_count: 3
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_003
+    name: animal_id_regex
+    description: animal_id follows the structural pattern AAAA-9999
+    dataset: goat_herd_animals
+    column: animal_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{4}\-[0-9]{4}$
+    remediation: &id001
+      deterministic:
+      - action: TRIM
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAAA-9999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_005
+    name: ear_tag_not_null
+    description: ear_tag is populated in 98.4% of rows
+    dataset: goat_herd_animals
+    column: ear_tag
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 1
+        null_percentage: 1.59
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_006
+    name: ear_tag_regex
+    description: ear_tag follows the structural pattern AA-9999
+    dataset: goat_herd_animals
+    column: ear_tag
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{2}\-[0-9]{4}$
+    remediation: *id001
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AA-9999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_008
+    name: breed_not_null
+    description: breed is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: breed
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_009
+    name: breed_allowed_values
+    description: breed has 5 frequent categorical values
+    dataset: goat_herd_animals
+    column: breed
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - Saanen
+      - Boer
+      - Osmanabadi
+      - Barbari
+      - Jamunapari
+    remediation:
+      deterministic:
+      - action: LOOKUP_MAPPING
+        lookup: goat_breeds
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.7
+      evidence:
+        value_counts:
+          Saanen: 17
+          Boer: 13
+          Osmanabadi: 12
+          Barbari: 11
+          Jamunapari: 9
+          boer: 1
+        excluded_rare_values:
+        - boer
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_010
+    name: gender_not_null
+    description: gender is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: gender
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_011
+    name: gender_allowed_values
+    description: gender has 2 frequent categorical values
+    dataset: goat_herd_animals
+    column: gender
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - MALE
+      - FEMALE
+    remediation:
+      deterministic:
+      - action: UPPERCASE
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.7
+      evidence:
+        value_counts:
+          MALE: 35
+          FEMALE: 27
+          female: 1
+        excluded_rare_values:
+        - female
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_012
+    name: date_of_birth_not_null
+    description: date_of_birth is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: date_of_birth
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_013
+    name: date_of_birth_date_format
+    description: date_of_birth is a date in yyyy-MM-dd
+    dataset: goat_herd_animals
+    column: date_of_birth
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation:
+      ai_assisted:
+        enabled: true
+        auto_apply: true
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9683
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 96.83
+          dd/MM/yyyy: 1.59
+          MM/dd/yyyy: 1.59
+        date_min: '2021-01-20'
+        date_max: '2024-10-31'
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_014
+    name: weight_kg_not_null
+    description: weight_kg is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: weight_kg
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_015
+    name: weight_kg_data_type
+    description: weight_kg holds decimal numbers stored as text
+    dataset: goat_herd_animals
+    column: weight_kg
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: decimal(18,2)
+    remediation:
+      ai_assisted:
+        enabled: true
+        auto_apply: true
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9841
+      evidence:
+        numeric_castable_percentage: 98.41
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_016
+    name: weight_kg_range
+    description: weight_kg typically between -12.5 and 128.65
+    dataset: goat_herd_animals
+    column: weight_kg
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: -12.5
+      max: 128.65
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -12.5
+        observed_max: 999.0
+        p25: 26.4
+        p75: 67.3
+        outliers: 1
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_017
+    name: health_status_not_null
+    description: health_status is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: health_status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_018
+    name: health_status_allowed_values
+    description: health_status has 3 frequent categorical values
+    dataset: goat_herd_animals
+    column: health_status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - HEALTHY
+      - QUARANTINE
+      - SICK
+    remediation:
+      ai_assisted:
+        enabled: true
+        auto_apply: false
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.7
+      evidence:
+        value_counts:
+          HEALTHY: 38
+          QUARANTINE: 14
+          SICK: 10
+          OK: 1
+        excluded_rare_values:
+        - OK
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_019
+    name: vaccine_status_not_null
+    description: vaccine_status is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: vaccine_status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_020
+    name: vaccine_status_allowed_values
+    description: vaccine_status has 3 frequent categorical values
+    dataset: goat_herd_animals
+    column: vaccine_status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - VACCINATED
+      - PENDING
+      - OVERDUE
+    remediation:
+      ai_assisted:
+        enabled: true
+        auto_apply: true
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.7
+      evidence:
+        value_counts:
+          VACCINATED: 24
+          PENDING: 20
+          OVERDUE: 18
+          done: 1
+        excluded_rare_values:
+        - done
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_021
+    name: owner_id_not_null
+    description: owner_id is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: owner_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_022
+    name: owner_id_allowed_values
+    description: owner_id has 8 frequent categorical values
+    dataset: goat_herd_animals
+    column: owner_id
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - OWN-005
+      - OWN-006
+      - OWN-007
+      - OWN-008
+      - OWN-004
+      - OWN-002
+      - OWN-003
+      - OWN-001
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          OWN-005: 14
+          OWN-006: 12
+          OWN-007: 9
+          OWN-008: 8
+          OWN-004: 7
+          OWN-002: 6
+          OWN-003: 4
+          OWN-001: 3
+        excluded_rare_values: []
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_023
+    name: pen_id_not_null
+    description: pen_id is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: pen_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_024
+    name: pen_id_allowed_values
+    description: pen_id has 6 frequent categorical values
+    dataset: goat_herd_animals
+    column: pen_id
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - PEN-5
+      - PEN-6
+      - PEN-2
+      - PEN-4
+      - PEN-1
+      - PEN-3
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          PEN-5: 15
+          PEN-6: 11
+          PEN-2: 10
+          PEN-4: 10
+          PEN-1: 9
+          PEN-3: 8
+        excluded_rare_values: []
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_025
+    name: last_checkup_date_not_null
+    description: last_checkup_date is populated in 98.4% of rows
+    dataset: goat_herd_animals
+    column: last_checkup_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 1
+        null_percentage: 1.59
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_026
+    name: last_checkup_date_date_format
+    description: last_checkup_date is a date in yyyy-MM-dd
+    dataset: goat_herd_animals
+    column: last_checkup_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: &id002
+      deterministic:
+      - action: DATE_STANDARDIZATION
+        input_formats:
+        - dd/MM/yyyy
+        - yyyy-MM-dd
+        output_format: yyyy-MM-dd
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 100.0
+        date_min: '2024-01-04'
+        date_max: '2025-08-20'
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_027
+    name: acquisition_date_not_null
+    description: acquisition_date is populated in 100.0% of rows
+    dataset: goat_herd_animals
+    column: acquisition_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 63
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_028
+    name: acquisition_date_date_format
+    description: acquisition_date is a date in yyyy-MM-dd
+    dataset: goat_herd_animals
+    column: acquisition_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: *id002
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 100.0
+        date_min: '2022-01-15'
+        date_max: '2025-04-11'
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_029
+    name: goat_herd_animals_duplicate
+    description: exact duplicate records were found
+    dataset: goat_herd_animals
+    column: null
+    rule_type: DUPLICATE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      keys: ALL_COLUMNS
+    remediation:
+      deterministic:
+      - action: DEDUPLICATE
+        survivor:
+          strategy: ANY_IDENTICAL
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        duplicate_rows: 3
+        duplicate_groups: 3
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  - rule_id: GEN_GOAT_HERD_ANIMALS_030
+    name: goat_herd_animals_schema_validation
+    description: schema observed at profiling time
+    dataset: goat_herd_animals
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: animal_id
+        type: string
+      - name: ear_tag
+        type: string
+      - name: breed
+        type: string
+      - name: gender
+        type: string
+      - name: date_of_birth
+        type: string
+      - name: weight_kg
+        type: string
+      - name: health_status
+        type: string
+      - name: vaccine_status
+        type: string
+      - name: owner_id
+        type: string
+      - name: pen_id
+        type: string
+      - name: last_checkup_date
+        type: string
+      - name: acquisition_date
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 12
+      profiled_at: '2026-11-10T03:56:07Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ''
+  approved_at: ''
+  change_log:
+  - 'v1.1: steward-added remediation policies - deterministic TRIM/UPPERCASE/LOOKUP_MAPPING/DATE_STANDARDIZATION/DEDUPLICATE
+    plus AI-assisted rules to demonstrate the full terminal-outcome spectrum.'
