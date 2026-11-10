@@ -5,7 +5,7 @@ Apache Spark (PySpark) core engine that plugs into existing Databricks-style pip
 with a handful of lines, profiles data, generates candidate rules, executes
 metadata-driven validation, remediates deterministically and via **real LLM calls
 (Databricks Model Serving)** or a mock AI fallback, quarantines uncertain records,
-revalidates corrections, and drives a **Bronze → Silver → Gold** medallion flow with
+revalidates corrections, and supports a **Bronze → Silver → Gold** medallion flow with
 quality gates, metrics and audit reports.
 
 > **Status: working local POC with real Databricks LLM integration.** The engine has
@@ -15,6 +15,9 @@ quality gates, metrics and audit reports.
 > to call `databricks-meta-llama-3-3-70b-instruct` for value correction with confidence
 > scoring. MockAI remains as automatic fallback when credentials are absent.
 > See `docs/testing_report.md` for exactly what was verified and how.
+>
+> **Current development boundary:** `docs/POC_CONTEXT.md`. Remaining POC work
+> is P0–P4 in `ROADMAP.md`; production orchestration remains deferred.
 
 ## What is in the box
 

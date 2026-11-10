@@ -18,11 +18,12 @@ writes it out. This engine sits **on top of your existing DataFrames** and:
 1. **Profiles** the data (nulls, duplicates, types, patterns, anomalies).
 2. **Generates candidate quality rules** from that evidence (a human approves them).
 3. **Validates** data against versioned, immutable rule sets.
-4. **Fixes** problems — deterministic corrections (trim, case, lookup, dates)
-   plus *simulated* AI proposals gated by a **90 % confidence threshold**.
+4. **Fixes** problems — deterministic corrections first, then AI proposals
+   gated by a **90% confidence threshold**. Databricks Model Serving is
+   verified; MockAI remains the fallback.
 5. **Quarantines** anything uncertain/unresolved and **re-validates** every fix.
-6. Runs the whole thing through **Bronze → Silver → Gold** layers with
-   quality gates, metrics and JSON audit reports.
+6. Supports **Bronze → Silver → Gold** stage execution with quality gates,
+   metrics, and JSON audit reports. Physical stage persistence is P0 work.
 7. Lets you **onboard / pause / offboard** pipelines via a lightweight registry.
 
 ### The three integration modes
@@ -36,8 +37,10 @@ writes it out. This engine sits **on top of your existing DataFrames** and:
 ### What it is NOT (honest scope)
 
 - ✅ **Verified on local Spark 4.1.3** (Windows 11, Java 21, Python 3.12).
-- ⚠️ Databricks integration = runnable notebook-style script + contract tests —
-  **no real Databricks workspace was used**.
+- ✅ Databricks Model Serving LLM calls are verified.
+- ⚠️ Databricks/Fabric/EMR/Dataproc Spark execution is portable code only —
+  no real cloud Spark run yet.
+- 📌 Active scope and priorities: `docs/POC_CONTEXT.md` and `ROADMAP.md`.
 - ❌ No UI, no REST API, no database, no real LLM, no production
   Airflow/ADF/dbt/Flink connectors (extension contracts only).
 

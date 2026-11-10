@@ -1,9 +1,13 @@
 # Medallion Data Flow — Bronze / Silver / Gold
 
 Code: `dq_core/orchestration/medallion.py` (`MedallionRunner`),
-`dq_core/io/sinks.py` (`StoragePaths`, `StorageSink`). Local POC paths under
-`data/`; on Databricks the same layout is driven by configurable paths
-(`engine.databricks.yaml` → `dbfs:`/Volume mounts).
+`dq_core/io/sinks.py` (`StoragePaths`, `StorageSink`).
+
+> **Status:** stage semantics and chained execution are implemented. The
+> backend can run BRONZE → SILVER → GOLD and hand the accepted DataFrame to
+> the next stage. Automatic physical persistence of every stage output is
+> **P0 and not complete**; do not describe the diagram below as current
+> persisted behavior. Target layout is defined in `docs/architecture.md`.
 
 ## 1. Stage responsibilities
 
@@ -99,6 +103,7 @@ emitted when `profile=True`. Phase durations (`bronze_write`, `silver_dq`,
 
 ## 7. Databricks mapping
 
-On Databricks, `StoragePaths`/`StorageSink` write to `dbfs:`/Volume paths from
-`engine.databricks.yaml`; Bronze/Silver/Gold become `/mnt/.../bronze|silver|gold`
-prefixes. The medallion logic is identical — only paths change.
+The intended cloud mapping changes only storage paths: DBFS or Volumes replace
+project-local `data/` paths. This mapping has not yet been executed on real
+Databricks Spark compute. P4 must provide that evidence before it is presented
+as verified.

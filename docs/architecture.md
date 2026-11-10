@@ -1,8 +1,99 @@
-# Architecture — High Level Design & Development Status
+# Architecture — HLD, LLD, and Current POC Status
 
-> **Current state (verified 2026-11-06):** all 12 checkpoints complete —
-> **130 automated tests passing** on local Spark 4.1.3, CLI verified end-to-end,
-> expected-results conformance proven. See §7 for the honest done/partial/not-built map.
+> **Current state:** local Spark POC is implemented and tested. Real Databricks
+> Model Serving remediation is verified. Physical medallion persistence,
+> managed Bronze ingestion, seven-pillar scoring, and real cloud Spark runs
+> remain prioritized POC work.
+>
+> **Scope authority:** `docs/POC_CONTEXT.md`. Do not extend into production
+> orchestration while P0–P4 in `ROADMAP.md` are open.
+
+## 0. Architecture views
+
+### 0.1 HLD — target POC
+
+```mermaid
+flowchart LR
+    USER["Data steward / pipeline owner"] --> UI["React UI"]
+    USER --> CLI["dqctl"]
+    UI --> API["FastAPI job API"]
+    CLI --> ENG["dq-core"]
+    API --> JOBS["SQLite jobs + SSE progress"]
+    API --> ENG
+
+    SRC["Existing pipeline DataFrame<br/>or uploaded file"] --> INGEST["Bronze ingestion"]
+    INGEST --> BRZ[("Bronze raw data")]
+    BRZ --> ENG
+    ENG --> SIL[("Silver accepted")]
+    ENG --> GOLD[("Gold accepted")]
+    ENG --> QUAR[("Quarantine")]
+    ENG --> AUDIT["Reports, metrics, audit"]
+
+    META["Rules, policies, manifests"] --> ENG
+    LLM["Databricks Model Serving<br/>or MockAI fallback"] --> ENG
+```
+
+Solid-line behavior is available now except the physical Bronze, Silver, and
+Gold persistence nodes, which are the current P0/P1 implementation target.
+
+### 0.2 HLD — deployment boundary
+
+```mermaid
+flowchart TB
+    subgraph LOCAL["Verified now"]
+        LS["Local Spark 4.1.3"]
+        APP["UI + FastAPI + dq-core"]
+        LLM["Remote Databricks Model Serving"]
+    end
+    subgraph TARGET["Same engine contract, not yet cloud-executed"]
+        DBX["Databricks Spark"]
+        FAB["Fabric Spark"]
+        EMR["Amazon EMR"]
+        DPC["Google Dataproc"]
+    end
+    APP --> LS
+    APP -. verified LLM call .-> LLM
+    APP -. portable code only .-> DBX & FAB & EMR & DPC
+```
+
+### 0.3 LLD — one stage execution
+
+```mermaid
+sequenceDiagram
+    participant Host as Host pipeline / API
+    participant Engine as DataQualityEngine
+    participant Rules as RuleSet registry
+    participant Spark as Caller SparkSession
+    participant Policy as Confidence policy
+    participant Store as Stage sink
+
+    Host->>Engine: run(existing DataFrame, ruleset, policy, stage)
+    Engine->>Rules: resolve version and checksum
+    Engine->>Spark: validate with native expressions
+    Engine->>Spark: apply deterministic fixes
+    Engine->>Policy: evaluate AI proposals and approvals
+    Policy-->>Engine: apply, approval, below threshold, or no proposal
+    Engine->>Spark: revalidate corrected rows
+    Engine->>Store: write accepted, quarantine, audit, report
+    Engine-->>Host: accepted DataFrame + DQResult
+```
+
+The sink call is the missing physical-persistence step. Validation, policy,
+revalidation, and report generation already exist.
+
+### 0.4 Target persisted layout
+
+```text
+data/
+  bronze/<dataset>/raw/                 immutable raw landing
+  bronze/<dataset>/_ingest.json         source, checksum, schema, counts
+  silver/<dataset>/accepted/            accepted Silver output
+  gold/<dataset>/accepted/              accepted Gold output
+  quarantine/<stage>/<dataset>/         original rows + dq_* provenance
+  audit/<stage>/<dataset>/              applied fixes and withheld proposals
+reports/
+  <pipeline>_<dataset>_<stage>_<run>.json
+```
 
 ## 1. Design goals
 
@@ -51,7 +142,7 @@ flowchart LR
         ACC[("accepted DataFrame")]
         QUAR[("quarantine DataFrame")]
         REP["reports/*.json"]
-        MED["data/bronze|silver|gold|quarantine"]
+        MED["physical Bronze/Silver/Gold sinks<br/>P0 — not complete"]
     end
 
     DF --> ENG
@@ -181,27 +272,46 @@ Mode resolution order: explicit `mode=` argument → `context.integration_mode` 
 | 11 | Portability contracts + candidate-rule tests | ✅ Done + contract-tested |
 | 12 | Test suite + demo + 15 docs + testing report | ✅ Done (130 tests green) |
 
-### 7.2 Component maturity map
+### 7.2 Current truth and remaining POC work
+
+| Area | State | Boundary |
+|---|---|---|
+| Local Spark engine and tests | ✅ Verified | 130 tests; not cloud evidence |
+| UI, CLI, onboarding, lifecycle | ✅ Verified | Manual execution; no scheduler |
+| Real LLM remediation | ✅ Verified | Databricks Model Serving only; MockAI fallback remains |
+| Medallion chaining | ✅ Verified | Stage metadata and accepted-frame handoff |
+| Physical medallion tables | ❌ Open P0 | Reports exist; stage data persistence is incomplete |
+| Managed Bronze ingestion | ❌ Open P1 | Uploads are stored, not managed as raw landings |
+| Seven-pillar scoring | ❌ Open P3 | Rule dimensions exist without formal pillar rollup |
+| Cloud Spark execution | ❌ Open P4 | Portable examples only; no Databricks/Fabric/EMR/Dataproc run |
+| Auth, scheduling, adapters, alert delivery | ⏸ Deferred P5 | Do not begin before P0–P4 |
+
+### 7.3 Component maturity map
 
 ```mermaid
 flowchart LR
-    subgraph DONE["IMPLEMENTED + TESTED (local Spark)"]
-        A1["Profiler"] & A2["CandidateRuleGenerator"] & A3["RuleSet versioning/registry/diff/rollback"]
-        A4["ValidationEngine"] & A5["Deterministic remediation"] & A6["MockAIProvider + 90% policy"]
-        A7["Quarantine + revalidation"] & A8["OBSERVE/ENFORCE/REMEDIATE"]
-        A9["MedallionRunner B/S/G"] & A10["Metrics + JSON reports"] & A11["Pipeline lifecycle registry"]
-        A12["dqctl CLI"] & A13["Local Spark harness + Windows FS shim"]
+    subgraph DONE["VERIFIED"]
+        A1["Local Spark engine"]
+        A2["UI and CLI onboarding"]
+        A3["Rule versioning"]
+        A4["Deterministic and real LLM remediation"]
+        A5["Quarantine policy"]
+        A6["Stage chaining and reports"]
     end
-    subgraph CONTRACT["CONTRACT-TESTED ONLY"]
-        B1["DataprocAdapter"] & B2["FabricSparkAdapter"] & B3["AirflowCliAdapter"]
-        B4["AdfActivityAdapter"] & B5["Databricks notebook pattern"]
+    subgraph POC["REMAINING POC — P0 to P4"]
+        D1["Physical medallion persistence"]
+        D2["Managed Bronze ingestion"]
+        D3["Complete AI outcome audit"]
+        D4["Seven-pillar scoring"]
+        D5["Real cloud Spark execution evidence"]
     end
-    subgraph DESIGNED["DESIGNED, NOT BUILT"]
-        C1["SqlAdapter (dbt/Snowflake/BigQuery/Redshift)"] & C2["StreamingAdapter (Kafka/Flink)"]
-        C3["Real LLM provider"] & C4["Governance DB / auth / multi-tenancy"]
-        C5["UI / REST service"] & C6["Production Airflow/ADF/Dagster/Prefect connectors"]
+    subgraph LATER["DEFERRED — P5"]
+        E1["Auth and multi-tenancy"]
+        E2["Scheduling and orchestration adapters"]
+        E3["Alert delivery"]
+        E4["Production registry and Kubernetes"]
     end
-    DONE --> CONTRACT --> DESIGNED
+    DONE --> POC --> LATER
 ```
 
 | Area | State | Evidence |

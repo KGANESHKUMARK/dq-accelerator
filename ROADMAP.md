@@ -381,21 +381,88 @@ Review anomalies → Fix / quarantine → Audit trail
 
 ---
 
-## 🔨 TODO — Production (Phase D)
+## Current POC boundary
+
+The POC goal is a reusable, platform-independent Apache Spark data-quality
+framework that can be inserted into an existing PySpark pipeline and operated
+through UI and CLI. It is **not** a cloud deployment project or a production
+control plane.
+
+Authoritative context and guardrails: `docs/POC_CONTEXT.md`.
+Architecture status and diagrams: `docs/architecture.md`.
+Client presentation points: `docs/presentation_deck.md`.
+
+Done means implemented and verified on local Spark unless a row explicitly says
+otherwise. Remote cloud execution is still unverified.
+
+## Priority plan — finish the POC in this order
+
+### P0 — Physical medallion persistence
+- [ ] Persist raw input unchanged to `data/bronze/<dataset>/`.
+- [ ] Persist accepted output to `data/silver/<dataset>/` and `data/gold/<dataset>/`.
+- [ ] Persist stage-specific quarantine and remediation audit outputs.
+- [ ] Show written paths in pipeline-run results and the UI.
+- [ ] Add a healthcare Bronze → Silver → Gold example with physical outputs.
+- **Current state:** stages, rulesets, chaining, and reports exist; tables are not automatically persisted.
+
+### P1 — Bronze ingestion
+- [ ] Add an ingestion path for uploaded CSV/Parquet into managed Bronze storage.
+- [ ] Record source path, checksum, row count, schema, and ingest timestamp.
+- [ ] Use the managed Bronze dataset—not only the original upload—as the medallion input.
+- **Current state:** uploads are stored and can be labeled BRONZE, but there is no managed landing service.
+
+### P2 — Coverage-aware quarantine and AI outcomes
+- [ ] Audit every quarantined violation: deterministic fix, AI proposal, no safe proposal, below 90%, approval required, or revalidation failed.
+- [ ] Guarantee a terminal remediation outcome for every eligible failing value.
+- [ ] Expose outcome counts in the report and UI.
+- **Current state:** below-90% proposals are withheld, but not every anomaly is guaranteed an AI proposal.
+
+### P3 — Seven quality pillars and domain recommendations
+- [ ] Score completeness, uniqueness, validity, consistency, accuracy, timeliness, and integrity.
+- [ ] Roll rule results into pillar scores and an overall quality score.
+- [ ] Add healthcare, pharmacy, and telecom recommendation templates to reports and DQ Assistant.
+- **Current state:** individual rule types exist; there is no formal pillar model or domain alert catalog.
+
+### P4 — Cross-platform execution evidence
+- [ ] Run the unchanged engine on a real Databricks Spark cluster.
+- [ ] Capture Fabric, EMR, and Dataproc execution evidence or explicitly keep them contract-only.
+- [ ] Separate “portable code verified” from “cloud runtime verified” in all docs.
+- **Current state:** local Spark and remote Databricks Model Serving are verified; no cloud Spark runtime has been executed.
+
+### P5 — Hold until the POC is accepted
+- [ ] Authentication, RBAC, and multi-tenancy.
+- [ ] Scheduling and orchestration beyond the current manual/UI/CLI flow.
+- [ ] Airflow, ADF, dbt, streaming, and warehouse adapters.
+- [ ] Alert delivery channels (email, webhook, Teams/Slack).
+- [ ] PostgreSQL registry, external secret store, Kubernetes, and production hardening.
+- **Rule:** do not start these while any P0–P4 item is open.
+
+## Explicit gap register
+
+| Gap | Current reality | Required POC outcome | Priority |
+|---|---|---|---|
+| Physical medallion persistence | Metadata, chained execution, and reports only | Raw, accepted, quarantine, and audit data persisted per stage | P0 |
+| Bronze landing | File upload stored under the project | Managed raw ingestion with lineage metadata | P1 |
+| AI coverage | Low-confidence corrections withheld | Every eligible violation has a terminal outcome | P2 |
+| Seven pillars and domain alerts | Rules cover many dimensions implicitly | Formal scores plus domain recommendations | P3 |
+| Cross-platform proof | Portable code and synthetic examples | Databricks cluster proof; other clouds documented truthfully | P4 |
+| Production orchestration | Contracts and roadmap only | Deferred until POC completion | P5 |
+
+## ⏸ Deferred — Production (former Phase D)
 
 | Item | Notes |
 |---|---|
-| Auth / multi-tenancy | JWT auth, per-user pipeline visibility, RBAC — biggest prod gap |
-| Scheduling | Cron/Job scheduler for recurring DQ runs (Airflow operator or APScheduler) |
-| Friendly error handling | Map raw stack traces (Py4J, KeyError) to user-readable messages |
-| PostgreSQL registry | `backend: sqlite` → `postgresql` via same interface |
-| Connections model | Unity Catalog / S3 / ADLS / JDBC sources + secrets manager |
-| E2E test suite | Real job submission → result assertion in `tests/e2e/` (currently empty) |
-| Kubernetes deployment | Helm chart; backend + static-served frontend |
-| Alerting | Email/webhook on gate failure or anomaly spikes |
-| Data contracts (ODCS) | Schema + quality rules from ODCS contract YAML |
-| Healthcare Gold ruleset | Complete Bronze→Silver→Gold for patients pipeline |
-| Performance: 1 GB+ | Proven on 1 GB CSV (6.3M rows, auto-sampled) locally; needs real cluster test |
+| Auth / multi-tenancy | Deferred to P5; JWT, pipeline visibility, RBAC |
+| Scheduling | Deferred to P5; recurring runs via Airflow or APScheduler |
+| Friendly error handling | Can be included only when it directly supports a P0–P4 demo flow |
+| PostgreSQL registry | Deferred to P5; current SQLite/file registry remains valid for POC |
+| Connections model | Deferred to P5; Unity Catalog, S3, ADLS, JDBC, secrets manager |
+| E2E test suite | Add focused tests alongside each P0–P4 implementation |
+| Kubernetes deployment | Deferred to P5 |
+| Alerting channels | Deferred to P5; P3 produces recommendations but does not send alerts |
+| Data contracts (ODCS) | Deferred; not required to complete the POC |
+| Healthcare Gold ruleset | Included in P0 as the physical medallion demonstration |
+| Cloud performance | Local 1 GB benchmark exists; real cluster performance belongs to P4 |
 
 ---
 
@@ -430,4 +497,5 @@ Review anomalies → Fix / quarantine → Audit trail
 | `73880cf` | Governed Run DQ: manifest-bound selection |
 | `5775cea` | fix: OOM on large-file profiling — tunable bootstrap + auto-SAMPLE |
 | `227ef82` | Telecom CDR 100MB dataset + pipeline |
-| current | ROADMAP.md + Phase A UI redesign |
+| `a64f6a2` | Live progress, job guard, medallion stage chaining, `.env` secrets |
+| current | POC context, prioritized P0–P5 gaps, corrected HLD/LLD and deck |
