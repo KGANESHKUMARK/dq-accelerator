@@ -12,6 +12,21 @@ Single entry point: **`DQ_start.bat`** — checks software, installs deps, start
 
 Verify: `python --version`, `java -version`, `node --version` — or just run `DQ_start.bat`; it checks and shows the links.
 
+## Fresh machine — first run
+
+1. Install the 3 prerequisites above (one-time, ~15 min).
+2. Copy/clone the `DQ-Accelerator` folder to the machine (e.g. `D:\DQ-Accelerator`). Everything installs **inside the project folder** — no system-wide changes.
+3. Double-click **`DQ_start.bat`**. First run takes ~10 min (venv + pip + npm); later runs ~30 s.
+4. The launcher prints `[1/6]`–`[6/6]` progress; `[MISSING]` = install that item and re-run.
+5. Browser auto-opens `http://localhost:5173`.
+
+### Verify it worked
+
+- UI loads → **Dashboard** shows KPIs (not a blank/error page)
+- `curl http://127.0.0.1:8000/api/health` → `{"status":"ok"}`
+- API docs: `http://127.0.0.1:8000/docs`
+- UI → **Settings → System status**: Spark engine OK; AI provider shows `mock` (or `dqx` if `.env` set)
+
 ## Daily use
 
 ```
@@ -75,3 +90,5 @@ data/  registry/  reports/  logs/  .tmp/       runtime artefacts (gitignored)
 | Spark OOM on big file | raise `runtime.driver_memory` in `config/engine.yaml` |
 | Settings shows MockAI | env vars not set → set them, restart launcher |
 | Port busy | another backend running → close stray `python`/`uvicorn` processes |
+| Browser doesn't open | go to `http://localhost:5173` manually |
+| `[MISSING]` on first run | install the printed software, re-run `DQ_start.bat` — it resumes where it left off |

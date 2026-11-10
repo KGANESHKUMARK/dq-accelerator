@@ -61,6 +61,7 @@ Last updated: 2026-07-14
   - `docs/POC_CONTEXT.md`
   - `ROADMAP.md`
   - `docs/architecture.md`
+  - `docs/DEVELOPER_GUIDE.md` (build phases + release process)
 
 ## Active implementation plan
 

@@ -1,0 +1,424 @@
+ruleset:
+  ruleset_id: bank_transactions_silver
+  dataset: bank_transactions
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates bank_transactions_silver@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_BANK_TRANSACTIONS_001
+    name: transaction_id_not_null
+    description: transaction_id is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: transaction_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_003
+    name: transaction_id_regex
+    description: transaction_id follows the structural pattern AAA9999999999
+    dataset: bank_transactions
+    column: transaction_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{3}[0-9]{10}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA9999999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_007
+    name: account_id_regex
+    description: account_id follows the structural pattern AAA99999999
+    dataset: bank_transactions
+    column: account_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{3}[0-9]{8}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA99999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_011
+    name: customer_id_regex
+    description: customer_id follows the structural pattern AAAA999999
+    dataset: bank_transactions
+    column: customer_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{4}[0-9]{6}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAAA999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_013
+    name: txn_type_not_null
+    description: txn_type is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: txn_type
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_015
+    name: amount_not_null
+    description: amount is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: amount
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_016
+    name: amount_data_type
+    description: amount holds decimal numbers stored as text
+    dataset: bank_transactions
+    column: amount
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_018
+    name: currency_not_null
+    description: currency is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: currency
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_020
+    name: txn_timestamp_not_null
+    description: txn_timestamp is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: txn_timestamp
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_021
+    name: txn_timestamp_regex
+    description: txn_timestamp follows the structural pattern 9999-99-99A99:99:99
+    dataset: bank_transactions
+    column: txn_timestamp
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[0-9]{4}\-[0-9]{2}\-[0-9]{2}[A-Z][0-9]{2}:[0-9]{2}:[0-9]{2}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9956
+      evidence:
+        dominant_pattern: 9999-99-99A99:99:99
+        share: 0.9956
+        other_patterns:
+        - pattern: 9999-99-99A99:99AA
+          count: 130
+          percentage: 0.26
+        - pattern: 9999/99/99A99:99:99
+          count: 90
+          percentage: 0.18
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_023
+    name: channel_not_null
+    description: channel is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: channel
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_025
+    name: status_not_null
+    description: status is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_027
+    name: balance_after_not_null
+    description: balance_after is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: balance_after
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_028
+    name: balance_after_data_type
+    description: balance_after holds decimal numbers stored as text
+    dataset: bank_transactions
+    column: balance_after
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_032
+    name: country_code_not_null
+    description: country_code is populated in 100.0% of rows
+    dataset: bank_transactions
+    column: country_code
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50400
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_034
+    name: bank_transactions_duplicate
+    description: exact duplicate records were found
+    dataset: bank_transactions
+    column: null
+    rule_type: DUPLICATE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      keys: ALL_COLUMNS
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        duplicate_rows: 388
+        duplicate_groups: 385
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  - rule_id: GEN_BANK_TRANSACTIONS_035
+    name: bank_transactions_schema_validation
+    description: schema observed at profiling time
+    dataset: bank_transactions
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: transaction_id
+        type: string
+      - name: account_id
+        type: string
+      - name: customer_id
+        type: string
+      - name: txn_type
+        type: string
+      - name: amount
+        type: string
+      - name: currency
+        type: string
+      - name: txn_timestamp
+        type: string
+      - name: channel
+        type: string
+      - name: status
+        type: string
+      - name: balance_after
+        type: string
+      - name: merchant_name
+        type: string
+      - name: country_code
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 12
+      profiled_at: '2026-11-10T11:55:09Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-10T12:01:54Z'
+  change_log:
+  - approved 17 of 35 candidate rules

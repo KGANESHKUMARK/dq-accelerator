@@ -1,0 +1,57 @@
+ruleset:
+  ruleset_id: orders_gold
+  dataset: orders
+  version: "1.0"
+  stage: GOLD
+  status: DRAFT
+  description: Gold publication rules for the Fabric orders pipeline — stricter business checks on Silver-accepted rows.
+  owner: retail-data-platform
+  record_key: [order_id]
+  created_by: dq.engineer@retail.example
+  created_at: "2026-11-10T00:00:00Z"
+  rules:
+    - rule_id: ORD_G_001
+      name: gold_order_id_not_null
+      description: Published orders must retain an order identifier.
+      column: order_id
+      rule_type: NOT_NULL
+      severity: ERROR
+    - rule_id: ORD_G_002
+      name: gold_order_id_unique
+      description: Published order identifiers must be unique.
+      column: order_id
+      rule_type: UNIQUE
+      severity: ERROR
+    - rule_id: ORD_G_003
+      name: gold_qty_positive
+      description: Published orders must have qty >= 1.
+      column: qty
+      rule_type: RANGE
+      severity: ERROR
+      config: {min: 1, max: 1000, data_type: int}
+    - rule_id: ORD_G_004
+      name: gold_unit_price_non_negative
+      description: Published orders must have unit_price >= 0.
+      column: unit_price
+      rule_type: RANGE
+      severity: ERROR
+      config:
+        min: 0
+        max: 100000
+        data_type: 'decimal(18,2)'
+    - rule_id: ORD_G_005
+      name: gold_status_allowed
+      description: Published orders must carry a known fulfilment status.
+      column: status
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config:
+        values: [SHIPPED, DELIVERED, PENDING, CANCELLED, RETURNED]
+    - rule_id: ORD_G_006
+      name: gold_currency_allowed
+      description: Published orders must carry an ISO currency code.
+      column: currency
+      rule_type: ALLOWED_VALUES
+      severity: ERROR
+      config:
+        values: [USD, EUR, GBP, JPY]

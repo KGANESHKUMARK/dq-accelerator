@@ -158,30 +158,49 @@ dqctl run sample_data/bronze/customers.csv --ruleset config/rulesets/customers_v
 
 ## Documentation
 
-**Start here: [`docs/PROJECT_GUIDE.md`](docs/PROJECT_GUIDE.md)** — one document with
-setup, the full annotated project structure, what the project is, and how to run
-everything (tests, CLI, examples, API).
+**Which doc for what** — pick by your role:
 
-| Document | Contents |
+### Start here
+
+| Document | Read it if you… |
 |---|---|
-| `docs/PROJECT_GUIDE.md` | **Master guide: setup + structure + how to run** |
-| `docs/architecture.md` | HLD, component map, Mermaid diagrams |
-| `docs/databricks_pipeline_assessment.md` | Assessment of the supplied/synthetic pipeline |
-| `docs/databricks_onboarding.md` | Step-by-step Databricks onboarding |
-| `docs/spark_core_engine.md` | LLD: module-by-module engine internals |
-| `docs/profiling.md` | Profiling modes, metrics, anomalies |
-| `docs/rule_management.md` | RuleSet versioning, registry, immutability |
-| `docs/remediation.md` | Deterministic + mock-AI remediation flows |
-| `docs/confidence_policy.md` | 90 % threshold, sensitive columns, approvals |
-| `docs/quarantine.md` | Quarantine schema and revalidation |
-| `docs/medallion_data_flow.md` | Bronze/Silver/Gold execution |
-| `docs/pipeline_adapters.md` | Portability matrix and adapter contracts |
-| `docs/testing_report.md` | Executed tests and evidence |
-| `docs/poc_demo_script.md` | 21-step repeatable demo with expected output |
-| `docs/ui_demo_guide.md` | **Client-facing UI onboarding + demo walkthrough** |
-| `docs/end_to_end_demo.md` | **Fresh-machine → live demo runbook (start here to present)** |
-| `docs/POC.md` | POC use case + P0–P4 verification status |
-| `docs/POC_CONTEXT.md` | Authoritative POC guardrails and priorities |
+| [`docs/PROJECT_GUIDE.md`](docs/PROJECT_GUIDE.md) | Want the master guide: what it is, setup, full structure, how to run everything |
+| [`docs/SETUP.md`](docs/SETUP.md) | Are setting up on a fresh machine (`DQ_start.bat`, prerequisites, `.env`) |
+| [`docs/end_to_end_demo.md`](docs/end_to_end_demo.md) | Are about to present — fresh machine → live demo runbook in order |
+| [`docs/ui_demo_guide.md`](docs/ui_demo_guide.md) | Are demoing the UI to a client — tab-by-tab walkthrough |
+
+### Developers
+
+| Document | Read it if you… |
+|---|---|
+| [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) | Are joining the project — build phases, verification, release process, extension points |
+| [`docs/architecture.md`](docs/architecture.md) | Need the architecture: HLD/LLD diagrams, component map, status, failure model |
+| [`docs/spark_core_engine.md`](docs/spark_core_engine.md) | Are hacking on `dq-core` internals — module-by-module LLD |
+| [`docs/testing_report.md`](docs/testing_report.md) | Want the executed-test evidence and defect log |
+| [`docs/POC.md`](docs/POC.md) | Need the POC use case + P0–P4 verification status |
+| [`docs/POC_CONTEXT.md`](docs/POC_CONTEXT.md) | Need authoritative POC guardrails and priorities |
+| [`ROADMAP.md`](ROADMAP.md) | Want the forward plan (post-POC phases) |
+
+### Feature deep-dives (engine internals)
+
+| Document | Covers |
+|---|---|
+| [`docs/profiling.md`](docs/profiling.md) | Profiling modes (FULL/SAMPLE/APPROXIMATE), metrics, anomalies |
+| [`docs/rule_management.md`](docs/rule_management.md) | RuleSet versioning, registry, publish immutability, diff/rollback |
+| [`docs/remediation.md`](docs/remediation.md) | Deterministic + AI remediation flows, outcome taxonomy |
+| [`docs/confidence_policy.md`](docs/confidence_policy.md) | 90% threshold, sensitive columns, approvals/rejections memory |
+| [`docs/quarantine.md`](docs/quarantine.md) | Quarantine schema, statuses, revalidation |
+| [`docs/medallion_data_flow.md`](docs/medallion_data_flow.md) | Bronze/Silver/Gold stage execution + physical persistence |
+| [`docs/pipeline_adapters.md`](docs/pipeline_adapters.md) | Portability matrix + per-platform adapter contracts |
+
+### Demo & assessment assets
+
+| Document | Covers |
+|---|---|
+| [`docs/poc_demo_script.md`](docs/poc_demo_script.md) | 21-step CLI demo script with expected output |
+| [`docs/presentation_deck.md`](docs/presentation_deck.md) | Slide-ready narrative for stakeholder presentations |
+| [`docs/databricks_pipeline_assessment.md`](docs/databricks_pipeline_assessment.md) | Assessment of the supplied/synthetic pipeline assets |
+| [`docs/databricks_onboarding.md`](docs/databricks_onboarding.md) | Step-by-step Databricks workspace onboarding pattern |
 
 ## Honest scope statement
 

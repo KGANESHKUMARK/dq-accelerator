@@ -377,8 +377,9 @@ _RUN_PHASE_LABELS = {
 @app.get("/api/datasets")
 def datasets() -> list[dict[str, str]]:
     d = ROOT / "sample_data" / "bronze"
+    files = sorted(d.glob("*.csv")) + sorted(d.glob("*.parquet"))
     return [{"id": p.stem, "path": str(p.relative_to(ROOT)).replace("\\", "/")}
-            for p in sorted(d.glob("*.csv"))]
+            for p in files]
 
 
 class RunIn(BaseModel):

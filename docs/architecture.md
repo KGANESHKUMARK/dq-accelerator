@@ -10,7 +10,7 @@
 
 ## 0. Architecture views
 
-### 0.1 HLD — target POC
+### 0.1 HLD — current POC
 
 ```mermaid
 flowchart LR
@@ -33,8 +33,10 @@ flowchart LR
     LLM["Databricks Model Serving<br/>or MockAI fallback"] --> ENG
 ```
 
-Solid-line behavior is available now except the physical Bronze, Silver, and
-Gold persistence nodes, which are the current P0/P1 implementation target.
+All nodes above are implemented and verified on local Spark — including
+physical Bronze/Silver/Gold persistence (P0), managed Bronze ingest manifests
+(P1), terminal outcome audit (P2), seven quality pillars (P3), and
+cross-Spark-version portability evidence (P4).
 
 ### 0.2 HLD — deployment boundary
 
@@ -78,21 +80,27 @@ sequenceDiagram
     Engine-->>Host: accepted DataFrame + DQResult
 ```
 
-The sink call is the missing physical-persistence step. Validation, policy,
-revalidation, and report generation already exist.
+The sink call is implemented (`StorageSink` + `StoragePaths`): every stage
+physically persists accepted/quarantine/audit outputs plus JSON reports.
 
-### 0.4 Target persisted layout
+### 0.4 Persisted layout (as implemented)
 
 ```text
 data/
-  bronze/<dataset>/raw/                 immutable raw landing
-  bronze/<dataset>/_ingest.json         source, checksum, schema, counts
-  silver/<dataset>/accepted/            accepted Silver output
-  gold/<dataset>/accepted/              accepted Gold output
-  quarantine/<stage>/<dataset>/         original rows + dq_* provenance
-  audit/<stage>/<dataset>/              applied fixes and withheld proposals
+  bronze/<dataset>/                  raw landing (parquet) + _ingest.json manifest
+  silver/<dataset>/                  accepted Silver output
+  gold/<dataset>/                    accepted Gold output
+  quarantine/<stage>/<dataset>/      quarantined rows + dq_* provenance
+  quarantine/<stage>/<dataset>_removed_duplicates/   dedupe audit rows
+  audit/<stage>/<dataset>_remediation_log/           per-record fix/proposal log
 reports/
-  <pipeline>_<dataset>_<stage>_<run>.json
+  <dataset>_<stage>_DQRUN-<ts>-<id>.json   execution report (metrics, pillars, outcomes)
+registry/
+  rulesets/   published immutable ruleset versions (checksum-sealed)
+  pipelines/  pipeline lifecycle states + execution history
+config/approvals/
+  approved_corrections.yaml    steward approvals → HUMAN_APPROVED_AI next run
+  rejected_corrections.yaml    steward rejections → REJECTED_BY_HUMAN forever
 ```
 
 ## 1. Design goals
@@ -118,6 +126,12 @@ flowchart LR
         DF[("Existing Spark DataFrame")]
     end
 
+    subgraph UI["Web console (local POC)"]
+        FE["React SPA<br/>Dashboard · Pipelines · Onboard · Run DQ<br/>Anomalies · Approvals · Rule Sets<br/>Reports · Settings · Assistant"]
+        API["FastAPI<br/>jobs + SSE progress · lifecycle<br/>approvals/rejections · reports"]
+        FE --> API
+    end
+
     subgraph DQ["dq-core engine"]
         ENG["DataQualityEngine<br/>(facade)"]
         PROF["Profiler<br/>full / sample / approx"]
@@ -125,9 +139,10 @@ flowchart LR
         VAL["ValidationEngine<br/>native PySpark exprs"]
         REM["Remediation<br/>deterministic + AI"]
         POL["Confidence &<br/>sensitive-data policy"]
+        APRV["ApprovalStore +<br/>RejectionStore"]
         QAR["Quarantine +<br/>Revalidator"]
         REG["RuleSet &<br/>Pipeline registries"]
-        MET["Metrics +<br/>JSON reports"]
+        MET["Metrics +<br/>JSON reports + pillars"]
     end
 
     subgraph Store["Config & state (local POC: filesystem)"]
@@ -142,12 +157,13 @@ flowchart LR
         ACC[("accepted DataFrame")]
         QUAR[("quarantine DataFrame")]
         REP["reports/*.json"]
-        MED["physical Bronze/Silver/Gold sinks<br/>P0 — not complete"]
+        MED["physical Bronze/Silver/Gold/Quarantine/Audit sinks"]
     end
 
     DF --> ENG
+    API --> ENG
     ENG --> PROF --> GEN
-    ENG --> VAL --> REM --> POL --> QAR
+    ENG --> VAL --> REM --> POL --> APRV --> QAR
     ENG --> REG
     ENG --> MET
     RS & POLY & AI & APR --> ENG
@@ -213,16 +229,18 @@ flowchart TD
     D --> R1{"revalidate"}
     R1 -->|still failing| AI["AI proposals<br/>(batched, deduped)"]
     R1 -->|clean| ACC2["accepted"]
-    AI --> P{"confidence ≥ 0.90?<br/>not sensitive / approved?"}
-    P -->|yes| AP["apply correction"]
-    P -->|no| Q1["quarantine:<br/>BELOW_THRESHOLD / PENDING_APPROVAL"]
-    AP --> R2{"revalidate"}
+    AI --> P{"human decision?<br/>then confidence ≥ 0.90?<br/>not sensitive / approved?"}
+    P -->|steward rejected| QR["quarantine:<br/>REJECTED_BY_HUMAN (permanent)"]
+    P -->|approved by human| AP["apply correction<br/>→ HUMAN_APPROVED_AI"]
+    P -->|yes, auto-apply| AP2["apply correction<br/>→ AI_APPLIED"]
+    P -->|no| Q1["quarantine:<br/>BELOW_THRESHOLD / SENSITIVE / NO_PROPOSAL"]
+    AP & AP2 --> R2{"revalidate"}
     R2 -->|clean| ACC2
     R2 -->|fails| Q2["quarantine:<br/>CORRECTION_FAILED_REVALIDATION"]
 
     O2 --> G["Quality gate<br/>max_quarantine_rate etc."]
     ACC2 --> G
-    Q1 & Q2 --> QUAR[("quarantine DataFrame<br/>dq_* audit columns")]
+    Q1 & Q2 & QR --> QUAR[("quarantine DataFrame<br/>dq_* audit columns")]
     G --> REP["DQResult → JSON report + metrics"]
 ```
 
@@ -276,34 +294,31 @@ Mode resolution order: explicit `mode=` argument → `context.integration_mode` 
 
 | Area | State | Boundary |
 |---|---|---|
-| Local Spark engine and tests | ✅ Verified | 130 tests; not cloud evidence |
-| UI, CLI, onboarding, lifecycle | ✅ Verified | Manual execution; no scheduler |
-| Real LLM remediation | ✅ Verified | Databricks Model Serving only; MockAI fallback remains |
-| Medallion chaining | ✅ Verified | Stage metadata and accepted-frame handoff |
-| Physical medallion tables | ❌ Open P0 | Reports exist; stage data persistence is incomplete |
-| Managed Bronze ingestion | ❌ Open P1 | Uploads are stored, not managed as raw landings |
-| Seven-pillar scoring | ❌ Open P3 | Rule dimensions exist without formal pillar rollup |
-| Cloud Spark execution | ❌ Open P4 | Portable examples only; no Databricks/Fabric/EMR/Dataproc run |
-| Auth, scheduling, adapters, alert delivery | ⏸ Deferred P5 | Do not begin before P0–P4 |
+| Local Spark engine and tests | ✅ Verified | 139 tests (74 unit + 65 integration); Spark 3.5.9↔4.1.3 matrix identical |
+| UI, CLI, onboarding, lifecycle | ✅ Verified | 9 tabs audited; every action persists + refreshes |
+| Real LLM remediation | ✅ Verified | Databricks Model Serving (`simulated=false` per decision); MockAI fallback |
+| Medallion chaining + physical persistence | ✅ Verified (P0) | Bronze/Silver/Gold/Quarantine/Audit all written per run |
+| Managed Bronze ingestion | ✅ Verified (P1) | `_ingest.json`: checksum, schema, row count per dataset |
+| Terminal outcome audit | ✅ Verified (P2) | All 7 outcomes incl. `REJECTED_BY_HUMAN` (rejection memory) |
+| Seven-pillar scoring | ✅ Verified (P3) | Pillars + domain recommendations in reports and UI |
+| Cross-platform evidence | ◐ Partial (P4) | Platform labels + Spark-version matrix proven; **real cloud Spark run still open — not claimed** |
+| Auth, scheduling, adapters, alert delivery | ⏸ Deferred P5 | Do not begin before P4 closes |
 
 ### 7.3 Component maturity map
 
 ```mermaid
 flowchart LR
-    subgraph DONE["VERIFIED"]
+    subgraph DONE["VERIFIED — P0 to P4"]
         A1["Local Spark engine"]
         A2["UI and CLI onboarding"]
         A3["Rule versioning"]
         A4["Deterministic and real LLM remediation"]
-        A5["Quarantine policy"]
-        A6["Stage chaining and reports"]
+        A5["Quarantine policy + rejection memory"]
+        A6["Stage chaining, physical persistence, pillars"]
+        A7["Spark 3.5/4.x portability matrix"]
     end
-    subgraph POC["REMAINING POC — P0 to P4"]
-        D1["Physical medallion persistence"]
-        D2["Managed Bronze ingestion"]
-        D3["Complete AI outcome audit"]
-        D4["Seven-pillar scoring"]
-        D5["Real cloud Spark execution evidence"]
+    subgraph OPEN["REMAINING — P4 tail"]
+        D1["Real cloud Spark cluster run"]
     end
     subgraph LATER["DEFERRED — P5"]
         E1["Auth and multi-tenancy"]
@@ -311,7 +326,7 @@ flowchart LR
         E3["Alert delivery"]
         E4["Production registry and Kubernetes"]
     end
-    DONE --> POC --> LATER
+    DONE --> OPEN --> LATER
 ```
 
 | Area | State | Evidence |
@@ -326,31 +341,46 @@ flowchart LR
 | 3 integration modes | ✅ all tested | OBSERVE 38/38, ENFORCE 16/22, REMEDIATE 24+8/13 |
 | Medallion B/S/G | ✅ Bronze preserved, Silver DQ, Gold ref-integrity+biz rules | transactions Gold: 26 acc/4 quar/18 summaries/2,519,147.89 |
 | Metrics + reports | ✅ `DQResult.to_dict/write_report`, phase timings | JSON reports verified |
-| Pipeline lifecycle | ✅ 7-state machine, offboard keeps data+history | CLI + integration tests |
+| Pipeline lifecycle | ✅ 7-state machine, offboard keeps data+history | CLI + integration tests + UI actions |
 | `dqctl` CLI | ✅ pipeline/ruleset/run/profile commands | all exercised with real output |
-| Local Spark harness | ✅ Spark 4.1.3 + Java 21 + Windows Parquet shim | `check_runtime.py` + 130 tests |
-| Portability adapters | 🔶 Contract-tested | `test_portability_contracts.py` 9 tests |
-| Databricks execution | ⚠️ Pattern only — **no workspace used** | notebook-style script, not run on Databricks |
+| Local Spark harness | ✅ Spark 4.1.3 + Java 21 + Windows Parquet shim | `check_runtime.py` + test suite |
+| Physical medallion persistence (P0) | ✅ Bronze/Silver/Gold/Quarantine/Audit written per run | `written_paths` in API + `data/` tree |
+| Managed Bronze ingestion (P1) | ✅ `_ingest.json` checksum/schema/rows per dataset | file inspection per dataset |
+| Outcome audit (P2) | ✅ 7 terminal outcomes incl. REJECTED_BY_HUMAN | `outcome_audit` in reports; goat full spectrum w/ real LLM |
+| Quality pillars (P3) | ✅ 7 pillars + domain recommendation | report JSON + UI pillar cards |
+| Approval + rejection memory | ✅ Approvals → HUMAN_APPROVED_AI; rejections → REJECTED_BY_HUMAN permanently | `config/approvals/*.yaml` + `RejectionStore` + UI decision history |
+| Portability (P4) | 🔶 Strong local evidence | platform labels + Spark 3.5.9↔4.1.3 matrix, ANSI on/off — `reports/p4_*_evidence.json` |
+| Databricks execution | ⚠️ Pattern + LLM verified — **no workspace Spark run** | Model Serving calls real (`simulated=false`); cluster run open |
 | Non-Spark targets (SQL/Flink/etc.) | 📐 Extension contracts only | `docs/pipeline_adapters.md` |
 
 ### 7.3 Verified evidence snapshot
 
-- **Tests:** `130 passed in 531s` — unit (metadata, policies, schema, lifecycle,
-  candidate-generation) + integration (Spark session, profiling, validation,
-  remediation, modes, medallion, pipeline lifecycle, portability).
+- **Tests:** `139 passed` — 74 unit (metadata, policies, schema, lifecycle,
+  candidate-generation, remediation outcomes) + 65 integration (Spark session,
+  profiling, validation, remediation, modes, medallion, pipeline lifecycle,
+  portability).
+- **P4 Spark matrix:** byte-identical metrics on the same wheel across
+  Spark 3.5.9 ↔ 4.1.3, ANSI enabled/disabled, shuffle partitions 8 ↔ 32 —
+  fresh venv containing only the wheel + pyspark
+  (`reports/p4_spark_matrix_evidence.json`).
+- **AI spectrum (goat, real LLM):** `AI_APPLIED` @0.95, `HUMAN_APPROVED_AI`
+  @0.80, `BLOCKED_SENSITIVE_DATA`, `DETERMINISTIC_FIX`, `NO_SAFE_PROPOSAL` —
+  every decision `simulated=false`.
 - **Expected-results conformance:** every per-record outcome in
   `sample_data/expected_results.json` reproduced (customers 38 rows,
   transactions 40 rows, Gold aggregates exact).
 - **CLI runs:** OBSERVE_ONLY report, profile JSON, ruleset publish/diff/
   activate/rollback/verify, pipeline onboard→offboard — all real output.
-- **Defects found & fixed during verification:** 8 items logged in
-  `docs/testing_report.md` §4 (path off-by-one ×2, Spark 4 createDataFrame,
-  circular import, ANSI lambda, immutability test, ruleset id, Windows Hadoop).
+- **UI audit:** all 9 tabs endpoint-verified; mutating actions persist +
+  refresh (Approvals rejection memory fixed and engine-wired).
+- **Defects found & fixed during verification:** logged in
+  `docs/testing_report.md` §4 plus approval-inbox no-op reject,
+  undeclared `click` dependency, CSV `inferSchema` mismatch.
 
 ### 7.4 What remains (honest list)
 
-- Real Databricks workspace run (needs credentials — pattern is ready).
-- Real LLM provider behind `AIRemediationProvider` (mock is labelled simulated).
+- Real managed-Spark cluster run (Databricks/Fabric/EMR) — engine contract is
+  proven portable; execution needs platform credentials (deployment, not engine).
 - SQL/streaming adapters, governance DB — later phases by design.
 - **PostgreSQL backend** for the registry — SQLite is the embedded impl today
   (`registry.backend: sqlite`); the seam interface means PostgreSQL drops in by
@@ -387,7 +417,8 @@ flowchart LR
 
 ## 9. What is deliberately NOT in this POC
 
-React UI, FastAPI service, PostgreSQL governance store, authentication,
-multi-tenancy, real LLM dependency, Databricks workspace automation, production
-Airflow/ADF/dbt/Flink/Snowflake connectors. These are extension points documented
+Authentication, multi-tenancy, production Airflow/ADF/dbt/Flink/Snowflake
+connectors, Kubernetes deployment, alerting integrations, and real managed-cloud
+Spark execution (contract-proven only). The React UI and FastAPI console ARE in
+scope as the local POC surface. These are extension points documented
 in `docs/pipeline_adapters.md`.

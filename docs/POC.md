@@ -125,7 +125,8 @@ The same minimal dataset and engine contract run through the Spark adapter
 under the platform contexts used by the POC. This phase must not claim a real
 Databricks, Fabric, EMR, or Dataproc cluster execution unless that execution
 actually happens. Current evidence is local Spark plus the shared Spark adapter
-contract.
+contract — strengthened by a clean-venv wheel install and a two-major Spark
+version matrix (see below).
 
 ## 5a. Verification status (minimal dataset: `sample_data/minimal/patients_minimal.csv`)
 
@@ -135,7 +136,7 @@ contract.
 | P1 | ✅ Verified | `_ingest.json` per dataset: source checksum, schema, row count, timestamp (patients `0a819f28…`, goat `dbdb7a3a…`) |
 | P2 | ✅ Verified | `outcome_audit` in every report; goat v1.1 run showed `DETERMINISTIC_FIX`, `BLOCKED_SENSITIVE_DATA`, `BELOW_CONFIDENCE_THRESHOLD` (real LLM @0.80), `NO_SAFE_PROPOSAL`; 5 unit tests |
 | P3 | ✅ Verified | `quality_pillars` in reports + pipeline-run API/UI: goat overall 99.59, agriculture recommendation; domain detection for healthcare/agriculture/pharmacy/telecom/banking |
-| P4 | ◐ Partial | Identical outcomes under DATABRICKS/FABRIC/STANDALONE_SPARK/LOCAL on local Spark; `engine.databricks.yaml` loads; evidence in `reports/p4_portability_evidence.json`. **Real cloud Spark run still open — not claimed.** |
+| P4 | ◐ Partial (strengthened) | Identical outcomes under DATABRICKS/FABRIC/STANDALONE_SPARK/LOCAL labels (`reports/p4_portability_evidence.json`) **plus** byte-identical metrics on the same wheel across Spark 3.5.9 ↔ 4.1.3, ANSI on/off, partition counts 8↔32, in a fresh venv containing only the wheel + pyspark (`reports/p4_spark_matrix_evidence.json`). Zero `import databricks` in dq-core; wheel deps = PyYAML + click. **Real cloud Spark run still open — not claimed.** |
 
 ### Second verified domain — goat herd (agriculture)
 

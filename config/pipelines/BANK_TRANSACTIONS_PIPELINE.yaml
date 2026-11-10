@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: BANK_TRANSACTIONS_PIPELINE
+  pipeline_name: Bank Transactions Pipeline
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: OBSERVE_ONLY
+  owner: test@gmail.com
+  description: Onboarded via UI wizard from bank_transactions.csv (50400 rows profiled)
+  policy: ../policies/default.yaml
+  datasets:
+  - dataset_id: bank_transactions
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    rulesets:
+      SILVER: ../rulesets/bank_transactions_v1.yaml
+    test_data: ../../data/uploads/bank_transactions.csv
+    test_data_format: CSV

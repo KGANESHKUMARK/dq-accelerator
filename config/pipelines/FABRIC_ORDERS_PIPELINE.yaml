@@ -4,7 +4,7 @@ pipeline:
   platform: FABRIC
   runtime: PYSPARK
   integration_mode: INLINE
-  dq_mode: OBSERVE_ONLY
+  dq_mode: REMEDIATE
   owner: synthetic-demo@example.com
   description: SYNTHETIC Microsoft Fabric orders lakehouse pipeline - onboarding sample (no real workspace)
   policy: ../policies/default.yaml
@@ -14,7 +14,9 @@ pipeline:
     stages:
     - BRONZE
     - SILVER
+    - GOLD
     rulesets:
-      SILVER: ../rulesets/orders_v1.yaml
+      SILVER: ../rulesets/orders_v1_3.yaml
+      GOLD: ../rulesets/orders_gold_v1.yaml
     test_data: ../../sample_data/bronze/orders.csv
     test_data_format: CSV
