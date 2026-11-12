@@ -8,7 +8,7 @@
 # ============================================================================
 
 # Used directly by dq_core.ai.dqx_provider → LiteLLM → Model Serving
-databricks-labs-dqx==0.17.2
+databricks-labs-dqx==0.16.0  # 0.17.x requires Python <3.13; 0.16.0 supports 3.14+
 litellm==1.96.2
 openai==2.54.0
 tiktoken==0.14.0
