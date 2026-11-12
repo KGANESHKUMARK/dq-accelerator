@@ -28,7 +28,7 @@ echo ============================================================
 echo.
 
 rem ---------------------------------------------------------------- 1. PYTHON
-echo [1/6] Checking Python 3.12+ ...
+echo [1/6] Checking Python 3.12-3.14 ...
 set "PYOK="
 for /f "tokens=2 delims= " %%v in ('python --version 2^>nul') do set "PYVER=%%v"
 if not defined PYVER (
@@ -37,10 +37,11 @@ if not defined PYVER (
     set "MISSING=1"
 ) else (
     for /f "tokens=1,2 delims=." %%a in ("%PYVER%") do (
-        if "%%a"=="3" if %%b GEQ 12 set "PYOK=1"
+        if "%%a"=="3" if %%b GEQ 12 if %%b LSS 15 set "PYOK=1"
     )
     if defined PYOK (echo      [OK] Python %PYVER%) else (
-        echo      [WARN] Python %PYVER% - need 3.12+. Install: https://www.python.org/downloads/release/python-3129/
+        echo      [WARN] Python %PYVER% - need 3.12-3.14. Python 3.15+ has no wheels for pinned deps.
+        echo      Install 3.12: https://www.python.org/downloads/release/python-3129/
         set "MISSING=1"
     )
 )
