@@ -12,7 +12,7 @@ set "VENV_PY=%ROOT%\.venv\Scripts\python.exe"
 set "LOGDIR=%ROOT%\logs"
 set "MISSING=0"
 
-rem Load local secrets/config (DATABRICKS_TOKEN etc.) if .env exists — gitignored
+rem Load local secrets/config (DATABRICKS_TOKEN etc.) if .env exists - gitignored
 if exist "%ROOT%\.env" (
     for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%ROOT%\.env") do (
         if not defined %%a set "%%a=%%b"
@@ -64,17 +64,18 @@ if not defined JVER (
 
 rem ---------------------------------------------------------------- 3. NODE
 echo [3/6] Checking Node.js 18+ ...
-set "NODEOK="
-for /f "tokens=1 delims=v" %%v in ('node --version 2^>nul') do set "NVER=%%v"
-if not defined NVER (
+set "NMAJ="
+for /f "tokens=1 delims=v." %%a in ('node --version 2^>nul') do set "NMAJ=%%a"
+if not defined NMAJ (
     echo      [MISSING] Node.js not found
     echo      Install LTS: https://nodejs.org/en/download
     set "MISSING=1"
 ) else (
-    for /f "tokens=1 delims=v." %%a in ("%NVER%") do set "NMAJ=%%a"
-    set "NMAJ=%NMAJ:v=%"
-    if %NMAJ% GEQ 18 (echo      [OK] Node.js v%NVER%) else (
-        echo      [WARN] Node.js v%NVER% - need 18+. Install: https://nodejs.org/en/download
+    set "NMAJ=%NMAJ: =%"
+    echo %NMAJ%|findstr /r "^[0-9][0-9]*$" >nul
+    if errorlevel 1 set "NMAJ=0"
+    if %NMAJ% GEQ 18 (echo      [OK] Node.js v%NMAJ%) else (
+        echo      [WARN] Node.js v%NMAJ% - need 18+. Install: https://nodejs.org/en/download
         set "MISSING=1"
     )
 )
@@ -124,7 +125,7 @@ if defined DATABRICKS_TOKEN (
 rem ------------------------------------------------------------- 5. FRONTEND
 echo [5/6] Frontend dependencies + build ...
 if not exist "%ROOT%\ui\frontend\node_modules" (
-    echo      npm install (first time - a few minutes)...
+    echo      npm install - first time, a few minutes...
     pushd "%ROOT%\ui\frontend"
     call npm install --silent
     if errorlevel 1 ( echo      [ERROR] npm install failed & popd & pause & exit /b 1 )
