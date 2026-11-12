@@ -188,6 +188,117 @@ class MongoMetadataStore(MetadataStore):
         self._client.close()
 
 
+# --------------------------------------------------------------------------- DynamoDB backend (lazy boto3)
+
+
+class DynamoCollection(Collection):
+    """boto3 DynamoDB table wrapper — same collection API.
+
+    Documents are stored as-is under a string ``id`` attribute (JSON-serialised
+    query keys). Works against real DynamoDB or DynamoDB Local via endpoint_url.
+    """
+
+    def __init__(self, table: Any) -> None:
+        self._t = table
+
+    @staticmethod
+    def _key(query: Mapping[str, Any]) -> str:
+        import hashlib, json as _j
+        return hashlib.sha256(_j.dumps(dict(query), sort_keys=True, default=str).encode()).hexdigest()
+
+    def insert_one(self, doc: Mapping[str, Any]) -> Any:
+        doc = dict(doc)
+        doc["_id"] = self._key({k: v for k, v in doc.items() if k != "_id"} or doc)
+        self._t.put_item(Item=doc)
+        return doc["_id"]
+
+    def replace_one(self, query: Mapping[str, Any], doc: Mapping[str, Any], upsert: bool = False) -> Any:
+        key = self._key(query)
+        existing = self._t.get_item(Key={"_id": key}).get("Item")
+        if existing is None and not upsert:
+            return None
+        item = {**(existing or {}), **dict(query), **dict(doc), "_id": key}
+        self._t.put_item(Item=item)
+        return key
+
+    def find_one(self, query: Mapping[str, Any]) -> dict[str, Any] | None:
+        return self._t.get_item(Key={"_id": self._key(query)}).get("Item")
+
+    def find(self, query: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+        if not query:
+            items: list[dict[str, Any]] = []
+            kwargs: dict[str, Any] = {}
+            while True:
+                page = self._t.scan(**kwargs)
+                items.extend(page.get("Items", []))
+                if "LastEvaluatedKey" not in page:
+                    return items
+                kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+        # field-equality scan (POC scale; production uses GSI/keys)
+        out = []
+        kwargs = {}
+        while True:
+            page = self._t.scan(**kwargs)
+            for it in page.get("Items", []):
+                if all(it.get(k) == v for k, v in dict(query).items()):
+                    out.append(it)
+            if "LastEvaluatedKey" not in page:
+                return out
+            kwargs["ExclusiveStartKey"] = page["LastEvaluatedKey"]
+
+    def delete_one(self, query: Mapping[str, Any]) -> Any:
+        key = self._key(query)
+        if self.find_one(query) is None:
+            return None
+        self._t.delete_item(Key={"_id": key})
+        return key
+
+    def count(self, query: Mapping[str, Any] | None = None) -> int:
+        return len(self.find(query))
+
+
+class DynamoMetadataStore(MetadataStore):
+    """AWS DynamoDB document store — requires ``boto3``.
+
+    Selected via ``metadata.engine: dynamodb`` with ``metadata.uri`` as either
+    a table ARN prefix or ``endpoint_url`` for DynamoDB Local. Tables are created
+    on demand as ``<prefix>_<collection>`` with a string ``_id`` hash key.
+    """
+
+    def __init__(self, uri: str = "", region: str = "us-east-1", table_prefix: str = "dq_meta",
+                 endpoint_url: str | None = None, aws_profile: str | None = None) -> None:
+        try:
+            import boto3
+        except ImportError as exc:  # pragma: no cover
+            raise ConfigurationError("metadata.engine=dynamodb requires boto3 (pip install boto3)") from exc
+        session = boto3.Session(profile_name=aws_profile, region_name=region)
+        kwargs: dict[str, Any] = {}
+        if endpoint_url:
+            kwargs["endpoint_url"] = endpoint_url
+        self._dynamodb = session.resource("dynamodb", **kwargs)
+        self._prefix = table_prefix
+        self._tables: dict[str, DynamoCollection] = {}
+
+    def collection(self, name: str) -> DynamoCollection:
+        if name not in self._tables:
+            table_name = f"{self._prefix}_{name}"
+            table = self._dynamodb.Table(table_name)
+            try:
+                table.load()
+            except Exception:
+                table = self._dynamodb.create_table(
+                    TableName=table_name,
+                    KeySchema=[{"AttributeName": "_id", "KeyType": "HASH"}],
+                    AttributeDefinitions=[{"AttributeName": "_id", "AttributeType": "S"}],
+                    BillingMode="PAY_PER_REQUEST")
+                table.wait_until_exists()
+            self._tables[name] = DynamoCollection(table)
+        return self._tables[name]
+
+    def close(self) -> None:  # pragma: no cover - boto3 manages its own lifecycle
+        pass
+
+
 # --------------------------------------------------------------------------- factory + YAML round-trip
 
 
@@ -206,7 +317,13 @@ def open_metadata_store(settings: Any) -> MetadataStore:
         if not uri:
             raise ConfigurationError("metadata.engine=mongodb requires metadata.uri")
         return MongoMetadataStore(uri, getattr(meta, "db_name", "dq_metadata") or "dq_metadata")
-    raise ConfigurationError(f"Unsupported metadata.engine '{engine}' (expected tinydb|mongodb)")
+    if engine == "dynamodb":
+        return DynamoMetadataStore(
+            region=getattr(meta, "region", "us-east-1") or "us-east-1",
+            table_prefix=getattr(meta, "table_prefix", "dq_meta") or "dq_meta",
+            endpoint_url=getattr(meta, "endpoint_url", None),
+            aws_profile=getattr(meta, "aws_profile", None))
+    raise ConfigurationError(f"Unsupported metadata.engine '{engine}' (expected tinydb|mongodb|dynamodb)")
 
 
 def export_collection(store: MetadataStore, name: str) -> list[dict[str, Any]]:

@@ -47,10 +47,14 @@ class ValidationSettings:
 
 @dataclass
 class MetadataSettings:
-    engine: str = "tinydb"                   # tinydb (embedded, default) | mongodb
+    engine: str = "tinydb"                   # tinydb (embedded, default) | mongodb | dynamodb
     db_path: str | None = None               # tinydb JSON file when engine=tinydb
     uri: str | None = None                   # mongodb://... when engine=mongodb
     db_name: str = "dq_metadata"
+    region: str = "us-east-1"                # dynamodb
+    table_prefix: str = "dq_meta"            # dynamodb
+    endpoint_url: str | None = None          # dynamodb local endpoint
+    aws_profile: str | None = None           # dynamodb
 
 
 @dataclass
@@ -129,7 +133,7 @@ class EngineConfig:
                 registry[key] = resolve_path(registry.get(key), base_dir)
             meta = dict(registry.get("metadata") or {})
             meta["db_path"] = resolve_path(meta.get("db_path"), base_dir)
-            registry["metadata"] = meta
+            registry["metadata"] = MetadataSettings(**meta)
             ai = dict(data.get("ai") or {})
             ai["mock_responses_path"] = resolve_path(ai.get("mock_responses_path"), base_dir)
             outputs = dict(data.get("outputs") or {})
