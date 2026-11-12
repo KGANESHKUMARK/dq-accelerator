@@ -482,6 +482,18 @@ otherwise. Remote cloud execution is still unverified.
 
 ---
 
+## 📋 BACKLOG — Next candidates (not urgent)
+
+| # | Item | Why | Effort |
+|---|---|---|---|
+| B1 | **Detailed onboarding progress + per-step history** | Onboarding wizard shows only coarse phase names (`phase=spark`); for 200MB+ files users can't see sub-steps. Add profiler progress callbacks (schema read → null rates → distinct counts → anomaly scan), live counters, per-phase elapsed in job history, and profile-preview as soon as profiling finishes | Medium |
+| B2 | Delta local verification | `format: delta` + `catalog:` plumbed; needs a machine with Maven access or pre-staged jars to verify `scripts/verify_delta.py` | Small |
+| B3 | Cloud cluster run evidence | Real Databricks/EMR execution — deployment task, not code | External |
+| B4 | Streaming DQ mode | Batch-only today | Large |
+| B5 | Production auth/multi-tenancy | Local POC | Large |
+
+---
+
 ## Git history summary
 
 | Commit | What |
