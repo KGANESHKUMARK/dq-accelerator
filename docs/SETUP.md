@@ -7,7 +7,7 @@ Single entry point: **`DQ_start.bat`** — checks software, installs deps, start
 | Software | Version | Download |
 |---|---|---|
 | Python | 3.12+ | https://www.python.org/downloads/ (check "Add to PATH") |
-| Java JDK | 21+ | https://learn.microsoft.com/en-us/java/openjdk/download |
+| Java JDK | 17+ (21 also fine) | https://learn.microsoft.com/en-us/java/openjdk/download |
 | Node.js | 18+ LTS | https://nodejs.org/en/download |
 
 Verify: `python --version`, `java -version`, `node --version` — or just run `DQ_start.bat`; it checks and shows the links.
