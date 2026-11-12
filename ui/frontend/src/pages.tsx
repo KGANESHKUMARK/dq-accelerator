@@ -135,6 +135,24 @@ const Sparkline = ({ data, color = '#3b82f6' }: { data: number[]; color?: string
   )
 }
 
+/* ---- Dashboard widget visibility (Settings → localStorage) ---- */
+const WIDGETS = [
+  { key: 'kpis', label: 'Headline KPI tiles' },
+  { key: 'journey', label: 'Quality journey (medallion flow + score trend)' },
+  { key: 'processing', label: 'Processing breakdown' },
+  { key: 'remediation', label: 'Remediation summary' },
+  { key: 'quarantine', label: 'Quarantine breakdown' },
+  { key: 'toprules', label: 'Top failing rules' },
+  { key: 'trend', label: 'Run quality trend (metrics)' },
+  { key: 'datasets', label: 'Per-dataset processing table' },
+]
+const widgetVisible = (key: string): boolean => {
+  try { const w = JSON.parse(localStorage.getItem('dq_widgets') || '{}'); return w[key] !== false } catch { return true }
+}
+const loadWidgets = (): Record<string, boolean> => {
+  try { return JSON.parse(localStorage.getItem('dq_widgets') || '{}') } catch { return {} }
+}
+
 /* ---- Profile / anomaly views ---- */
 const SEV_STYLE: Record<string, { border: string; bg: string; fg: string }> = {
   ERROR: { border: 'var(--danger)', bg: 'rgba(239,68,68,.12)', fg: 'var(--danger)' },
@@ -439,7 +457,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     {loading && <div className="info-box">Loading real metrics from {'{'}reports/{'}'}… <span className="spin" /></div>}
 
     {/* ── Row 1: headline KPIs ── */}
-    <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+    {widgetVisible('kpis') && <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
       <div className="stat-tile"><div className={`num ${scoreClass}`}>{scoreVal != null ? scoreVal + '%' : '—'}</div><div className="lbl">Acceptance rate</div></div>
       <div className="stat-tile"><div className="num">{(t.total_runs ?? 0)}</div><div className="lbl">Total DQ runs</div></div>
       <div className="stat-tile"><div className="num ok">{(t.gates_passed ?? 0)}</div><div className="lbl">Gates passed</div></div>
@@ -448,14 +466,14 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
       <div className="stat-tile"><div className="num ok">{(t.accepted_records ?? 0).toLocaleString()}</div><div className="lbl">Total accepted</div></div>
       <div className="stat-tile"><div className="num bad">{(t.quarantined_records ?? 0).toLocaleString()}</div><div className="lbl">Total quarantined</div></div>
       <div className="stat-tile"><div className="num warn">{anomStats['OPEN'] ?? 0}</div><div className="lbl">Open anomalies</div></div>
-    </div>
+    </div>}
 
     {/* ── Row 1b: quality journey — the story in one glance ── */}
-    <QualityJourney pipes={pipes} />
+    {widgetVisible('journey') && <QualityJourney pipes={pipes} />}
 
     {/* ── Row 2: processing breakdown + remediation ── */}
-    {t.input_records > 0 && <div className="card-row">
-      <div className="card">
+    {t.input_records > 0 && (widgetVisible('processing') || widgetVisible('remediation')) && <div className="card-row">
+      {widgetVisible('processing') && <div className="card">
         <h3>Processing breakdown <span className="muted">— all runs combined</span></h3>
         <DonutBar label="Accepted" value={t.accepted_records ?? 0} total={t.input_records ?? 0} color="#22c55e" />
         <DonutBar label="Quarantined" value={t.quarantined_records ?? 0} total={t.input_records ?? 0} color="#ef4444" />
@@ -466,8 +484,8 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
           <span>Rules failed: <b style={{ color: 'var(--danger)' }}>{(t.rules_failed ?? 0).toLocaleString()}</b></span>
           <span>Rule pass rate: <b style={{ color: 'var(--success)' }}>{t.rules_evaluated ? Math.round((t.rules_evaluated - t.rules_failed) / t.rules_evaluated * 100) + '%' : '—'}</b></span>
         </div>
-      </div>
-      <div className="card">
+      </div>}
+      {widgetVisible('remediation') && <div className="card">
         <h3>Remediation summary</h3>
         <div className="stat-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div className="stat-tile"><div className="num ok">{t.deterministic_fixes ?? 0}</div><div className="lbl">Deterministic fixes</div></div>
@@ -484,12 +502,12 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
             </div>
           ))}
         </>}
-      </div>
+      </div>}
     </div>}
 
     {/* ── Row 3: quarantine breakdown + top failing rules ── */}
-    {summary && <div className="card-row">
-      {Object.keys(summary.quarantine_breakdown ?? {}).length > 0 && <div className="card">
+    {summary && (widgetVisible('quarantine') || widgetVisible('toprules')) && <div className="card-row">
+      {Object.keys(summary.quarantine_breakdown ?? {}).length > 0 && widgetVisible('quarantine') && <div className="card">
         <h3>Quarantine breakdown <span className="muted">— all runs</span></h3>
         {Object.entries(summary.quarantine_breakdown).map(([k, v]: any) => (
           <div key={k} style={{ marginBottom: 8 }}>
@@ -503,7 +521,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
         ))}
       </div>}
 
-      {(summary.top_failing_rules ?? []).length > 0 && <div className="card">
+      {(summary.top_failing_rules ?? []).length > 0 && widgetVisible('toprules') && <div className="card">
         <h3>Top failing rules <span className="muted">— across all datasets</span></h3>
         {summary.top_failing_rules.slice(0, 8).map((r: any) => (
           <div className="rule-row" key={r.rule_id}>
@@ -520,7 +538,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     </div>}
 
     {/* ── Row 3b: run quality trend (NoSQL metrics collection) ── */}
-    {runMetrics?.count > 0 && <div className="card" style={{ marginTop: 12 }}>
+    {runMetrics?.count > 0 && widgetVisible('trend') && <div className="card" style={{ marginTop: 12 }}>
       <h3>Run quality trend <span className="muted">— last {runMetrics.count} runs · avg {runMetrics.avg_score ?? '—'} · source: metrics collection</span></h3>
       {runMetrics.sparkline?.length > 1 && <div style={{ marginBottom: 10 }}><Sparkline data={runMetrics.sparkline} color="#3b82f6" /></div>}
       <table className="tbl">
@@ -542,7 +560,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     </div>}
 
     {/* ── Row 4: per-dataset processing table (REAL data) ── */}
-    {(summary?.by_dataset ?? []).length > 0 && <div className="card">
+    {(summary?.by_dataset ?? []).length > 0 && widgetVisible('datasets') && <div className="card">
       <h3>Dataset processing summary <span className="muted">— real data from all {summary.totals?.total_runs ?? 0} runs + {summary.profile_runs ?? 0} profiles</span></h3>
       <table>
         <thead><tr><th>Dataset</th><th>Runs</th><th>Total rows</th><th>Accepted</th><th>Quarantined</th><th>Acceptance %</th><th>Gate pass%</th><th>Det. fixes</th><th>AI fixes</th><th>Last run</th></tr></thead>
@@ -1551,6 +1569,12 @@ export function Settings() {
   const [metaEngine, setMetaEngine] = useState<string>('tinydb')
   const [metaMsg, setMetaMsg] = useState<string>('')
   const [metaColl, setMetaColl] = useState<{name: string; count: number; docs: any[]} | null>(null)
+  const [widgets, setWidgets] = useState<Record<string, boolean>>(loadWidgets)
+  const toggleWidget = (key: string) => setWidgets(prev => {
+    const next = { ...prev, [key]: prev[key] === false ? true : false }
+    localStorage.setItem('dq_widgets', JSON.stringify(next))
+    return next
+  })
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
@@ -1647,6 +1671,17 @@ export function Settings() {
     </div>
 
     <div className="card">
+      <div className="card">
+        <h3>Dashboard widgets <span className="muted">— show/hide dashboard cards (saved locally)</span></h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 6 }}>
+          {WIDGETS.map(w => (
+            <label key={w.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={widgets[w.key] !== false} onChange={() => toggleWidget(w.key)} />
+              {w.label}
+            </label>
+          ))}
+        </div>
+      </div>
       <h3>Metadata store <span className="badge">{meta?.backend ?? '—'}{meta?.metadata_engine ? ' / ' + meta.metadata_engine : ''}</span></h3>
       {meta && <div className="form-grid" style={{ marginBottom: 12 }}>
         <div className="kv"><span>Backend</span><b>{meta.backend}</b></div>
