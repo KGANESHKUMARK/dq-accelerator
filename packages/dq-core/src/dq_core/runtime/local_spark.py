@@ -267,6 +267,12 @@ def create_local_spark_session(settings: LocalSparkSettings | None = None) -> An
     builder = SparkSession.builder
     for key, value in conf.items():
         builder = builder.config(key, value)
+    if os.environ.get("DQ_OUTPUT_FORMAT", "").lower() == "delta":
+        try:
+            from delta import configure_spark_with_delta_pip
+            builder = configure_spark_with_delta_pip(builder)
+        except ImportError:
+            pass
     try:
         spark = builder.getOrCreate()
     finally:
