@@ -15,17 +15,25 @@ Verify: `python --version`, `java -version`, `node --version` — or just run `D
 ## Fresh machine — first run
 
 1. Install the 3 prerequisites above (one-time, ~15 min).
-2. Copy/clone the `DQ-Accelerator` folder to the machine (e.g. `D:\DQ-Accelerator`). Everything installs **inside the project folder** — no system-wide changes.
+2. `git clone <repo-url>` (or copy the folder) to e.g. `D:\DQ-Accelerator`. Everything installs **inside the project folder** — no system-wide changes.
 3. Double-click **`DQ_start.bat`**. First run takes ~10 min (venv + pip + npm); later runs ~30 s.
-4. The launcher prints `[1/6]`–`[6/6]` progress; `[MISSING]` = install that item and re-run.
-5. Browser auto-opens `http://localhost:5173`.
+4. The launcher prints `[1/6]`–`[6/6]` progress; `[MISSING]` = install that item and re-run. If the window closes instantly, the bat file may be corrupted — re-copy it (it must have **CRLF** line endings and no BOM).
+5. **Seed the metadata store** (one-time — `data/` and `registry/` are gitignored, so a fresh clone starts empty):
+   ```
+   .venv\Scripts\python.exe scripts\migrate_registry_to_nosql.py --from-config
+   ```
+   This publishes all `config/rulesets/*.yaml` and onboards all `config/pipelines/*.yaml` into the NoSQL store. Safe to re-run.
+6. Browser auto-opens `http://localhost:5173` (or open it manually).
 
 ### Verify it worked
 
 - UI loads → **Dashboard** shows KPIs (not a blank/error page)
+- UI → **Pipelines** lists the seeded pipelines (GOAT_HERD, FABRIC_ORDERS, BANK_TRANSACTIONS, …)
+- UI → **Rulesets** lists published rulesets with versions
 - `curl http://127.0.0.1:8000/api/health` → `{"status":"ok"}`
 - API docs: `http://127.0.0.1:8000/docs`
 - UI → **Settings → System status**: Spark engine OK; AI provider shows `mock` (or `dqx` if `.env` set)
+- UI → **Settings → Metadata store**: backend `nosql`, engine `tinydb`, collections populated
 
 ## Daily use
 

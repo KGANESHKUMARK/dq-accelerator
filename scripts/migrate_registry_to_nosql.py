@@ -1,10 +1,13 @@
-"""One-time migration: file registry -> NoSQL metadata store (tinydb).
+"""Seed the NoSQL metadata store.
 
-Reads every published ruleset version + pipeline entry from the file registry
-and upserts them into the document store, preserving checksums/history exactly.
-Idempotent — safe to re-run.
+Two modes, both idempotent:
 
-Usage:  .venv/Scripts/python.exe scripts/migrate_registry_to_nosql.py [--db data/metadata.nosql.json]
+* default — migrate the file registry (registry/*.json) into the store.
+* --from-config — fresh-clone seed: publish every config/rulesets/*.yaml and
+  onboard every config/pipelines/*.yaml using the engine's configured backend
+  (use this on a new machine where registry/ and data/ are gitignored).
+
+Usage:  .venv/Scripts/python.exe scripts/migrate_registry_to_nosql.py [--db ...] [--from-config]
 """
 import argparse
 import json
@@ -17,11 +20,48 @@ sys.path.insert(0, str(ROOT / "packages" / "dq-core" / "src"))
 from dq_core.metadata.store import TinyMetadataStore  # noqa: E402
 
 
+def seed_from_config() -> tuple[int, int]:
+    """Publish rulesets + onboard pipelines straight from config YAMLs."""
+    from dq_core.metadata.serialization import load_ruleset
+    from dq_core.pipelines.manifest import PipelineManifest
+    from dq_core.registries.factory import build_pipeline_registry, build_ruleset_registry
+    from dq_core.runtime.config import EngineConfig
+
+    cfg = EngineConfig.from_yaml(ROOT / "config" / "engine.yaml")
+    rs_reg = build_ruleset_registry(cfg.registry)
+    pp_reg = build_pipeline_registry(cfg.registry)
+    n_rs = n_pp = 0
+    rdir = ROOT / "config" / "rulesets"
+    if rs_reg is not None and rdir.exists():
+        for p in sorted(rdir.glob("*.yaml")):
+            try:
+                rs_reg.publish(load_ruleset(p), published_by="seed", activate=True)
+                n_rs += 1
+            except Exception as exc:
+                print(f"  skip ruleset {p.name}: {exc}")
+    mdir = ROOT / "config" / "pipelines"
+    if pp_reg is not None and mdir.exists():
+        for p in sorted(mdir.glob("*.yaml")):
+            try:
+                pp_reg.onboard(PipelineManifest.load(p), actor="seed")
+                n_pp += 1
+            except Exception as exc:
+                print(f"  skip manifest {p.name}: {exc}")
+    return n_rs, n_pp
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default=str(ROOT / "data" / "metadata.nosql.json"))
     ap.add_argument("--registry", default=str(ROOT / "registry"))
+    ap.add_argument("--from-config", action="store_true",
+                    help="fresh-clone seed: publish/onboard everything under config/")
     args = ap.parse_args()
+
+    seeded_rs = seeded_pp = 0
+    if args.from_config:
+        seeded_rs, seeded_pp = seed_from_config()
+        print(f"seeded from config: {seeded_rs} rulesets published, {seeded_pp} pipelines onboarded")
 
     store = TinyMetadataStore.open(args.db)
     reg = Path(args.registry)
