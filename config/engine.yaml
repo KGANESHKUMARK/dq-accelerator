@@ -69,8 +69,9 @@ engine:
   outputs:
     base_path: ../data
     reports_path: ../reports
-    format: parquet
+    format: parquet          # parquet | delta  (delta = ACID tables + _delta_log, queryable as catalog.schema.table)
     write_mode: overwrite
+    # catalog: dq           # optional namespace: <base>/dq/bronze/<dataset>  ==  dq.bronze.<dataset>
 
   # Local Spark runtime tuning (used by UI backend + CLI local harness).
   # On Databricks/Fabric/EMR these are ignored — the cluster provides Spark.

@@ -83,8 +83,10 @@ class AISettings:
 class OutputSettings:
     base_path: str | None = None
     reports_path: str | None = None
-    format: str = "parquet"
+    format: str = "parquet"          # parquet | delta
     write_mode: str = "overwrite"
+    catalog: str = ""                # optional namespace level: <base>/<catalog>/<layer>/<dataset>
+                                      # mirrors catalog.schema.table (catalog.dq, schema=layer, table=dataset)
 
 
 @dataclass

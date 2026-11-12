@@ -16,12 +16,23 @@ from dq_core.runtime.utils import is_uri, join_path, to_jsonable
 
 @dataclass(frozen=True)
 class StoragePaths:
-    """Medallion layout under a configurable base path (local folder, Volume or cloud URI)."""
+    """Medallion layout under a configurable base path (local folder, Volume or cloud URI).
+
+    With ``catalog`` set, paths gain a namespace level so they mirror
+    ``catalog.schema.table`` naming (catalog → schema=layer → table=dataset),
+    e.g. catalog="dq" gives ``<base>/dq/bronze/<dataset>`` which maps to
+    ``dq.bronze.<dataset>`` on Unity- catalog-style deployments.
+    """
 
     base_path: str
+    catalog: str = ""
 
     def layer(self, name: str, *parts: str) -> str:
-        return join_path(self.base_path, name, *parts)
+        segs = [self.base_path]
+        if self.catalog:
+            segs.append(self.catalog)
+        segs += [name, *parts]
+        return join_path(*segs)
 
     def bronze(self, dataset: str) -> str:
         return self.layer("bronze", dataset)

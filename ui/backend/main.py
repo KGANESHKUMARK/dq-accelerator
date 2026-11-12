@@ -528,8 +528,9 @@ def _do_pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, Any]:
     pipe_run_id = f"{pid}-{int(t0)}"
     platform = getattr(mf.platform, "value", mf.platform) if mf.platform else "LOCAL"
 
-    paths = StoragePaths(str(_output_base()))
-    sink = StorageSink()
+    _out = engine.config.outputs
+    paths = StoragePaths(str(_output_base()), catalog=getattr(_out, "catalog", "") or "")
+    sink = StorageSink(fmt=getattr(_out, "format", "parquet") or "parquet")
     silver_ruleset = ds.rulesets.get("SILVER")
     if not silver_ruleset:
         raise HTTPException(400, f"{pid}/{ds.dataset_id} has no SILVER ruleset")

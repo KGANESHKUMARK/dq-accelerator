@@ -15,7 +15,7 @@ dependencies = ["PyYAML>=6.0,<7", "click>=8.1,<9", "tinydb>=4.8,<5"]
 
 [project.optional-dependencies]
 # PySpark is PROVIDED by Databricks / Dataproc / Fabric runtimes - only install it for local use.
-spark = ["pyspark>=3.5,<5"]
+spark = ["pyspark>=3.5,<5", "delta-spark>=4.0,<5"]
 
 [project.scripts]
 dqctl = "dq_core.cli.main:main"
