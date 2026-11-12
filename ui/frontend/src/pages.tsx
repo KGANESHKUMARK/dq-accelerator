@@ -136,21 +136,33 @@ const Sparkline = ({ data, color = '#3b82f6' }: { data: number[]; color?: string
 }
 
 /* ---- Profile / anomaly views ---- */
-const AnomalyCard = ({ a }: { a: any }) => (
-  <div className="anomaly-card">
-    <span className="tag">{a.type}</span>
-    <div style={{ flex: 1 }}>
-      <b style={{ color: 'var(--info)' }}>{a.column}</b>
-      <span className="muted" style={{ marginLeft: 8 }}>{a.detail}</span>
+const SEV_STYLE: Record<string, { border: string; bg: string; fg: string }> = {
+  ERROR: { border: 'var(--danger)', bg: 'rgba(239,68,68,.12)', fg: 'var(--danger)' },
+  WARNING: { border: '#d97706', bg: 'rgba(217,119,6,.12)', fg: '#d97706' },
+  INFO: { border: 'var(--info)', bg: 'rgba(59,130,246,.10)', fg: 'var(--info)' },
+}
+const AnomalyCard = ({ a }: { a: any }) => {
+  const sev = SEV_STYLE[(a.severity || 'WARNING').toUpperCase()] || SEV_STYLE.WARNING
+  return (
+    <div className="anomaly-card" style={{ borderLeft: `3px solid ${sev.border}`, background: sev.bg }}>
+      <span className="tag">{a.type}</span>
+      <span style={{ fontSize: 10, fontWeight: 700, color: sev.fg, textTransform: 'uppercase' }}>{a.severity || 'WARNING'}</span>
+      <div style={{ flex: 1 }}>
+        <b style={{ color: 'var(--info)' }}>{a.column}</b>
+        <span className="muted" style={{ marginLeft: 8 }}>{a.detail}</span>
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
-const ColCard = ({ c }: { c: any }) => (
+const ColCard = ({ c, rowCount }: { c: any; rowCount?: number }) => {
+  const distinctPct = rowCount && c.non_null_count ? (100 * c.distinct_count / c.non_null_count) : null
+  return (
   <div className="colcard">
     <h4>{c.name}</h4>
     <div className="kv"><span>type</span><b>{c.data_type}{c.inferred_type !== c.data_type ? ` → ${c.inferred_type}` : ''}</b></div>
     <div className="kv"><span>distinct / unique</span><b>{c.distinct_count} / {c.unique_count ?? '-'}</b></div>
+    {distinctPct != null && <div style={{ marginTop: 4 }}><span className="muted">distinct ratio</span><Bar pct={distinctPct} color={distinctPct >= 90 ? '#22c55e' : distinctPct >= 50 ? '#f59e0b' : '#3b82f6'} /></div>}
     {c.mean != null && <div className="kv"><span>mean ± σ</span><b>{c.mean.toFixed(2)} ± {c.stddev?.toFixed(2)}</b></div>}
     {c.min != null && <div className="kv"><span>min – max</span><b>{String(c.min).slice(0, 14)} – {String(c.max).slice(0, 14)}</b></div>}
     {c.date_min && <div className="kv"><span>dates</span><b>{c.date_min} → {c.date_max}</b></div>}
@@ -159,7 +171,8 @@ const ColCard = ({ c }: { c: any }) => (
     <div style={{ marginTop: 6 }}><span className="muted">null rate</span><Bar pct={c.null_percentage} /></div>
     {c.top_values?.length ? <div className="muted" style={{ marginTop: 6 }}>top: {c.top_values.slice(0, 3).map((v: any) => `${v.value ?? v[0]} (${v.count ?? v[1]})`).join(', ')}</div> : null}
   </div>
-)
+  )
+}
 
 const ProfileView = ({ r, jid }: { r: any; jid?: string }) => (
   <div className="card">
@@ -169,7 +182,7 @@ const ProfileView = ({ r, jid }: { r: any; jid?: string }) => (
       <h4>Anomalies ({(r.anomalies?.length || 0) + (r.schema_anomalies?.length || 0)})</h4>
       {[...(r.anomalies || []), ...(r.schema_anomalies || [])].map((a: any, i: number) => <AnomalyCard a={a} key={i} />)}
     </>}
-    <div className="colgrid">{(r.columns || []).map((c: any) => <ColCard c={c} key={c.name} />)}</div>
+    <div className="colgrid">{(r.columns || []).map((c: any) => <ColCard c={c} rowCount={r.row_count} key={c.name} />)}</div>
   </div>
 )
 
@@ -329,6 +342,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
   const [anomStats, setAnoStats] = useState<any>({})
   const [viewJob, setViewJob] = useState<Job | null>(null)
   const [trends, setTrends] = useState<Record<string, any[]>>({})
+  const [runMetrics, setRunMetrics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   const load = () => {
@@ -336,6 +350,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     api.pipelines().then(setPipes)
     api.jobs().then(setJobs)
     api.anomalyStats().then(setAnoStats).catch(() => {})
+    api.metricsRecent(30).then(setRunMetrics).catch(() => {})
   }
   useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t) }, [])
   useEffect(() => {
@@ -428,6 +443,28 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
           </div>
         ))}
       </div>}
+    </div>}
+
+    {/* ── Row 3b: run quality trend (NoSQL metrics collection) ── */}
+    {runMetrics?.count > 0 && <div className="card" style={{ marginTop: 12 }}>
+      <h3>Run quality trend <span className="muted">— last {runMetrics.count} runs · avg {runMetrics.avg_score ?? '—'} · source: metrics collection</span></h3>
+      {runMetrics.sparkline?.length > 1 && <div style={{ marginBottom: 10 }}><Sparkline data={runMetrics.sparkline} color="#3b82f6" /></div>}
+      <table className="tbl">
+        <thead><tr><th>When</th><th>Pipeline</th><th>Dataset</th><th>Stage</th><th>Score</th><th>Gate</th><th>In → Acc/Quar</th></tr></thead>
+        <tbody>
+          {(runMetrics.runs || []).slice(0, 8).map((m: any, i: number) => (
+            <tr key={i}>
+              <td className="muted" style={{ fontSize: 11 }}>{String(m.recorded_at || m.finished_at || '').slice(0, 19).replace('T', ' ')}</td>
+              <td>{m.pipeline_id ?? '—'}</td>
+              <td>{m.dataset ?? '—'}</td>
+              <td><span className="tag">{m.stage ?? '—'}</span></td>
+              <td><b className={m.quality_score >= 90 ? 'ok' : m.quality_score >= 70 ? 'warn' : 'err'}>{m.quality_score != null ? m.quality_score : '—'}</b></td>
+              <td><span className={`badge ${m.gate_passed ? 'COMPLETED' : 'FAILED'}`}>{m.gate_passed ? 'PASS' : 'FAIL'}</span></td>
+              <td className="muted" style={{ fontSize: 11 }}>{m.input_records?.toLocaleString() ?? '—'} → {(m.accepted_records ?? 0).toLocaleString()}/{(m.quarantined_records ?? 0).toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>}
 
     {/* ── Row 4: per-dataset processing table (REAL data) ── */}

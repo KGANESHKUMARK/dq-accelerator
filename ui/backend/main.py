@@ -777,6 +777,34 @@ def metadata_collection(name: str, limit: int = 50) -> dict[str, Any]:
     return {"collection": name, "count": coll.count(), "docs": coll.find()[:limit]}
 
 
+@app.get("/api/metrics/recent")
+def metrics_recent(limit: int = 30, dataset: str | None = None) -> dict[str, Any]:
+    """Recent DQ run metrics for trend views — NoSQL metrics collection, JSONL fallback."""
+    engine = _meta_engine()
+    store = getattr(getattr(engine, "ruleset_registry", None), "store", None)
+    docs: list[dict[str, Any]] = []
+    if store is not None and hasattr(store, "collection"):
+        try:
+            docs = store.collection("metrics").find()
+        except Exception:
+            docs = []
+    if not docs:  # JSONL fallback for file/sqlite backends
+        import json as _json
+        p = _output_base() / "metrics.jsonl"
+        if p.exists():
+            for line in p.read_text(encoding="utf-8").splitlines()[-limit * 3:]:
+                try:
+                    docs.append(_json.loads(line))
+                except Exception:
+                    continue
+    docs = [d for d in docs if not dataset or d.get("dataset") == dataset]
+    docs.sort(key=lambda d: str(d.get("recorded_at") or d.get("finished_at") or ""), reverse=True)
+    docs = docs[:limit]
+    scores = [float(d["quality_score"]) for d in reversed(docs) if d.get("quality_score") is not None]
+    return {"count": len(docs), "runs": docs,
+            "sparkline": scores[-30:], "avg_score": round(sum(scores) / len(scores), 2) if scores else None}
+
+
 class MetadataSwitchIn(BaseModel):
     backend: str                     # file | sqlite | nosql
     engine: str | None = None        # tinydb | mongodb | dynamodb (nosql only)
