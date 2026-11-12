@@ -64,7 +64,7 @@ scratch all live under `.venv\` and `.tmp\` **inside this folder on D:**.
 
 ## 3. Setup (one time, ~10–15 min)
 
-**Easiest: double-click `DQ_start.bat`** — it checks Python 3.12 / JDK 21 /
+**Easiest: double-click `DQ_start.bat`** — it checks Python 3.12 / JDK 17+ /
 Node 18+ (prints install URLs if missing), creates `.venv`, installs
 `requirements.txt`, optionally installs `requirements-llm.txt` when
 `DATABRICKS_TOKEN` is set, builds the frontend, and launches backend + frontend.

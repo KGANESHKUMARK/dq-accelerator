@@ -46,18 +46,18 @@ if not defined PYVER (
 )
 
 rem ---------------------------------------------------------------- 2. JAVA
-echo [2/6] Checking Java JDK 21+ ...
+echo [2/6] Checking Java JDK 17+ ...
 set "JAVAOK="
 for /f "tokens=3" %%v in ('java -version 2^>^&1 ^| findstr /i "version"') do set "JVER=%%~v"
 if not defined JVER (
     echo      [MISSING] Java not found
-    echo      Install JDK 21: https://learn.microsoft.com/en-us/java/openjdk/download
+    echo      Install JDK 17 or 21: https://learn.microsoft.com/en-us/java/openjdk/download
     set "MISSING=1"
 ) else (
     set "JVER=%JVER:"=%"
-    for /f "tokens=1 delims=." %%a in ("%JVER%") do if %%a GEQ 21 set "JAVAOK=1"
+    for /f "tokens=1 delims=." %%a in ("%JVER%") do if %%a GEQ 17 set "JAVAOK=1"
     if defined JAVAOK (echo      [OK] Java %JVER%) else (
-        echo      [WARN] Java %JVER% - need 21+. Install: https://learn.microsoft.com/en-us/java/openjdk/download
+        echo      [WARN] Java %JVER% - need 17+. Install: https://learn.microsoft.com/en-us/java/openjdk/download
         set "MISSING=1"
     )
 )
