@@ -1473,6 +1473,47 @@ def reject_correction(body: ApprovalAction) -> dict[str, Any]:
             "original_value": body.original_value}
 
 
+# ------------------------------------------------------------------ stage data preview
+_STAGE_DIRS = {"bronze": "bronze", "silver": "silver", "gold": "gold"}
+
+
+@app.get("/api/data/available")
+def data_available() -> dict[str, Any]:
+    """List datasets available per medallion stage (dirs under data/)."""
+    out: dict[str, list[str]] = {}
+    for stage in _STAGE_DIRS:
+        d = ROOT / "data" / stage
+        out[stage] = sorted(p.name for p in d.iterdir() if p.is_dir()) if d.exists() else []
+    q = ROOT / "data" / "quarantine"
+    out["quarantine"] = sorted(p.name for p in q.iterdir() if p.is_dir()) if q.exists() else []
+    return out
+
+
+@app.get("/api/data/preview")
+def data_preview(dataset: str, stage: str = "silver", limit: int = 50) -> dict[str, Any]:
+    """Preview actual output rows — reads the stage parquet dir via Spark."""
+    stage = stage.lower()
+    if stage == "quarantine":
+        # quarantine layout: data/quarantine/<substage>/<dataset>
+        base = ROOT / "data" / "quarantine"
+        hits = [p for p in base.glob(f"*/{dataset}") if p.is_dir()]
+        if not hits:
+            raise HTTPException(404, f"no quarantine data for {dataset}")
+        path = hits[0]
+    else:
+        if stage not in _STAGE_DIRS:
+            raise HTTPException(400, f"stage must be one of {list(_STAGE_DIRS)}|quarantine")
+        path = (ROOT / "data" / _STAGE_DIRS[stage] / dataset).resolve()
+        if not str(path).startswith(str(ROOT.resolve())) or not path.exists():
+            raise HTTPException(404, f"no {stage} data for {dataset}")
+    spark = J.get_spark()
+    df = spark.read.parquet(str(path))
+    rows = [r.asDict(recursive=True) for r in df.limit(min(limit, 200)).collect()]
+    cols = df.columns
+    return {"dataset": dataset, "stage": stage, "columns": cols,
+            "rows": rows, "shown": len(rows)}
+
+
 # ------------------------------------------------------------------ onboarding wizard
 @app.post("/api/onboard/upload")
 async def onboard_upload(file: UploadFile = File(...)) -> dict[str, Any]:
@@ -1527,6 +1568,19 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     df = _read_any_source(spark, body.source, body.source_format)
     _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
     rep = engine.profile(df, ds, mode=mode)
+    # drift vs last stored baseline profile (profiles collection — written at finalize)
+    try:
+        from dq_core.metadata import resolver as _res
+        from dq_core.profiling.drift import detect_drift
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            docs = store.collection("profiles").find({"dataset": ds})
+            if docs:
+                base_cols = ((docs[-1].get("profile") or {}).get("columns")) or {}
+                for f in detect_drift(rep.columns, base_cols):
+                    rep.anomalies.append(f.to_anomaly())
+    except Exception:
+        pass
     _prog("phase=profile | generating candidate rules from profile")
     ruleset_id = f"{ds}_{body.stage.lower()}"
     candidates = CandidateRuleGenerator().generate(rep, ruleset_id=ruleset_id,

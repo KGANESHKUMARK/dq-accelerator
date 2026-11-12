@@ -49,5 +49,7 @@ export const api = {
   metadataCollection: (name: string, limit = 50) => fetch(`${B}/metadata/collection/${name}?limit=${limit}`).then(j),
   metadataSwitch: (body: any) => fetch(`${B}/metadata/switch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   metricsRecent: (limit = 30, dataset?: string) => fetch(`${B}/metrics/recent?limit=${limit}${dataset ? `&dataset=${encodeURIComponent(dataset)}` : ''}`).then(j),
+  dataAvailable: () => fetch(`${B}/data/available`).then(j),
+  dataPreview: (dataset: string, stage: string, limit = 50) => fetch(`${B}/data/preview?dataset=${encodeURIComponent(dataset)}&stage=${stage}&limit=${limit}`).then(j),
 }
 export type Job = { job_id: string; kind: string; status: string; progress?: string; result?: any; error?: string; submitted_at: string; started_at?: string; finished_at?: string }

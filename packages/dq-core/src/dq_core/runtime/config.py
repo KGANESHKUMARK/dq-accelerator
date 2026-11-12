@@ -106,6 +106,7 @@ class AlertSettings:
     fail_pipeline: bool = False               # raise QualityGateFailedError on gate fail
     timeout_seconds: int = 10
     min_quarantine_rate: float = 1.0          # quarantine_threshold event fires at/above this
+    webhook_format: str = "generic"           # generic | slack | teams — payload shape for the endpoint
 
 
 @dataclass

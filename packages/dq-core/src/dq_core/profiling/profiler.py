@@ -297,6 +297,16 @@ class DataProfiler:
                 if rare and max(counts) >= 3:
                     add(c, "RARE_CATEGORY_VALUES", f"rare values (possible typos): {rare}")
 
+        # PII / sensitive-entity detection (name + sampled-value signals)
+        try:
+            from dq_core.pii import detect_pii
+            for col, f in detect_pii(profiles).items():
+                sev = "WARNING" if f.confidence >= 0.8 else "INFO"
+                cat = f" → sensitive category '{f.category}'" if f.category else ""
+                add(col, "PII_SUSPECTED", f"{f.entity_type} detected ({f.evidence}){cat}", sev)
+        except Exception:  # noqa: BLE001 — PII scan must never break profiling
+            pass
+
         schema_anomalies: list[dict[str, Any]] = []
         seen: dict[str, str] = {}
         for c in columns:

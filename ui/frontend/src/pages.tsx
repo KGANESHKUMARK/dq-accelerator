@@ -1474,8 +1474,12 @@ export function RuleSets() {
    ============================================================ */
 export function Reports() {
   const [reps, setReps] = useState<any[]>([]); const [sel, setSel] = useState<any>(null); const [selName, setSelName] = useState('')
-  useEffect(() => { api.reports().then(setReps) }, [])
+  const [avail, setAvail] = useState<any>(null); const [dpStage, setDpStage] = useState('silver')
+  const [dpDs, setDpDs] = useState(''); const [dp, setDp] = useState<any>(null); const [dpBusy, setDpBusy] = useState(false)
+  useEffect(() => { api.reports().then(setReps); api.dataAvailable().then(setAvail).catch(() => {}) }, [])
   const open = async (name: string) => { const d = await api.report(name); setSel(d); setSelName(name) }
+  const loadPreview = async () => { setDpBusy(true); try { setDp(await api.dataPreview(dpDs, dpStage)) } catch (e: any) { setDp({ error: e.message }) } finally { setDpBusy(false) } }
+  const stageDs = (avail?.[dpStage] ?? []) as string[]
 
   const scoreFor = (r: any) => {
     const m = r.execution_metrics
@@ -1500,6 +1504,36 @@ export function Reports() {
           ))}
         </tbody>
       </table>
+    </div>
+
+    {/* ── Stage data preview — actual output rows ── */}
+    <div className="card">
+      <h3>Stage data preview <span className="muted">— actual Bronze / Silver / Gold / Quarantine rows</span></h3>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+        <select value={dpStage} onChange={e => { setDpStage(e.target.value); setDpDs(''); setDp(null) }}>
+          {['bronze', 'silver', 'gold', 'quarantine'].map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+        </select>
+        <select value={dpDs} onChange={e => { setDpDs(e.target.value); setDp(null) }} style={{ minWidth: 200 }}>
+          <option value="">— dataset —</option>
+          {stageDs.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <button className="btn sm" disabled={!dpDs || dpBusy} onClick={loadPreview}>{dpBusy ? 'Loading…' : 'Preview rows'}</button>
+        {dp && !dp.error && <span className="muted" style={{ fontSize: 11 }}>{dp.shown} rows shown{dp.columns ? ` · ${dp.columns.length} cols` : ''}</span>}
+      </div>
+      {dp?.error && <div className="warn-box">{dp.error}</div>}
+      {dp && !dp.error && dp.rows?.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table>
+            <thead><tr>{dp.columns.map((c: string) => <th key={c}>{c}</th>)}</tr></thead>
+            <tbody>
+              {dp.rows.map((r: any, i: number) => (
+                <tr key={i}>{dp.columns.map((c: string) => <td key={c} className="muted" style={{ fontSize: 11, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r[c] ?? '∅')}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {dp && !dp.error && dp.rows?.length === 0 && <div className="empty-state"><p>No rows in this stage for {dpDs}.</p></div>}
     </div>
 
     {sel && (() => {
