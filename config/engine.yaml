@@ -49,7 +49,7 @@ engine:
 
   # DQ Assistant chatbot — toggle from Settings page (edited in place, comments preserved)
   assistant:
-    enabled: true
+    enabled: false
     log_path: ../logs/assistant/chat_log.jsonl   # one JSON per conversation turn
 
   outputs:

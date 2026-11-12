@@ -46,9 +46,18 @@ class ValidationSettings:
 
 
 @dataclass
+class MetadataSettings:
+    engine: str = "tinydb"                   # tinydb (embedded, default) | mongodb
+    db_path: str | None = None               # tinydb JSON file when engine=tinydb
+    uri: str | None = None                   # mongodb://... when engine=mongodb
+    db_name: str = "dq_metadata"
+
+
+@dataclass
 class RegistrySettings:
-    backend: str = "file"                      # "file" (default) or "sqlite"
+    backend: str = "file"                      # "file" (default), "sqlite" or "nosql"
     db_path: str | None = None                 # sqlite file when backend="sqlite"
+    metadata: MetadataSettings = field(default_factory=MetadataSettings)
     rulesets_path: str | None = None
     pipelines_path: str | None = None
     enforce_published_immutability: bool = True
@@ -118,6 +127,9 @@ class EngineConfig:
             registry = dict(data.get("registry") or {})
             for key in ("rulesets_path", "pipelines_path", "db_path"):
                 registry[key] = resolve_path(registry.get(key), base_dir)
+            meta = dict(registry.get("metadata") or {})
+            meta["db_path"] = resolve_path(meta.get("db_path"), base_dir)
+            registry["metadata"] = meta
             ai = dict(data.get("ai") or {})
             ai["mock_responses_path"] = resolve_path(ai.get("mock_responses_path"), base_dir)
             outputs = dict(data.get("outputs") or {})
