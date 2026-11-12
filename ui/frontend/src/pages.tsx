@@ -145,12 +145,63 @@ const WIDGETS = [
   { key: 'toprules', label: 'Top failing rules' },
   { key: 'trend', label: 'Run quality trend (metrics)' },
   { key: 'datasets', label: 'Per-dataset processing table' },
+  { key: 'registry', label: 'Pipeline registry cards' },
+  { key: 'recent_runs', label: 'Recent DQ runs table' },
+  { key: 'jobqueue', label: 'Job queue table' },
 ]
 const widgetVisible = (key: string): boolean => {
   try { const w = JSON.parse(localStorage.getItem('dq_widgets') || '{}'); return w[key] !== false } catch { return true }
 }
 const loadWidgets = (): Record<string, boolean> => {
   try { return JSON.parse(localStorage.getItem('dq_widgets') || '{}') } catch { return {} }
+}
+
+/* ---- Sidebar nav visibility (Settings → localStorage) ---- */
+const NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard' }, { key: 'pipelines', label: 'Pipelines' },
+  { key: 'onboard', label: 'Onboard' }, { key: 'rundq', label: 'Run DQ' },
+  { key: 'anomalies', label: 'Anomalies' }, { key: 'approvals', label: 'Approvals' },
+  { key: 'rulesets', label: 'Rule Sets' }, { key: 'reports', label: 'Reports' },
+]
+const loadNav = (): Record<string, boolean> => {
+  try { return JSON.parse(localStorage.getItem('dq_nav') || '{}') } catch { return {} }
+}
+
+/* ---- First-visit welcome card ---- */
+const WelcomeCard = () => {
+  const [show, setShow] = useState(() => !localStorage.getItem('dq_welcome_dismissed'))
+  if (!show) return null
+  const go = (p: string) => window.dispatchEvent(new CustomEvent('dq:navigate', { detail: p }))
+  const dismiss = () => { localStorage.setItem('dq_welcome_dismissed', '1'); setShow(false) }
+  const steps = [
+    { t: '1 · Onboard a pipeline', d: 'Upload a file or point at a table — the profiler discovers rules automatically', p: 'onboard' },
+    { t: '2 · Review candidate rules', d: 'Approve or reject generated rules — nothing executes unreviewed', p: 'onboard' },
+    { t: '3 · Run DQ', d: 'Execute Bronze → Silver → Gold against the published ruleset', p: 'rundq' },
+    { t: '4 · Watch quality', d: 'Dashboard journey, reports, quarantine inbox, metrics trend', p: 'dashboard' },
+  ]
+  return (
+    <div className="card" style={{ borderLeft: '3px solid var(--info)', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div>
+          <h3>Welcome to DQ Accelerator</h3>
+          <p className="muted" style={{ fontSize: 12, margin: '4px 0 10px', maxWidth: 720 }}>
+            A governance layer for Apache Spark pipelines — it profiles your data, generates quality rules,
+            applies deterministic + AI remediation, quarantines low-confidence records, and keeps a full audit trail.
+            Runs on Databricks, Fabric, EMR, Dataproc, or local Spark — same engine everywhere.
+          </p>
+        </div>
+        <button className="btn sm sec" onClick={dismiss}>Don&apos;t show again</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
+        {steps.map(s => (
+          <div key={s.t} className="card" style={{ cursor: 'pointer', margin: 0 }} onClick={() => go(s.p)}>
+            <b style={{ fontSize: 12 }}>{s.t}</b>
+            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>{s.d}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 /* ---- Profile / anomaly views ---- */
@@ -456,6 +507,8 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     <div className="section-title">Data Quality Command Centre</div>
     {loading && <div className="info-box">Loading real metrics from {'{'}reports/{'}'}… <span className="spin" /></div>}
 
+    <WelcomeCard />
+
     {/* ── Row 1: headline KPIs ── */}
     {widgetVisible('kpis') && <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
       <div className="stat-tile"><div className={`num ${scoreClass}`}>{scoreVal != null ? scoreVal + '%' : '—'}</div><div className="lbl">Acceptance rate</div></div>
@@ -591,7 +644,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     </div>}
 
     {/* ── Row 5: pipeline status grid with real sparklines ── */}
-    <div className="card">
+    {widgetVisible('registry') && <div className="card">
       <h3>Pipeline registry</h3>
       {pipes.length === 0 && <div className="empty-state"><div className="icon">⬡</div><p>No pipelines yet — use Onboard to add one.</p></div>}
       <div className="pipe-grid">
@@ -629,10 +682,10 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
           )
         })}
       </div>
-    </div>
+    </div>}
 
     {/* ── Row 6: run timeline ── */}
-    {(summary?.timeline ?? []).length > 0 && <div className="card">
+    {(summary?.timeline ?? []).length > 0 && widgetVisible('recent_runs') && <div className="card">
       <h3>Recent DQ runs <span className="muted">— from reports on disk (real execution data)</span></h3>
       <table>
         <thead><tr><th>Run ID</th><th>Dataset</th><th>Mode</th><th>Input</th><th>Accepted</th><th>Quarantined</th><th>Pass rate</th><th>Gate</th><th>Det.fix</th><th>AI fix</th><th>Duration</th><th>Finished</th></tr></thead>
@@ -663,7 +716,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     </div>}
 
     {/* ── Recent jobs (for running/queued status) ── */}
-    <div className="card">
+    {widgetVisible('jobqueue') && <div className="card">
       <h3>Job queue</h3>
       <table>
         <thead><tr><th>Job</th><th>Type</th><th>Status</th><th>Finished</th><th>Progress</th><th></th></tr></thead>
@@ -680,7 +733,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
           ))}
         </tbody>
       </table>
-    </div>
+    </div>}
 
     {viewJob && <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1575,6 +1628,12 @@ export function Settings() {
     localStorage.setItem('dq_widgets', JSON.stringify(next))
     return next
   })
+  const [nav, setNav] = useState<Record<string, boolean>>(loadNav)
+  const toggleNav = (key: string) => setNav(prev => {
+    const next = { ...prev, [key]: prev[key] === false ? true : false }
+    localStorage.setItem('dq_nav', JSON.stringify(next))
+    return next
+  })
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
@@ -1681,6 +1740,18 @@ export function Settings() {
             </label>
           ))}
         </div>
+      </div>
+      <div className="card">
+        <h3>Sidebar tabs <span className="muted">— show/hide left-nav pages (saved locally)</span></h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
+          {NAV_ITEMS.map(n => (
+            <label key={n.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={nav[n.key] !== false} onChange={() => toggleNav(n.key)} />
+              {n.label}
+            </label>
+          ))}
+        </div>
+        <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>Settings stays visible so you can always re-enable tabs.</div>
       </div>
       <h3>Metadata store <span className="badge">{meta?.backend ?? '—'}{meta?.metadata_engine ? ' / ' + meta.metadata_engine : ''}</span></h3>
       {meta && <div className="form-grid" style={{ marginBottom: 12 }}>

@@ -26,12 +26,22 @@ const PAGES: Page[] = [
   { id: 'settings',   label: 'Settings',        icon: '⚙', section: 'SYSTEM',     component: Settings },
 ]
 
+const navVisible = (id: string): boolean => {
+  try { const n = JSON.parse(localStorage.getItem('dq_nav') || '{}'); return n[id] !== false } catch { return true }
+}
+
 export default function App() {
   const [pageId, setPageId] = useState('dashboard')
   const [pipeFocus, setPipeFocus] = useState<string | null>(null)
   const openPipeline = (id: string) => { setPipeFocus(id); setPageId('pipelines') }
   const [health, setHealth] = useState<string>('')
   const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    const go = (e: Event) => setPageId((e as CustomEvent).detail)
+    window.addEventListener('dq:navigate', go)
+    return () => window.removeEventListener('dq:navigate', go)
+  }, [])
 
   useEffect(() => {
     api.health().then(h => setHealth(h.status)).catch(() => setHealth('offline'))
@@ -54,7 +64,7 @@ export default function App() {
           <span>Data Quality Platform</span>
         </div>
         <nav className="sidebar-nav">
-          {PAGES.map(p => (
+          {PAGES.filter(p => p.id === 'settings' || navVisible(p.id)).map(p => (
             <React.Fragment key={p.id}>
               {p.section && <div className="nav-section">{p.section}</div>}
               <div

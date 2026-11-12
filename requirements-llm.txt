@@ -20,7 +20,7 @@ databricks-ai-bridge==0.22.0
 databricks-ai-search==0.83
 databricks-langchain==0.8.2
 databricks-vectorsearch==0.82
-databricks-labs-blueprint==0.13.0
+databricks-labs-blueprint==0.12.0  # dqx 0.16.x caps blueprint <=0.12 (was 0.13.0)
 mlflow==3.18.0
 mlflow-skinny==3.18.0
 mlflow-tracing==3.18.0
