@@ -853,6 +853,7 @@ export function Onboard() {
   const [step, setStep] = useState(0)
   const [datasets, setDatasets] = useState<any[]>([])
   const [source, setSource] = useState(''); const [dataset, setDataset] = useState('')
+  const [sourceFormat, setSourceFormat] = useState('AUTO')
   const [pipelineId, setPipelineId] = useState(''); const [platform, setPlatform] = useState('DATABRICKS')
   const [stage, setStage] = useState('SILVER'); const [dqMode, setDqMode] = useState('OBSERVE_ONLY')
   const [policy, setPolicy] = useState('../policies/default.yaml'); const [owner, setOwner] = useState('')
@@ -866,9 +867,9 @@ export function Onboard() {
   useEffect(() => { api.datasets().then(setDatasets) }, [])
   useEffect(() => { if (preview?.candidates) setApproved(new Set(preview.candidates.map((c: any) => c.rule_id))) }, [job?.status])
 
-  const pickDs = (path: string, name: string) => { setSource(path); setDataset(name); if (!pipelineId) setPipelineId(`${name.toUpperCase()}_PIPELINE`) }
+  const pickDs = (path: string, name: string) => { setSource(path); setDataset(name); setSourceFormat('AUTO'); if (!pipelineId) setPipelineId(`${name.toUpperCase()}_PIPELINE`) }
   const upload = async (f: File) => { setErr(''); try { const r = await api.upload(f); pickDs(r.path, r.filename.replace(/\.[^.]+$/, '').toLowerCase()) } catch (e: any) { setErr(e.message) } }
-  const runPreview = async () => { setErr(''); setResult(null); try { setJobId((await api.onboardPreview({ source, dataset, stage })).job_id); setStep(2) } catch (e: any) { setErr(e.message) } }
+  const runPreview = async () => { setErr(''); setResult(null); try { setJobId((await api.onboardPreview({ source, dataset, stage, source_format: sourceFormat })).job_id); setStep(2) } catch (e: any) { setErr(e.message) } }
   const [finishing, setFinishing] = useState(false)
   const previewBusy = !!job && (job.status === 'RUNNING' || job.status === 'QUEUED')
   const finalize = async () => {
@@ -910,7 +911,21 @@ export function Onboard() {
       </div>
       <div className="field"><label>Upload CSV / Parquet (any size)</label>
         <input type="file" accept=".csv,.parquet" onChange={e => e.target.files?.[0] && upload(e.target.files[0])} /></div>
-      {source && <div className="success-box">Source: <code>{source}</code></div>}
+      <div className="field"><label>…or connect a table / URI source</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <select value={sourceFormat} onChange={e => setSourceFormat(e.target.value)} style={{ minWidth: 190 }}>
+            <option value="AUTO">File (CSV / Parquet)</option>
+            <option value="TABLE">Table — catalog.schema.table</option>
+            <option value="DELTA">Delta path / URI</option>
+            <option value="JSON">JSON path / URI</option>
+          </select>
+          {sourceFormat !== 'AUTO' &&
+            <input style={{ flex: 1 }} placeholder={sourceFormat === 'TABLE' ? 'catalog.schema.table' : 'path or URI (dbfs:/, abfss://, /Volumes/…)'}
+              onChange={e => { setSource(e.target.value); const tail = e.target.value.split(/[/.]/).filter(Boolean).pop() || ''; if (!dataset && tail) setDataset(tail.toLowerCase()) }} />}
+        </div>
+        {sourceFormat !== 'AUTO' && <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Runs spark.read.{sourceFormat === 'TABLE' ? 'table' : 'format'} — works on Databricks, Fabric, EMR, Dataproc</div>}
+      </div>
+      {source && <div className="success-box">Source: <code>{source}</code>{sourceFormat !== 'AUTO' ? ` [${sourceFormat}]` : ''}</div>}
       <div className="btn-row"><button className="btn" disabled={!source} onClick={() => setStep(1)}>Next: set options →</button></div>
     </div>}
 

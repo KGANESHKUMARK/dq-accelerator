@@ -1495,21 +1495,36 @@ async def onboard_upload(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 class PreviewIn(BaseModel):
-    source: str                  # path relative to repo root (upload or sample_data)
+    source: str                  # path relative to repo root, OR table name / URI for TABLE|DELTA|JSON
     dataset: str | None = None
     stage: str = "SILVER"
+    source_format: str = "AUTO"  # AUTO|CSV|PARQUET|JSON|DELTA|TABLE
+
+
+def _read_any_source(spark: Any, source: str, fmt: str):
+    """Read a source by explicit format — files stay under repo root; TABLE/DELTA/URI pass through."""
+    from dq_core.io.sources import read_source, SourceSpec
+    f = (fmt or "AUTO").upper()
+    if f in ("TABLE", "DELTA", "JSON"):
+        _prog(f"phase=read | reading {f} source {source}")
+        return read_source(spark, SourceSpec(format=f, path=source))
+    src = (ROOT / source).resolve()
+    if not str(src).startswith(str(ROOT.resolve())) or not src.exists():
+        raise HTTPException(400, f"source not found under repo: {source}")
+    if f in ("CSV", "PARQUET"):
+        _prog(f"phase=read | reading {source} ({f})")
+        return read_source(spark, SourceSpec(format=f, path=str(src)))
+    return _read_source(spark, src)  # AUTO — suffix inference
 
 
 def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     """Profile + candidate rules for the wizard — same path as `dqctl bootstrap`."""
     from dq_core.generation.generator import CandidateRuleGenerator
     spark, engine = _spark_engine()
-    src = (ROOT / body.source).resolve()
-    if not str(src).startswith(str(ROOT.resolve())) or not src.exists():
-        raise HTTPException(400, f"source not found under repo: {body.source}")
-    df = _read_source(spark, src)
-    ds = body.dataset or src.stem
-    mode = _profile_mode_for(src, "FULL", engine)
+    ds = body.dataset or Path(body.source).stem
+    src_path = (ROOT / body.source).resolve()
+    mode = _profile_mode_for(src_path, "FULL", engine) if src_path.suffix and src_path.exists() else "SAMPLE"
+    df = _read_any_source(spark, body.source, body.source_format)
     _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
     rep = engine.profile(df, ds, mode=mode)
     _prog("phase=profile | generating candidate rules from profile")
