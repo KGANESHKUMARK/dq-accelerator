@@ -1417,6 +1417,11 @@ export function Settings() {
   const [assistantOn, setAssistantOn] = useState<boolean>(true)
   const [chatLog, setChatLog] = useState<any[]>([])
   const [reloadMsg, setReloadMsg] = useState<string>('')
+  const [meta, setMeta] = useState<any>(null)
+  const [metaBackend, setMetaBackend] = useState<string>('nosql')
+  const [metaEngine, setMetaEngine] = useState<string>('tinydb')
+  const [metaMsg, setMetaMsg] = useState<string>('')
+  const [metaColl, setMetaColl] = useState<{name: string; count: number; docs: any[]} | null>(null)
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
@@ -1424,7 +1429,25 @@ export function Settings() {
     api.systemStatus().then(setSys).catch(() => {})
     api.assistantEnabled().then(r => setAssistantOn(r.enabled)).catch(() => {})
     api.chatLog().then(r => setChatLog(r.entries ?? [])).catch(() => {})
+    api.metadataStatus().then(m => {
+      setMeta(m)
+      setMetaBackend(m?.backend ?? 'file')
+      setMetaEngine(m?.metadata_engine ?? 'tinydb')
+    }).catch(() => {})
   }, [])
+
+  const browseCollection = (name: string) => {
+    api.metadataCollection(name, 25).then(setMetaColl).catch(e => setMetaColl({name, count: -1, docs: [{error: String(e)}]}))
+  }
+  const applyMetaSwitch = async () => {
+    setMetaMsg('switching…')
+    try {
+      await api.metadataSwitch({ backend: metaBackend, engine: metaBackend === 'nosql' ? metaEngine : undefined })
+      await api.reloadEngine(false)
+      const m = await api.metadataStatus()
+      setMeta(m); setMetaMsg(`switched to ${m.backend}${m.metadata_engine ? '/' + m.metadata_engine : ''} — engine reloaded`)
+    } catch (e: any) { setMetaMsg('switch failed: ' + String(e)) }
+  }
 
   const dqxReady = ai && ai.provider === 'DQXProvider' && !ai.simulated
   const mockReady = ai && ai.provider === 'MockAIProvider'
@@ -1491,6 +1514,54 @@ export function Settings() {
       <div className="info-box" style={{ marginTop: 10, fontSize: 11 }}>
         Use <b>Apply</b> after editing <code>config/engine.yaml</code> (provider, thresholds) — no backend restart needed.
         Use <b>Reload + restart Spark</b> only when changing <code>runtime.*</code> (memory, master, partitions) — takes ~30 s.
+      </div>
+    </div>
+
+    <div className="card">
+      <h3>Metadata store <span className="badge">{meta?.backend ?? '—'}{meta?.metadata_engine ? ' / ' + meta.metadata_engine : ''}</span></h3>
+      {meta && <div className="form-grid" style={{ marginBottom: 12 }}>
+        <div className="kv"><span>Backend</span><b>{meta.backend}</b></div>
+        <div className="kv"><span>Store</span><code style={{ fontSize: 11 }}>{meta.store_type ?? meta.store_path ?? '—'}</code></div>
+        {meta.store_path && <div className="kv"><span>Location</span><code style={{ fontSize: 11, wordBreak: 'break-all' }}>{meta.store_path}</code></div>}
+      </div>}
+      {meta?.collections && <table style={{ marginBottom: 12 }}>
+        <thead><tr><th>Collection (meta table)</th><th>Documents</th><th></th></tr></thead>
+        <tbody>
+          {Object.entries(meta.collections).map(([k, v]: [string, any]) => (
+            <tr key={k}>
+              <td><code style={{ fontSize: 11 }}>{k}</code></td>
+              <td><b>{v}</b></td>
+              <td><button style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => browseCollection(k)}>browse</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>}
+      {metaColl && <div style={{ marginBottom: 12 }}>
+        <h4 style={{ margin: '4px 0' }}>{metaColl.name} — {metaColl.count} doc(s){metaColl.count > 25 ? ' (first 25)' : ''}</h4>
+        <pre style={{ maxHeight: 220, overflow: 'auto', fontSize: 10, background: 'var(--bg)', padding: 8, borderRadius: 4 }}>{JSON.stringify(metaColl.docs, null, 1).slice(0, 6000)}</pre>
+      </div>}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 12 }}>Backend</label>
+        <select value={metaBackend} onChange={e => setMetaBackend(e.target.value)} style={{ padding: '4px 8px' }}>
+          <option value="file">file (YAML/JSON registry)</option>
+          <option value="sqlite">sqlite</option>
+          <option value="nosql">nosql (document store)</option>
+        </select>
+        {metaBackend === 'nosql' && <>
+          <label style={{ fontSize: 12 }}>Engine</label>
+          <select value={metaEngine} onChange={e => setMetaEngine(e.target.value)} style={{ padding: '4px 8px' }}>
+            <option value="tinydb">tinydb (embedded)</option>
+            <option value="mongodb">mongodb</option>
+            <option value="dynamodb">dynamodb</option>
+          </select>
+        </>}
+        <button className="primary" style={{ padding: '6px 14px' }} onClick={applyMetaSwitch}>Switch + reload engine</button>
+        {metaMsg && <span className="muted" style={{ fontSize: 11 }}>{metaMsg}</span>}
+      </div>
+      <div className="info-box" style={{ marginTop: 10, fontSize: 11 }}>
+        Stores do <b>not</b> auto-sync — switching backends shows that store's own state.
+        Migrate file→nosql with <code>scripts/migrate_registry_to_nosql.py</code>.
+        DynamoDB needs AWS creds or <code>metadata.endpoint_url</code> for DynamoDB Local.
       </div>
     </div>
 

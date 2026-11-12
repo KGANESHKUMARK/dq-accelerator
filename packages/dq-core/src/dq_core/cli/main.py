@@ -495,5 +495,67 @@ def profile_cmd(source: str, dataset: str | None, config: str, mode: str, out: s
     spark.stop()
 
 
+# ===========================================================================  metadata
+_METADATA_COLLECTIONS = ("ruleset_index", "ruleset_versions", "pipelines", "manifests",
+                         "policies", "approvals", "rejections", "profiles", "candidates", "jobs")
+
+
+@main.group()
+def metadata() -> None:
+    """Metadata store — status, collections, backend switch (file|sqlite|nosql)."""
+
+
+@metadata.command("status")
+@click.option("--config", "-c", default="config/engine.yaml")
+def metadata_status(config: str) -> None:
+    """Show metadata backend, store location and per-collection document counts."""
+    from dq_core.engine import DataQualityEngine
+    from dq_core.runtime.config import EngineConfig
+
+    cfg = EngineConfig.from_yaml(config)
+    reg = cfg.registry
+    click.echo(f"backend:          {(reg.backend or 'file').lower()}")
+    if reg.backend and reg.backend.lower() == "nosql":
+        meta = reg.metadata
+        click.echo(f"metadata.engine:  {meta.engine}")
+        click.echo(f"store path/uri:   {meta.db_path or meta.uri or '(default)'}")
+    engine = DataQualityEngine(cfg)
+    store = getattr(getattr(engine, "ruleset_registry", None), "store", None)
+    if store is not None and hasattr(store, "collection"):
+        click.echo(f"store:            {type(store).__name__}")
+        for name in _METADATA_COLLECTIONS:
+            try:
+                click.echo(f"  {name:<20} {store.collection(name).count()}")
+            except Exception:
+                click.echo(f"  {name:<20} -")
+    elif hasattr(getattr(engine, "ruleset_registry", None), "store"):
+        click.echo("store:            sqlite (RegistryStore)")
+    else:
+        click.echo("store:            file (YAML/JSON registry)")
+
+
+@metadata.command("switch")
+@click.argument("backend", type=click.Choice(["file", "sqlite", "nosql"], case_sensitive=False))
+@click.option("--engine", "nosql_engine", default=None,
+              type=click.Choice(["tinydb", "mongodb", "dynamodb"], case_sensitive=False),
+              help="NoSQL engine when backend=nosql (default: tinydb)")
+@click.option("--config", "-c", default="config/engine.yaml")
+def metadata_switch(backend: str, nosql_engine: str | None, config: str) -> None:
+    """Switch registry.backend (+ metadata.engine) in engine.yaml. Restart backend/CLI after."""
+    import re
+    from pathlib import Path
+
+    path = Path(config)
+    text = path.read_text(encoding="utf-8")
+    backend = backend.lower()
+    text = re.sub(r"(registry:\s*\n(?:.*\n)*?\s*backend:\s*)\S+", rf"\g<1>{backend}", text, count=1)
+    if backend == "nosql":
+        eng = (nosql_engine or "tinydb").lower()
+        text = re.sub(r"(metadata:\s*\n(?:.*\n)*?\s*engine:\s*)\S+", rf"\g<1>{eng}", text, count=1)
+    path.write_text(text, encoding="utf-8")
+    _ok(f"registry.backend -> {backend}" + (f" (metadata.engine={eng})" if backend == "nosql" else ""))
+    click.echo("  Restart the backend/CLI to apply. Data does not auto-sync between stores.")
+
+
 if __name__ == "__main__":
     main()

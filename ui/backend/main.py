@@ -716,6 +716,76 @@ def ai_status() -> dict[str, Any]:
         return {"error": str(exc), "provider": "unknown"}
 
 
+# ------------------------------------------------------------------ metadata store
+_META_COLLECTIONS = ("ruleset_index", "ruleset_versions", "pipelines", "manifests",
+                     "policies", "approvals", "rejections", "profiles", "candidates", "jobs")
+
+
+def _meta_engine():
+    from dq_core import DataQualityEngine
+    return DataQualityEngine(EngineConfig.from_yaml(ROOT / "config" / "engine.yaml"))
+
+
+@app.get("/api/metadata/status")
+def metadata_status() -> dict[str, Any]:
+    """Metadata store backend + per-collection document counts."""
+    cfg = EngineConfig.from_yaml(ROOT / "config" / "engine.yaml")
+    reg = cfg.registry
+    out: dict[str, Any] = {"backend": (reg.backend or "file").lower(),
+                           "metadata_engine": getattr(reg.metadata, "engine", None),
+                           "db_path": getattr(reg.metadata, "db_path", None),
+                           "uri": getattr(reg.metadata, "uri", None)}
+    try:
+        engine = _meta_engine()
+        store = getattr(getattr(engine, "ruleset_registry", None), "store", None)
+        out["store_type"] = type(store).__name__ if store is not None else ("sqlite" if hasattr(getattr(engine, "ruleset_registry", None), "store") else "file")
+        if store is not None and hasattr(store, "collection"):
+            out["collections"] = {n: store.collection(n).count() for n in _META_COLLECTIONS}
+            out["store_path"] = getattr(store, "path", None)
+    except Exception as exc:
+        out["error"] = str(exc)[:300]
+    return out
+
+
+@app.get("/api/metadata/collection/{name}")
+def metadata_collection(name: str, limit: int = 50) -> dict[str, Any]:
+    """Browse documents in a metadata collection (NoSQL backends only)."""
+    if name not in _META_COLLECTIONS:
+        raise HTTPException(404, f"Unknown collection '{name}'")
+    engine = _meta_engine()
+    store = getattr(getattr(engine, "ruleset_registry", None), "store", None)
+    if store is None or not hasattr(store, "collection"):
+        raise HTTPException(400, "Current registry backend is not a document store")
+    coll = store.collection(name)
+    return {"collection": name, "count": coll.count(), "docs": coll.find()[:limit]}
+
+
+class MetadataSwitchIn(BaseModel):
+    backend: str                     # file | sqlite | nosql
+    engine: str | None = None        # tinydb | mongodb | dynamodb (nosql only)
+
+
+@app.post("/api/metadata/switch")
+def metadata_switch(body: MetadataSwitchIn) -> dict[str, Any]:
+    """Switch registry.backend (+ metadata.engine) in engine.yaml, then hot-reload."""
+    import re
+    backend = body.backend.lower()
+    if backend not in ("file", "sqlite", "nosql"):
+        raise HTTPException(400, "backend must be file|sqlite|nosql")
+    engine = (body.engine or "tinydb").lower()
+    if engine not in ("tinydb", "mongodb", "dynamodb"):
+        raise HTTPException(400, "engine must be tinydb|mongodb|dynamodb")
+    path = ROOT / "config" / "engine.yaml"
+    text = path.read_text(encoding="utf-8")
+    # registry.backend line (first 'backend:' inside registry block)
+    text = re.sub(r"(registry:\s*\n(?:.*\n)*?\s*backend:\s*)\S+", rf"\g<1>{backend}", text, count=1)
+    if backend == "nosql":
+        text = re.sub(r"(metadata:\s*\n(?:.*\n)*?\s*engine:\s*)\S+", rf"\g<1>{engine}", text, count=1)
+    path.write_text(text, encoding="utf-8")
+    return {"ok": True, "backend": backend, "engine": engine if backend == "nosql" else None,
+            "note": "call /api/engine/reload (restart_spark=false) to apply"}
+
+
 # ------------------------------------------------------------------ health score
 @app.get("/api/health/score")
 def health_score() -> dict[str, Any]:
