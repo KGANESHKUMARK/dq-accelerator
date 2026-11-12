@@ -71,6 +71,23 @@ class DataQualityEngine:
             return RemediationPolicyConfig()
         if isinstance(policy, RemediationPolicyConfig):
             return policy
+        # Store-first: NoSQL `policies` collection canonical, YAML fallback + write-through
+        try:
+            from dq_core.metadata import resolver as _res
+            from dq_core.metadata.serialization import load_document
+            store = _res.store_from_engine(self)
+            path = Path(policy)
+            if store is not None:
+                key = path.stem
+                raw = _res.policy_from_store(store, key)
+                if raw is not None:
+                    return RemediationPolicyConfig.from_dict(raw, source_path=str(path))
+                if path.exists():
+                    doc = load_document(path)
+                    _res.save_policy(store, key, doc)
+                    return RemediationPolicyConfig.from_dict(doc, source_path=str(path.resolve()))
+        except Exception:
+            pass
         return RemediationPolicyConfig.load(policy)
 
     # ------------------------------------------------------------------ profiling & generation

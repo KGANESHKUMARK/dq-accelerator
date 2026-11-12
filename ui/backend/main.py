@@ -459,11 +459,28 @@ _STAGE_ORDER = {"BRONZE": 0, "SILVER": 1, "GOLD": 2}
 
 
 def _load_pipeline_manifest(pid: str):
+    """Store-first manifest resolution: NoSQL `manifests` collection, YAML fallback + write-through."""
+    from dq_core.metadata import resolver as _res
     from dq_core.pipelines.manifest import PipelineManifest
+    try:
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            raw = _res.manifest_from_store(store, pid)
+            if raw:
+                return PipelineManifest.from_dict(raw)
+    except Exception:
+        pass
     mdir = ROOT / "config" / "pipelines"
     direct = mdir / f"{pid}.yaml"
     if direct.exists():
-        return PipelineManifest.load(direct)
+        mf = PipelineManifest.load(direct)
+        try:
+            store = _res.store_from_engine(J.get_engine())
+            if store is not None:
+                _res.save_manifest(store, mf)
+        except Exception:
+            pass
+        return mf
     for p in sorted(mdir.glob("*.yaml")):
         try:
             mf = PipelineManifest.load(p)
@@ -1330,6 +1347,13 @@ def approve_correction(body: ApprovalAction) -> dict[str, Any]:
     })
     with open(_APPROVALS_FILE, "w", encoding="utf-8") as f:
         _yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
+    try:  # dual-write into NoSQL approvals collection when doc store active
+        from dq_core.metadata import resolver as _res
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            _res.record_approval(store, approvals[-1])
+    except Exception:
+        pass
     return {"ok": True, "total_approved": len(approvals)}
 
 
@@ -1352,6 +1376,13 @@ def reject_correction(body: ApprovalAction) -> dict[str, Any]:
     })
     with open(_REJECTIONS_FILE, "w", encoding="utf-8") as f:
         _yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
+    try:  # dual-write into NoSQL rejections collection when doc store active
+        from dq_core.metadata import resolver as _res
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            _res.record_rejection(store, rejections[-1])
+    except Exception:
+        pass
     return {"ok": True, "status": "REJECTED", "column": body.column,
             "original_value": body.original_value}
 

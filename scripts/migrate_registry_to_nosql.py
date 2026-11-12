@@ -63,10 +63,64 @@ def main() -> None:
                 {"pipeline_id": pid}, {"pipeline_id": pid, "entry": entry}, upsert=True)
             n_pp += 1
 
-    print(f"migrated: {n_rs} ruleset indexes, pipeline entries -> {args.db}")
+    # ---- governance definitions: manifests, policies, approvals, rejections ----
+    import yaml
+    n_man = n_pol = n_app = n_rej = 0
+    mdir = ROOT / "config" / "pipelines"
+    if mdir.exists():
+        for p in sorted(mdir.glob("*.yaml")):
+            try:
+                doc = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+            except Exception:
+                continue
+            mf = doc.get("manifest") or doc
+            pid = mf.get("pipeline_id") or p.stem
+            store.collection("manifests").replace_one(
+                {"pipeline_id": pid}, {"pipeline_id": pid, "manifest": mf}, upsert=True)
+            n_man += 1
+    pdir = ROOT / "config" / "policies"
+    if pdir.exists():
+        for p in sorted(pdir.glob("*.yaml")):
+            try:
+                doc = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+            except Exception:
+                continue
+            pol = doc.get("policy") or doc
+            key = str(pol.get("policy_id") or p.stem)
+            store.collection("policies").replace_one(
+                {"policy_id": key}, {"policy_id": key, "config": pol}, upsert=True)
+            n_pol += 1
+    adir = ROOT / "config" / "approvals"
+    if adir.exists():
+        for p in sorted(adir.glob("*.yaml")):
+            try:
+                doc = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+            except Exception:
+                continue
+            for item in doc.get("approvals") or []:
+                key = {"dataset": item.get("dataset"), "column": item.get("column"),
+                       "original_value": item.get("original_value"),
+                       "approved_value": item.get("approved_value")}
+                if not store.collection("approvals").find_one(key):
+                    store.collection("approvals").insert_one(dict(item))
+                    n_app += 1
+            for item in doc.get("rejections") or []:
+                key = {"dataset": item.get("dataset"), "column": item.get("column"),
+                       "original_value": item.get("original_value"),
+                       "proposed_value": item.get("proposed_value", item.get("corrected_value"))}
+                if not store.collection("rejections").find_one(key):
+                    store.collection("rejections").insert_one(dict(item))
+                    n_rej += 1
+
+    print(f"migrated: {n_rs} ruleset indexes, {n_pp} pipeline entries, "
+          f"{n_man} manifests, {n_pol} policies, {n_app} approvals, {n_rej} rejections")
     print("ruleset_index docs:", store.collection("ruleset_index").count())
     print("ruleset_versions docs:", store.collection("ruleset_versions").count())
     print("pipelines docs:", store.collection("pipelines").count())
+    print("manifests docs:", store.collection("manifests").count())
+    print("policies docs:", store.collection("policies").count())
+    print("approvals docs:", store.collection("approvals").count())
+    print("rejections docs:", store.collection("rejections").count())
 
 
 if __name__ == "__main__":

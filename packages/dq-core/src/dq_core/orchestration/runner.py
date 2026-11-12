@@ -152,8 +152,15 @@ class DQRunner:
                 deterministic = DeterministicRemediator(policy).apply(candidates, ruleset)
                 intermediate = self.validation.validate(deterministic.dataframe, ruleset, reference_data=reference_data)
                 persisted.append(intermediate)
-                policy_engine = ConfidencePolicyEngine(policy, ApprovalStore.load(policy.approvals_path),
-                                                        RejectionStore.load(policy.rejections_path))
+                store = self.metadata_store if hasattr(self.metadata_store, "collection") else None
+                if store is not None:
+                    from dq_core.metadata import resolver as _res
+                    approvals = ApprovalStore.from_documents(_res.approval_docs(store))
+                    rejections = RejectionStore.from_documents(_res.rejection_docs(store))
+                else:
+                    approvals = ApprovalStore.load(policy.approvals_path)
+                    rejections = RejectionStore.load(policy.rejections_path)
+                policy_engine = ConfidencePolicyEngine(policy, approvals, rejections)
                 _ph("remediation_ai")
                 ai = AIRemediator(self.provider, policy_engine, policy).apply(intermediate.annotated, ruleset, run_id)
             phases["remediation"] = sw.elapsed_ms
