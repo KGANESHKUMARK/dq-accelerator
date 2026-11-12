@@ -1099,6 +1099,63 @@ def pipeline_trend(pid: str) -> list[dict[str, Any]]:
     return list(reversed(out))
 
 
+@app.get("/api/pipelines/{pid}/journey")
+def pipeline_journey(pid: str) -> dict[str, Any]:
+    """Quality journey for one pipeline: latest-run medallion stage scores
+    (Bronze→Silver→Gold with ruleset versions) + score-over-runs history."""
+    rows = J.list_jobs(limit=200)
+    runs: list[dict[str, Any]] = []
+    for r in rows:
+        if r.get("kind") not in ("pipeline_run", "dq_run") or r.get("status") != "COMPLETED":
+            continue
+        j = J.get(r["job_id"])
+        res = (j or {}).get("result") or {}
+        if res.get("pipeline_id") != pid:
+            continue
+        stages = res.get("stages") or []
+        if not stages:  # dq_run single-stage results carry scores differently
+            score = ((res.get("quality_gate") or {}).get("quality_score")
+                     or (res.get("summary") or {}).get("quality_score"))
+            if score is None:
+                continue
+            stages = [{"stage": res.get("stage") or "SILVER", "quality_score": score,
+                       "ruleset": res.get("ruleset"), "accepted": res.get("accepted"),
+                       "quarantined": res.get("quarantined"), "gate_passed": res.get("gate_passed")}]
+        runs.append({
+            "job_id": r["job_id"],
+            "ran_at": r.get("finished_at") or r.get("submitted_at"),
+            "gate_passed": res.get("gate_passed"),
+            "stages": stages,
+        })
+    if not runs:
+        return {"pipeline_id": pid, "stages": [], "history": []}
+    latest = runs[0]
+
+    def _norm_stage(s: dict[str, Any]) -> dict[str, Any]:
+        score = s.get("quality_score")
+        if score is None and s.get("pass_rate") is not None:
+            score = s["pass_rate"]
+        return {"stage": s.get("stage"), "score": score,
+                "ruleset": s.get("ruleset"), "status": s.get("status"),
+                "accepted": s.get("accepted"), "quarantined": s.get("quarantined"),
+                "rows": s.get("rows") or s.get("input"),
+                "gate": s.get("gate_passed", s.get("gate"))}
+
+    stages = [_norm_stage(s) for s in latest["stages"]]
+    history = []
+    for run in runs[:20]:
+        scores = [float(s["quality_score"]) for s in run["stages"]
+                  if isinstance(s.get("quality_score"), (int, float))]
+        if not scores:  # fall back to pass_rate style fields
+            scores = [float(s["pass_rate"]) for s in run["stages"]
+                      if isinstance(s.get("pass_rate"), (int, float))]
+        versions = sorted({str(s.get("ruleset")) for s in run["stages"] if s.get("ruleset")})
+        history.append({"ran_at": run["ran_at"], "score": round(sum(scores) / len(scores), 1) if scores else None,
+                        "versions": versions, "gate_passed": run["gate_passed"]})
+    return {"pipeline_id": pid, "latest_run_at": latest["ran_at"],
+            "latest_job_id": latest["job_id"], "stages": stages, "history": list(reversed(history))}
+
+
 # ------------------------------------------------------------------ anomaly lifecycle
 import sqlite3 as _sqlite3
 

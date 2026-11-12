@@ -335,6 +335,77 @@ const DonutBar = ({ label, value, total, color }: { label: string; value: number
   )
 }
 
+/* ---- Quality journey: medallion stage scores + score-over-runs ---- */
+const STAGE_COLOR: Record<string, string> = { BRONZE: '#94a3b8', SILVER: '#f59e0b', GOLD: '#22c55e' }
+const QualityJourney = ({ pipes }: { pipes: any[] }) => {
+  const [pid, setPid] = useState('')
+  const [j, setJ] = useState<any>(null)
+  const sel = pid || pipes[0]?.pipeline_id || ''
+  useEffect(() => {
+    if (!sel) { setJ(null); return }
+    api.pipelineJourney(sel).then(setJ).catch(() => setJ(null))
+  }, [sel])
+  if (!pipes.length) return null
+  const hist = j?.history || []
+  const maxScore = Math.max(10, ...hist.map((h: any) => h.score ?? 0))
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <h3 style={{ margin: 0 }}>Quality journey</h3>
+        <select value={sel} onChange={e => setPid(e.target.value)} style={{ marginLeft: 'auto' }}>
+          {pipes.map((p: any) => <option key={p.pipeline_id} value={p.pipeline_id}>{p.pipeline_id}</option>)}
+        </select>
+        {j?.latest_run_at && <span className="muted" style={{ fontSize: 11 }}>latest run {String(j.latest_run_at).slice(0, 16).replace('T', ' ')}</span>}
+      </div>
+      {/* medallion flow */}
+      {j?.stages?.length ? (
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: 14, overflowX: 'auto' }}>
+          {j.stages.map((s: any, i: number) => {
+            const sc = s.score
+            const col = sc == null ? '#64748b' : sc >= 90 ? '#22c55e' : sc >= 70 ? '#f59e0b' : '#ef4444'
+            return (
+              <div key={s.stage} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 150 }}>
+                {i > 0 && <div style={{ flex: '0 0 26px', height: 2, background: 'var(--border)', position: 'relative' }}>
+                  <div style={{ position: 'absolute', right: -1, top: -4, borderLeft: '6px solid var(--border)', borderTop: '5px solid transparent', borderBottom: '5px solid transparent' }} />
+                </div>}
+                <div style={{ flex: 1, border: `1.5px solid ${col}`, borderRadius: 10, padding: '10px 12px', background: `${col}14` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <b style={{ color: STAGE_COLOR[s.stage] ?? col, fontSize: 13 }}>{s.stage}</b>
+                    <b style={{ color: col, fontSize: 15 }}>{sc != null ? sc : '—'}</b>
+                  </div>
+                  <div className="muted" style={{ fontSize: 10, marginTop: 3 }}>{s.ruleset ?? 'no ruleset'}</div>
+                  <div className="muted" style={{ fontSize: 10 }}>{s.accepted?.toLocaleString?.() ?? '—'} accepted · {s.quarantined?.toLocaleString?.() ?? '—'} quarantined</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>No completed runs for this pipeline yet — run DQ to see the journey.</div>}
+      {/* score-over-runs */}
+      {hist.length > 1 && <>
+        <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>Quality score per run (oldest → newest) — watch it climb as rulesets improve</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 56 }}>
+          {hist.map((h: any, i: number) => {
+            const sc = h.score
+            const col = sc == null ? '#64748b' : sc >= 90 ? '#22c55e' : sc >= 70 ? '#f59e0b' : '#ef4444'
+            return (
+              <div key={i} title={`${String(h.ran_at).slice(0, 16)} · ${sc ?? '—'} · ${h.versions?.join(', ') ?? ''}`}
+                   style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                <div style={{ width: '100%', height: `${sc != null ? Math.max(6, (sc / maxScore) * 100) : 4}%`, background: col, borderRadius: '3px 3px 0 0', minHeight: 4 }} />
+              </div>
+            )
+          })}
+        </div>
+        <div className="muted" style={{ fontSize: 10, marginTop: 3, display: 'flex', justifyContent: 'space-between' }}>
+          <span>{String(hist[0]?.ran_at).slice(5, 16).replace('T', ' ')}</span>
+          <span>{hist[hist.length - 1]?.versions?.join(' · ') ?? ''}</span>
+          <span>{String(hist[hist.length - 1]?.ran_at).slice(5, 16).replace('T', ' ')}</span>
+        </div>
+      </>}
+    </div>
+  )
+}
+
 export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) => void } = {}) {
   const [summary, setSummary] = useState<any>(null)
   const [pipes, setPipes] = useState<any[]>([])
@@ -378,6 +449,9 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
       <div className="stat-tile"><div className="num bad">{(t.quarantined_records ?? 0).toLocaleString()}</div><div className="lbl">Total quarantined</div></div>
       <div className="stat-tile"><div className="num warn">{anomStats['OPEN'] ?? 0}</div><div className="lbl">Open anomalies</div></div>
     </div>
+
+    {/* ── Row 1b: quality journey — the story in one glance ── */}
+    <QualityJourney pipes={pipes} />
 
     {/* ── Row 2: processing breakdown + remediation ── */}
     {t.input_records > 0 && <div className="card-row">
