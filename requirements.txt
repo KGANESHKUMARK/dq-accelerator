@@ -30,6 +30,7 @@ pyarrow==26.0.1
 
 # Backend (FastAPI + SQLite)
 fastapi==0.115.6
+python-multipart==0.0.20
 uvicorn==0.34.0
 starlette==0.41.3
 pydantic==2.14.3
