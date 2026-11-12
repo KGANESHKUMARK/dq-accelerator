@@ -78,3 +78,10 @@ colorama==0.4.6
 
 # ── DQ core engine (editable install from this repository) ──────────────────
 -e ./packages/dq-core
+
+# ============================================================================
+# OPTIONAL — install only if you switch the NoSQL metadata engine:
+#   pymongo                 -> registry.metadata.engine: mongodb
+#   boto3                   -> registry.metadata.engine: dynamodb
+# (tinydb is the default embedded engine and needs nothing extra)
+# ============================================================================
