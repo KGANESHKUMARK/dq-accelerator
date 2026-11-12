@@ -264,6 +264,74 @@ def ruleset_verify(ruleset_yaml: str, config: str) -> None:
         _warn(f"{rs.ref} is NOT published in the registry")
 
 
+@ruleset.command("import-odcs")
+@click.argument("contract", type=click.Path(exists=True))
+@click.option("--out", "-o", required=True, type=click.Path(), help="Output ruleset YAML path")
+@click.option("--ruleset-id", default=None)
+@click.option("--version", default="1.0")
+@click.option("--owner", default="")
+@click.option("--stage", default="SILVER", type=click.Choice(["BRONZE", "SILVER", "GOLD"], case_sensitive=False))
+def ruleset_import_odcs(contract: str, out: str, ruleset_id: str | None, version: str,
+                        owner: str, stage: str) -> None:
+    """Import an ODCS data contract as CANDIDATE rules (review before publish)."""
+    from dq_core.contracts.odcs import load_odcs, odcs_to_ruleset, write_ruleset_yaml
+    doc = load_odcs(contract)
+    doc["_source"] = contract
+    rs = odcs_to_ruleset(doc, ruleset_id=ruleset_id, version=version, owner=owner, stage=stage)
+    path = write_ruleset_yaml(rs, out)
+    _ok(f"ODCS contract -> {len(rs.rules)} candidate rules")
+    _ok(f"Ruleset written to {path} (all rules CANDIDATE — review, approve, then publish)")
+
+
+@ruleset.command("generate")
+@click.option("--describe", "-d", "description", required=True,
+              help="Business description of data-quality expectations")
+@click.option("--source", "-s", type=click.Path(exists=True), default=None,
+              help="CSV/Parquet file to derive schema from (optional)")
+@click.option("--schema", default=None, help="Inline schema 'col:type,col:type' (alternative to --source)")
+@click.option("--dataset", required=True)
+@click.option("--domain", default="")
+@click.option("--out", "-o", required=True, type=click.Path())
+@click.option("--ruleset-id", default=None)
+@click.option("--no-llm", is_flag=True, help="Force heuristic keyword generation")
+def ruleset_generate(description: str, source: str | None, schema: str | None, dataset: str,
+                     domain: str, out: str, ruleset_id: str | None, no_llm: bool) -> None:
+    """Generate CANDIDATE rules from a business description (+ optional schema)."""
+    from dq_core.contracts.odcs import write_ruleset_yaml
+    from dq_core.generation.llm_generator import LLMRuleGenerator
+    from dq_core.metadata.models import RuleSet, RuleSetStatus
+    from dq_core.runtime.utils import utc_now_iso
+
+    cols: dict[str, str] = {}
+    if source:
+        from dq_core.io.sources import CsvSource, ParquetSource
+        spark = _spark("config/engine.yaml", master="local[2]")
+        df = (ParquetSource(source).read(spark) if source.endswith(".parquet")
+              else CsvSource(source).read(spark))
+        cols = dict(df.dtypes)
+        spark.stop()
+    elif schema:
+        for pair in schema.split(","):
+            if ":" in pair:
+                c, t = pair.split(":", 1)
+                cols[c.strip()] = t.strip()
+    else:
+        _err("Provide --source <file> or --schema 'col:type,...'")
+        raise SystemExit(2)
+
+    rules = LLMRuleGenerator().generate(cols, description, dataset=dataset, domain=domain,
+                                        ruleset_id=ruleset_id, use_llm=not no_llm)
+    if not rules:
+        _warn("No rules generated — description may not match known patterns")
+        raise SystemExit(1)
+    rs = RuleSet(ruleset_id=ruleset_id or f"{dataset}_desc", dataset=dataset, version="1.0",
+                 status=RuleSetStatus.DRAFT, description=f"LLM/heuristic rules from: {description[:80]}",
+                 owner="", rules=rules, created_at=utc_now_iso())
+    path = write_ruleset_yaml(rs, out)
+    _ok(f"Generated {len(rules)} candidate rules -> {path}")
+    _ok("All rules CANDIDATE — review, approve, publish via UI or dqctl ruleset publish")
+
+
 # ===========================================================================  bootstrap
 @main.command("bootstrap")
 @click.argument("source", type=click.Path(exists=True))

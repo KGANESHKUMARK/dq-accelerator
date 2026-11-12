@@ -97,6 +97,16 @@ class RuntimeSettings:
 
 
 @dataclass
+class AlertSettings:
+    enabled: bool = False
+    webhook_url: str | None = None            # Slack/Teams/any HTTP POST endpoint
+    events: list[str] = field(default_factory=lambda: ["gate_fail"])
+    fail_pipeline: bool = False               # raise QualityGateFailedError on gate fail
+    timeout_seconds: int = 10
+    min_quarantine_rate: float = 1.0          # quarantine_threshold event fires at/above this
+
+
+@dataclass
 class EngineConfig:
     name: str = "dq-accelerator"
     default_mode: IntegrationMode = IntegrationMode.OBSERVE_ONLY
@@ -105,6 +115,7 @@ class EngineConfig:
     profiling: ProfilingSettings = field(default_factory=ProfilingSettings)
     validation: ValidationSettings = field(default_factory=ValidationSettings)
     ai: AISettings = field(default_factory=AISettings)
+    alerts: AlertSettings = field(default_factory=AlertSettings)
     outputs: OutputSettings = field(default_factory=OutputSettings)
     runtime: RuntimeSettings = field(default_factory=RuntimeSettings)
     logging_level: str = "INFO"
@@ -157,6 +168,7 @@ class EngineConfig:
                 profiling=ProfilingSettings(**(data.get("profiling") or {})),
                 validation=ValidationSettings(**(data.get("validation") or {})),
                 ai=AISettings(**ai),
+                alerts=AlertSettings(**(data.get("alerts") or {})),
                 outputs=OutputSettings(**outputs),
                 runtime=RuntimeSettings(**runtime),
                 logging_level=str(logging_cfg.get("level", "INFO")),

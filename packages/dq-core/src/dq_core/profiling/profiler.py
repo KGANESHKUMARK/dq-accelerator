@@ -153,12 +153,23 @@ class DataProfiler:
                                and (_is_numeric(p.data_type) or (p.numeric_castable_percentage or 0) >= 100 * s.semantic_match_rate)}
             if outlier_targets and rows:
                 exprs = []
+                robust_targets: dict[str, tuple[float, float]] = {}
                 for c, p in outlier_targets.items():
                     numeric = safe_cast(c, "double") if p.data_type == "string" else col(c).cast("double")
                     exprs.append(F.sum((F.abs(numeric - F.lit(p.mean)) > F.lit(s.outlier_stddevs * p.stddev)).cast("int")).alias(c))
+                    pcts = p.percentiles or {}
+                    p25, p50, p75 = pcts.get("p25"), pcts.get("p50"), pcts.get("p75")
+                    if None not in (p25, p50, p75):
+                        iqr = float(p75) - float(p25)
+                        if iqr > 0:
+                            robust_sigma = iqr / 1.349
+                            robust_targets[c] = (float(p50), 3.5 * robust_sigma)
+                            exprs.append(F.sum((F.abs(numeric - F.lit(float(p50))) > F.lit(3.5 * robust_sigma)).cast("int")).alias(f"{c}__robust"))
                 out = data.agg(*exprs).collect()[0].asDict()
                 for c in outlier_targets:
                     profiles[c].outlier_count = int(out[c] or 0)
+                    if c in robust_targets:
+                        profiles[c].robust_outlier_count = int(out.get(f"{c}__robust") or 0)
                 jobs += 1
             data.unpersist()
 
@@ -257,6 +268,9 @@ class DataProfiler:
             if p.outlier_count:
                 add(c, "OUTLIERS", f"{p.outlier_count} value(s) beyond {s.outlier_stddevs} standard deviations "
                                    f"(mean={p.mean}, stddev={p.stddev}, min={p.min}, max={p.max})")
+            if p.robust_outlier_count:
+                add(c, "ROBUST_OUTLIERS", f"{p.robust_outlier_count} value(s) beyond 3.5 robust sigma "
+                                          "(median±IQR/1.349 — resistant to masking by extreme values)")
             if p.negative_count and p.non_null_count and p.negative_count <= 0.1 * p.non_null_count:
                 add(c, "RARE_NEGATIVE_VALUES", f"{p.negative_count} negative value(s) in a mostly positive column - "
                                                "review with the business (may be valid, e.g. refunds)", "INFO")

@@ -82,6 +82,14 @@ def default_message(rule: RuleDefinition) -> str:
         return f"length of {c} outside [{cfg.get('min', 0)}, {cfg.get('max', 'inf')}]"
     if t == RuleType.REFERENTIAL_INTEGRITY:
         return f"{c} not found in {cfg.get('reference_dataset')}.{cfg.get('reference_column')}"
+    if t == RuleType.NULL_RATE:
+        return f"null rate on {c} exceeds {cfg.get('max_null_rate', cfg.get('max_null_percent'))}"
+    if t == RuleType.DISTINCT_RATIO:
+        return f"distinct ratio on {c} below {cfg.get('min_distinct_ratio', cfg.get('min_distinct_percent'))}"
+    if t == RuleType.FRESHNESS:
+        return f"{c} data is older than max_age {cfg.get('max_age', cfg.get('max_age_seconds'))}"
+    if t == RuleType.COLUMN_AGGREGATE:
+        return f"{cfg.get('aggregate', 'SUM')}({c}) outside [{cfg.get('min', '-inf')}, {cfg.get('max', '+inf')}]"
     return rule.description or rule.name
 
 

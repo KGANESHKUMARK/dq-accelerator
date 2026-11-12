@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Mapping, Sequence
 
@@ -11,7 +12,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 from dq_core.metadata.models import RuleDefinition, RuleSet, RuleType
-from dq_core.runtime.compat import col, compact, safe_cast
+from dq_core.runtime.compat import col, compact, safe_cast, safe_to_timestamp
 from dq_core.runtime.config import ValidationSettings
 from dq_core.runtime.logging import get_logger, log_event
 from dq_core.runtime.schema import compare_schema, missing_columns, schema_to_list, user_columns
@@ -21,6 +22,34 @@ from dq_core.validation.expressions import RowCheck, build_row_check, default_me
 from dq_core.validation.models import RuleResult, ValidationReport, pct
 
 _logger = get_logger("validation")
+
+_AGE_UNITS = {"s": 1, "sec": 1, "second": 1, "seconds": 1,
+              "m": 60, "min": 60, "minute": 60, "minutes": 60,
+              "h": 3600, "hr": 3600, "hour": 3600, "hours": 3600,
+              "d": 86400, "day": 86400, "days": 86400,
+              "w": 604800, "week": 604800, "weeks": 604800}
+
+
+def _parse_age_seconds(value: Any) -> float:
+    """Accept seconds (number) or strings like '30d', '12 hours', '2 weeks'."""
+    if value is None:
+        raise ValueError("FRESHNESS rule requires config.max_age (e.g. '30 days' or seconds)")
+    if isinstance(value, (int, float)):
+        return float(value)
+    import re as _re
+    text = str(value).strip().lower()
+    if text.replace(".", "", 1).isdigit():
+        return float(text)
+    compact = _re.match(r"^(\d+(?:\.\d+)?)([smhdw])$", text)
+    if compact:
+        return float(compact.group(1)) * _AGE_UNITS[compact.group(2)]
+    parts = text.split()
+    if len(parts) == 2:
+        amount, unit = parts
+        mult = _AGE_UNITS.get(unit)
+        if mult and amount.replace(".", "", 1).isdigit():
+            return float(amount) * mult
+    raise ValueError(f"Cannot parse max_age '{value}' — use seconds or '<n> <unit>' (s/m/h/d/w)")
 
 
 @dataclass
@@ -239,6 +268,55 @@ class ValidationEngine:
             reason = [] if ok else [f"{aggregate}({rule.column})={actual} differs from {cfg['reference_dataset']}."
                                     f"{cfg['reference_column']}={expected} beyond tolerance {tolerance}"]
             return ok, reason, details
+        if rule.rule_type == RuleType.NULL_RATE:
+            blank = F.trim(col(rule.column).cast("string")) == F.lit("") if cfg.get("treat_blank_as_null", True) else F.lit(False)
+            row = df.agg(F.sum(F.when(col(rule.column).isNull() | blank, 1).otherwise(0)).alias("n"),
+                         F.count(F.lit(1)).alias("t")).collect()[0]
+            null_count, n = int(row["n"] or 0), int(row["t"] or 0)
+            rate = (null_count / n) if n else 0.0
+            limit = float(cfg.get("max_null_rate", cfg.get("max_null_percent", 0.0)) /
+                          (100.0 if "max_null_percent" in cfg else 1.0))
+            ok = rate <= limit
+            reason = [] if ok else [f"null rate {rate:.4%} on {rule.column} exceeds {limit:.4%}"]
+            return ok, reason, {"null_rate": rate, "null_count": null_count, "row_count": n,
+                                "max_null_rate": limit, "column": rule.column}
+        if rule.rule_type == RuleType.DISTINCT_RATIO:
+            distinct = df.select(col(rule.column)).distinct().count()
+            ratio = (distinct / total) if total else 0.0
+            limit = float(cfg.get("min_distinct_ratio", cfg.get("min_distinct_percent", 0.0)) /
+                          (100.0 if "min_distinct_percent" in cfg else 1.0))
+            ok = ratio >= limit
+            reason = [] if ok else [f"distinct ratio {ratio:.4%} on {rule.column} below {limit:.4%}"]
+            return ok, reason, {"distinct_count": distinct, "distinct_ratio": ratio,
+                                "min_distinct_ratio": limit, "column": rule.column}
+        if rule.rule_type == RuleType.FRESHNESS:
+            max_ts = df.agg(F.max(safe_to_timestamp(col(rule.column).cast("string"),
+                                                    str(cfg.get("format", "yyyy-MM-dd HH:mm:ss"))))).collect()[0][0]
+            ref_raw = cfg.get("reference_time")
+            ref_ts = (datetime.fromisoformat(str(ref_raw).replace("Z", "+00:00")) if ref_raw
+                      else datetime.now(timezone.utc).replace(tzinfo=None))
+            max_age = _parse_age_seconds(cfg.get("max_age", cfg.get("max_age_seconds")))
+            age = (ref_ts - max_ts).total_seconds() if max_ts else float("inf")
+            ok = max_ts is not None and age <= max_age
+            reason = [] if ok else [f"latest {rule.column}={max_ts} is {age/86400:.1f}d old "
+                                    f"(max {max_age/86400:.1f}d)"]
+            return ok, reason, {"max_timestamp": str(max_ts), "age_seconds": age,
+                                "max_age_seconds": max_age, "column": rule.column}
+        if rule.rule_type == RuleType.COLUMN_AGGREGATE:
+            agg = str(cfg.get("aggregate", "SUM")).upper()
+            col_expr = safe_cast(rule.column, str(cfg.get("data_type", "double")))
+            if agg == "COUNT":
+                val = total
+            else:
+                fn = {"SUM": F.sum, "AVG": F.avg, "MIN": F.min, "MAX": F.max}[agg]
+                val = df.agg(fn(col_expr)).collect()[0][0]
+            val = float(val) if val is not None else None
+            lo, hi = cfg.get("min"), cfg.get("max")
+            ok = val is not None and (lo is None or val >= float(lo)) and (hi is None or val <= float(hi))
+            reason = [] if ok else [f"{agg}({rule.column})={val} outside [{lo if lo is not None else '-inf'}, "
+                                    f"{hi if hi is not None else '+inf'}]"]
+            return ok, reason, {"aggregate": agg, "value": val, "min": lo, "max": hi,
+                                "column": rule.column}
         return True, [], {}  # pragma: no cover
 
 

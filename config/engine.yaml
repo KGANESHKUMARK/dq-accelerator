@@ -57,6 +57,15 @@ engine:
     enabled: false
     log_path: ../logs/assistant/chat_log.jsonl   # one JSON per conversation turn
 
+  # Alerting — webhook notifications on quality-gate failures / quarantine spikes
+  alerts:
+    enabled: false
+    webhook_url: null                # Slack/Teams/any HTTP POST endpoint (JSON payload)
+    events: [gate_fail]              # gate_fail | quarantine_threshold | always
+    fail_pipeline: false             # true → halt pipeline when gate fails (post-report)
+    timeout_seconds: 10
+    min_quarantine_rate: 1.0         # quarantine_threshold fires at/above this rate (0.05 = 5%)
+
   outputs:
     base_path: ../data
     reports_path: ../reports

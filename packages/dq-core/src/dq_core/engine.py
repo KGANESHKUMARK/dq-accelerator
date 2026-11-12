@@ -111,7 +111,10 @@ class DataQualityEngine:
                 and self.ruleset_registry is not None and not published):
             raise ConfigurationError(f"{rules.ref} is not published. Publish the reviewed rule set "
                                      f"(dqctl ruleset publish) before running in {resolved_mode.value} mode.")
-        runner = DQRunner(self.validator, self.profiler, self.ai_provider, self.config.include_dq_columns_in_accepted)
+        store = getattr(self.ruleset_registry, "store", None)
+        runner = DQRunner(self.validator, self.profiler, self.ai_provider, self.config.include_dq_columns_in_accepted,
+                          alerts=self.config.alerts, metadata_store=store,
+                          reports_path=self.config.outputs.reports_path)
         if self.pipeline_registry is not None and self.config.registry.enforce_pipeline_lifecycle:
             state = self.pipeline_registry.state(context.pipeline_id)
             if state in PASS_THROUGH_STATES:

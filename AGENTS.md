@@ -76,3 +76,22 @@ Last updated: 2026-07-14
    view; add pharmacy/telecom recommendation templates.
 5. Verify the same minimal contract through the portable Spark adapter without
    fabricating cloud execution evidence.
+
+## feature/nosql-metadata branch (in progress, local commits only)
+
+- **NoSQL metadata store** (`dq_core/metadata/store.py`): MetadataStore abstraction,
+  TinyDB embedded default + MongoDB + DynamoDB (boto3) backends; collections for
+  ruleset_index/versions, pipelines, manifests, policies, approvals, rejections,
+  profiles, candidates, jobs, metrics. `registry.backend: nosql` + `registry.metadata.*`.
+- Doc-backed registries (`registries/doc_store.py`), migration script
+  `scripts/migrate_registry_to_nosql.py` (ran: 12 rulesets/18 versions/10 pipelines
+  → `data/metadata.nosql.json`). API: `/api/metadata/status|collection/{n}|switch`.
+  CLI: `dqctl metadata status|switch`. Settings UI card with collection browser.
+- **DQX-adoption Tier1+2**: `alerts:` config (webhook + fail_pipeline via
+  `alerts/webhook.py`); metrics recorder → `metrics` collection/JSONL;
+  ODCS import (`contracts/odcs.py` + `dqctl ruleset import-odcs`);
+  LLM rule gen from descriptions (`generation/llm_generator.py` + `dqctl ruleset
+  generate`, LiteLLM path + heuristic fallback); 4 new dataset rule types
+  (NULL_RATE, DISTINCT_RATIO, FRESHNESS, COLUMN_AGGREGATE — verified under Spark);
+  robust MAD outliers (`robust_outlier_count`, IQR/1.349) in profiler.
+- 80 unit tests green. Backend live on nosql/tinydb.
