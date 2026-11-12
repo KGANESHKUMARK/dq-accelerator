@@ -1346,6 +1346,9 @@ export function Reports() {
                           <b style={{ textTransform: 'capitalize' }}>{name}</b>
                           <span className={cls} style={{ fontWeight: 700 }}>{measured ? p.score : '—'}</span>
                         </div>
+                        {measured && <div style={{ height: 4, borderRadius: 2, background: 'var(--border)', margin: '5px 0 3px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.min(100, p.score)}%`, background: p.score >= 90 ? 'var(--success)' : p.score >= 70 ? '#d97706' : 'var(--danger)', borderRadius: 2 }} />
+                        </div>}
                         <div className="muted" style={{ fontSize: 10, marginTop: 2 }}>{p.status === 'MEASURED' ? `${p.rules ?? 0} rules` : p.status}</div>
                       </div>
                     )

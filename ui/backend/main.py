@@ -1540,6 +1540,24 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(400, f"generated manifest failed validation: {exc}") from exc
 
+    try:  # persist onboarding artifacts to NoSQL meta collections (best-effort)
+        from dq_core.metadata import resolver as _res
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            _res.save_manifest(store, mf)
+            store.collection("candidates").insert_one({
+                "ruleset_id": body.ruleset_id, "dataset": body.dataset, "version": "1.0",
+                "stage": body.stage, "candidate_count": len(res["candidates"]),
+                "approved_count": len(rs.rules), "rules": [c["raw"] for c in res["candidates"]],
+                "created_at": __import__("dq_core.runtime.utils", fromlist=["utc_now_iso"]).utc_now_iso()})
+            prof = res.get("profile") or res.get("profile_report")
+            if prof:
+                store.collection("profiles").insert_one({
+                    "dataset": body.dataset, "ruleset_id": body.ruleset_id,
+                    "profiled_at": prof.get("profiled_at") if isinstance(prof, dict) else None,
+                    "row_count": res.get("row_count"), "profile": prof})
+    except Exception:
+        pass
     out = {"ok": True, "ruleset": f"{body.ruleset_id}@1.0",
            "ruleset_path": str(ruleset_path.relative_to(ROOT)).replace("\\", "/"),
            "manifest_path": str(manifest_path.relative_to(ROOT)).replace("\\", "/"),

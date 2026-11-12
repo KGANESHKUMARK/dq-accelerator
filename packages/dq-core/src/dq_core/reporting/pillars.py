@@ -71,4 +71,53 @@ def domain_recommendation(dataset: str, pillars: dict[str, dict[str, Any]]) -> s
         domain = "generic"
     if not weak:
         return f"{domain}: no pillar is below 90; continue monitoring quarantine and approvals."
-    return f"{domain}: review {', '.join(weak)} before publication; records below the remediation threshold remain quarantined."
+    advice = _DOMAIN_ADVICE.get(domain, {})
+    tips = [advice.get(p) for p in weak if advice.get(p)]
+    suffix = f" Suggested: {'; '.join(tips[:2])}." if tips else ""
+    return (f"{domain}: review {', '.join(weak)} before publication; records below the "
+            f"remediation threshold remain quarantined.{suffix}")
+
+
+_DOMAIN_ADVICE = {
+    "pharmacy": {
+        "validity": "verify NDC/drug-code formats and SIG (directions) text patterns",
+        "completeness": "prescription fields (drug, dose, prescriber) must be non-null for dispensing",
+        "consistency": "cross-check dose units (mg vs mcg) and refill counts against formulary",
+        "timeliness": "prior-auth approvals and refill windows must stay current",
+        "accuracy": "dispense quantities should reconcile with prescribed quantities",
+    },
+    "telecom": {
+        "validity": "MSISDN/IMSI formats and cell-tower IDs must match network dictionaries",
+        "completeness": "CDR records need originating/destination numbers and event timestamps",
+        "consistency": "call durations and data volumes must be non-negative and internally coherent",
+        "timeliness": "CDR ingestion lag should stay within the billing-cycle window",
+        "uniqueness": "CDR event IDs must be unique to avoid double-billing",
+        "accuracy": "rated usage should reconcile with raw counters",
+    },
+    "healthcare": {
+        "validity": "ICD/SNOMED/NDC codes must match reference terminologies",
+        "completeness": "clinical fields (patient, encounter, provider) must be populated",
+        "consistency": "dosages, units and dates must be clinically coherent",
+        "timeliness": "claims and eligibility checks must be current",
+        "uniqueness": "patient encounter IDs must be unique",
+    },
+    "banking": {
+        "validity": "account/IFSC/UTR formats and amounts must be well-formed",
+        "completeness": "transaction references and timestamps are mandatory",
+        "consistency": "debits/credits must reconcile with balances",
+        "timeliness": "settlement and posting timestamps must be current",
+        "uniqueness": "transaction IDs must be unique (double-posting risk)",
+    },
+    "hospitality": {
+        "validity": "guest emails, phone numbers and confirmation codes must be well-formed",
+        "completeness": "reservation dates, guests and rates must be populated",
+        "consistency": "check-in/check-out must be chronologically coherent",
+        "timeliness": "arrival/departure windows must be current",
+    },
+    "agriculture": {
+        "validity": "field/batch/livestock IDs and GPS coordinates must be plausible",
+        "completeness": "sensor readings and timestamps must be present",
+        "consistency": "yield/moisture/nutrient values must be agronomically coherent",
+        "timeliness": "seasonal readings must be current",
+    },
+}
