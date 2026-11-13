@@ -344,6 +344,39 @@ def ruleset_diff(rid: str, from_: str = "", to: str = "") -> dict[str, Any]:
         raise HTTPException(400, str(exc)) from exc
 
 
+@app.get("/api/rulesets/{rid}/rules")
+def ruleset_rules(rid: str) -> dict[str, Any]:
+    """Return the actual rule definitions for a ruleset (all published versions merged by rule_id)."""
+    import yaml as _yaml
+    found: dict[str, dict[str, Any]] = {}
+    for base in (ROOT / "config" / "rulesets", ROOT / "registry" / "rulesets"):
+        if not base.exists():
+            continue
+        for p in base.rglob("*.yaml"):
+            try:
+                doc = _yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+            except Exception:
+                continue
+            rs = doc.get("ruleset") or {}
+            if rs.get("ruleset_id") != rid:
+                continue
+            for r in rs.get("rules") or []:
+                rid_rule = r.get("rule_id")
+                if rid_rule and rid_rule not in found:
+                    g = r.get("generation") or {}
+                    found[rid_rule] = {
+                        "rule_id": rid_rule, "name": r.get("name"),
+                        "rule_type": r.get("rule_type"), "column": r.get("column"),
+                        "severity": r.get("severity"), "scope": r.get("scope"),
+                        "status": r.get("status"), "confidence": g.get("confidence"),
+                        "description": r.get("description"),
+                        "config": r.get("config") or {},
+                    }
+    if not found:
+        raise HTTPException(404, f"no rules found for ruleset {rid}")
+    return {"ruleset_id": rid, "count": len(found), "rules": list(found.values())}
+
+
 # ------------------------------------------------------------------ datasets / runs
 def _prog(msg: str) -> None:
     """Emit a granular progress update for the job running on this thread.

@@ -22,6 +22,7 @@ export const api = {
   publishRuleset: (ruleset_yaml: string, activate = true) => fetch(`${B}/rulesets/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ruleset_yaml, activate }) }).then(j),
   rulesetAction: (id: string, action: string, version: string) => fetch(`${B}/rulesets/${id}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version }) }).then(j),
   rulesetDiff: (id: string) => fetch(`${B}/rulesets/${id}/diff`).then(j),
+  rulesetRules: (id: string) => fetch(`${B}/rulesets/${id}/rules`).then(j),
   datasets: () => fetch(`${B}/datasets`).then(j),
   run: (body: any) => fetch(`${B}/dq/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   pipelineRun: (id: string, body: any) => fetch(`${B}/pipelines/${id}/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),

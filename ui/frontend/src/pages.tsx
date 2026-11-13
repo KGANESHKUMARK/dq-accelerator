@@ -1683,6 +1683,7 @@ export function Profiles() {
 export function RuleSets() {
   const [rs, setRs] = useState<any[]>([]); const [yaml, setYaml] = useState(''); const [msg, setMsg] = useState(''); const [err, setErr] = useState('')
   const [diff, setDiff] = useState<any>(null); const [selRs, setSelRs] = useState<any>(null)
+  const [rsRules, setRsRules] = useState<any>(null)
 
   const load = () => api.rulesets().then(setRs)
   useEffect(() => { load() }, [])
@@ -1700,6 +1701,9 @@ export function RuleSets() {
   const showDiff = async (id: string) => {
     try { setDiff(await api.rulesetDiff(id)) } catch (e: any) { setErr(e.message) }
   }
+  const showRules = async (id: string) => {
+    try { setRsRules(await api.rulesetRules(id)) } catch (e: any) { setErr(e.message) }
+  }
 
   const grouped: Record<string, any[]> = rs.reduce((a: Record<string, any[]>, r: any) => { (a[r.ruleset_id] = a[r.ruleset_id] ?? []).push(r); return a }, {})
 
@@ -1716,7 +1720,10 @@ export function RuleSets() {
               <span className="muted">{versions[0]?.dataset} · {versions.length} version{versions.length !== 1 ? 's' : ''}</span>
               {active && <span className="badge ACTIVE" style={{ marginLeft: 10 }}>v{active.version} active</span>}
             </div>
-            <button className="btn sm sec" onClick={() => showDiff(rid)}>Diff</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn sm sec" onClick={() => showRules(rid)}>Rules ({versions[0]?.rules ?? '—'})</button>
+              <button className="btn sm sec" onClick={() => showDiff(rid)}>Diff</button>
+            </div>
           </div>
           <table style={{ marginTop: 12 }}>
             <thead><tr><th>Version</th><th>Rules</th><th>Checksum</th><th>Published</th><th>Status</th><th></th></tr></thead>
@@ -1739,6 +1746,34 @@ export function RuleSets() {
         </div>
       )
     })}
+
+    {rsRules && (
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <h3>Rules — {rsRules.ruleset_id} <span className="muted">({rsRules.count} rules)</span></h3>
+          <button className="btn sm sec" onClick={() => setRsRules(null)}>✕</button>
+        </div>
+        <div style={{ overflowX: 'auto', marginTop: 8 }}>
+          <table>
+            <thead><tr><th>Rule</th><th>Name</th><th>Type</th><th>Column</th><th>Severity</th><th>Conf</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              {rsRules.rules.map((r: any) => (
+                <tr key={r.rule_id}>
+                  <td><code style={{ fontSize: 10 }}>{r.rule_id}</code></td>
+                  <td>{r.name}</td>
+                  <td><span className="tag">{r.rule_type}</span></td>
+                  <td className="muted">{r.column ?? '—'}</td>
+                  <td><span className={`badge ${r.severity === 'ERROR' ? 'FAILED' : 'REGISTERED'}`}>{r.severity}</span></td>
+                  <td style={{ color: (r.confidence ?? 0) >= 0.9 ? '#22c55e' : '#eab308', fontWeight: 700 }}>{r.confidence ?? '—'}</td>
+                  <td className="muted">{r.status ?? '—'}</td>
+                  <td className="muted" style={{ maxWidth: 320 }}>{r.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
 
     {diff && (
       <div className="card">
