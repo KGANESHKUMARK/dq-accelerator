@@ -1,6 +1,7 @@
 # Demo Walkthrough — UI click → code path
 
-Demo-scoped nav: **Dashboard · Onboard · Run DQ · Anomalies · Approvals · Reports · Settings**
+Full nav visible: **Dashboard · Onboard · Run DQ · Profiles · Anomalies · Approvals · Rule Sets · Reports · Pipelines · Settings**
+(Settings → Sidebar tabs / Onboard page sections can hide any of these live.)
 
 Say-this lines are in *italics*. File refs are repo-relative.
 
@@ -22,25 +23,29 @@ Say-this lines are in *italics*. File refs are repo-relative.
 
 ## ACT 2 — Onboard → Auto E2E (the hero moment, ~2 min)
 
-**Click:** Onboard tab → top card **"⚡ Auto E2E"** → pick `demo_insurance_claims` → **▶ Run auto E2E**.
+**Click:** Onboard tab → top card **"Auto E2E — one click: profile → rules → publish → run"** → pick `demo_insurance_claims` (or **Browse / upload…** any CSV/Parquet/JSON → auto-fills pipeline ID) → **Preview data** (first 20 rows) → **▶ Run auto E2E**.
 
-*"One click does the whole governed lifecycle — watch the live phases."*
+*"One click onboards ANY file — watch the live steps at the bottom too."*
 
-### What happens live (JobStatus card)
+### What happens live (JobStatus card + bottom Live activity feed)
 
 | Live phase you see | Code path |
 |---|---|
-| `phase=profile \| profiling demo_insurance_claims` | `api.autoRun()` → `POST /api/auto/run` → `J.submit("auto_e2e")` → `_do_auto_e2e()` → `_do_bootstrap_preview()` → `engine.profile()` → `profiling/profiler.py` (column stats, anomalies, IQR outliers) |
+| `phase=spark` / `phase=read` | `api.autoRun()` → `POST /api/auto/run` → `J.submit("auto_e2e")` → `_spark_engine()` → `_read_any_source()` (CSV/Parquet/JSON/TABLE/DELTA) |
+| `phase=profile \| profiling demo_x` + per-job lines | `_do_bootstrap_preview()` → `engine.profile(on_phase=…)` → `profiling/profiler.py` — emits per Spark job: `column statistics for N columns`, `duplicate-row detection`, `top values + cardinality`, `string pattern detection`, `numeric outlier counts`, `building anomaly report` |
 | PII suspects appear | `profiling/profiler.py` `_anomalies()` → `pii/detector.py` heuristics → `PII_SUSPECTED` anomalies |
 | Drift vs last baseline | `_do_bootstrap_preview` → `profiles` collection lookup → `profiling/drift.py` `detect_drift()` |
-| `phase=profile \| generating candidate rules` | `generation/generator.py` `CandidateRuleGenerator.generate()` → NOT_NULL/UNIQUE/RANGE/DATA_TYPE/ALLOWED_VALUES candidates w/ confidence |
+| `phase=profile \| profiled N rows · M anomalies · K candidate rules · K auto-approved` | `generation/generator.py` `CandidateRuleGenerator.generate()` → NOT_NULL/UNIQUE/RANGE/DATA_TYPE/ALLOWED_VALUES candidates w/ confidence |
 | Profile persisted | `_do_bootstrap_preview` → `store.collection("profiles").insert_one()` → Profiles tab viewer |
-| `phase=validate \| N rules approved — writing ruleset + manifest` | `_purge_pipeline_artifacts()` (idempotent reruns) → `onboard_finalize()` → `rules/registry.py` publish (immutable checksum) + `pipelines/manifest.py` manifest YAML + NoSQL `manifests`/`pipelines` |
-| `phase=read \| landing raw data…medallion stages` | `_do_pipeline_run()` → `orchestration/medallion.py` `MedallionRunner.run()` → `raw_df.persist(MEMORY_AND_DISK)` → BRONZE write + ingest manifest → `engine.run()` silver |
-| `phase=validate / remediate / revalidate` | `engine.run()` → `validation/engine.py` + `validation/expressions.py` (per-rule Spark checks) → `remediation/deterministic.py` + `ai_remediation.py` → `policies/confidence.py` 90% gate → quarantine |
-| `✓ COMPLETED` | `reports/<dataset>_silver_DQRUN-*.json` written → `execution_metrics` + `quality_pillars` + `outcome_audit` |
+| `phase=validate \| ruleset … + manifest written · pipeline … registered · gold ruleset …` | `_purge_pipeline_artifacts()` (idempotent reruns) → `onboard_finalize()` → silver ruleset publish + gold ruleset auto-gen (APPROVED copies) + manifest patched with GOLD → `rules/registry.py` publish (immutable checksum) + `pipelines/manifest.py` + NoSQL `manifests`/`pipelines` |
+| `phase=read \| [BRONZE] persisting raw bronze layer` | `_do_pipeline_run()` → `orchestration/medallion.py` `MedallionRunner.run(on_phase=_stage_prog)` → `raw_df.persist(MEMORY_AND_DISK)` → BRONZE write + ingest manifest |
+| `phase=validate \| [SILVER] validating all rules` → `remediate` → `ai` → `revalidate` → `quarantine` → `[SILVER] writing outputs` | `engine.run(on_phase=…)` → `validation/engine.py` + `validation/expressions.py` → `remediation/deterministic.py` + `ai_remediation.py` → `policies/confidence.py` 90% gate → quarantine → parquet writes |
+| `phase=validate \| [GOLD] loading gold ruleset (strict re-check)` → same sub-phases → `[GOLD] writing outputs` | second `engine.run(ENFORCE)` on silver accepted output |
+| `phase=report \| writing run reports` | `reports/<dataset>_{silver,gold}_DQRUN-*.json` + profile JSON → `execution_metrics` + `quality_pillars` + `outcome_audit` |
+| `✓ COMPLETED` → result card | `reports/<dataset>_silver_DQRUN-*.json` written → `execution_metrics` + `quality_pillars` + `outcome_audit`; card shows per-stage accepted/quarantined + **View auto-created profile →** + **View ruleset + versions →** nav buttons |
+| Bottom feed rows | `jobs.py` `progress_cb()` → `_prog_hist[job_id]` (last 60 msgs) → `GET /api/jobs` `progress_log[-10:]` → LiveJobsFeed renders last 4 steps per job, 3s poll |
 
-*Key lines to show if asked:* `main.py` `_do_auto_e2e` (~line 1715), `medallion.py` `run()` (~line 92), `expressions.py` `build_row_check` (~line 96).
+*Key lines to show if asked:* `main.py` `_do_auto_e2e` + `_stage_prog`/`_RUN_PHASE_LABELS`, `medallion.py` `run(on_phase=…)`, `profiler.py` `_emit()` per-job calls, `jobs.py` `progress_cb`.
 
 ---
 
@@ -73,7 +78,22 @@ Say-this lines are in *italics*. File refs are repo-relative.
 
 ---
 
-## ACT 5 — Anomalies (what profiling caught, ~30 sec)
+## ACT 5 — Profiles + Rule Sets (the "where did it come from" beat, ~1 min)
+
+**Click:** auto result card → **View auto-created profile →** (Profiles tab) → back → **View ruleset + versions →** (Rule Sets tab) → **Rules (N)** button on the ruleset card.
+
+| UI element | Code path |
+|---|---|
+| Profile detail | `api.profiles()` → NoSQL `profiles` collection → per-column stats, anomalies, drift baseline written at finalize |
+| Ruleset versions + checksums | `api.rulesets()` → `GET /api/rulesets` → registry index — version, rule count, checksum, ACTIVE badge, Activate/Rollback |
+| **Rules (N) panel** | `api.rulesetRules(id)` → `GET /api/rulesets/{rid}/rules` → registry `get()` per version → full rule table: rule_id, name, type, column, severity, confidence, status, description |
+| Diff | `api.rulesetDiff(id)` → `GET /api/rulesets/{rid}/diff` → added/removed/modified rule IDs between versions |
+
+*Say:* "The engine profiled the data, generated these exact rules with confidence scores — here's the immutable versioned ruleset. Rules are data, not code."
+
+---
+
+## ACT 6 — Anomalies (what profiling caught, ~30 sec)
 
 **Click:** Anomalies tab.
 
@@ -84,7 +104,7 @@ Say-this lines are in *italics*. File refs are repo-relative.
 
 ---
 
-## ACT 6 — Run DQ (optional deep-dive, ~1 min)
+## ACT 7 — Run DQ (optional deep-dive, ~1 min)
 
 **Click:** Run DQ → governed pipeline (manifest-locked) OR ad-hoc (File/Table/Delta/JSON selector + auto-suggest ruleset/policy/pipeline-id).
 
@@ -115,6 +135,11 @@ UI (React) → FastAPI → jobs.py (worker threads, phase progress, cancel)
 
 ## Honest boundaries (say before they ask)
 
-- Local single-node Spark — 1M rows ≈ minutes; Databricks cluster + Photon = seconds. Speed is runtime, not code.
+- Local single-node Spark — 20K rows ≈ 1–2 min, 1M rows ≈ 4–5 min; Databricks cluster + Photon = seconds. Speed is runtime, not code. Parquet ≈ 5–10× faster reads than CSV.
+- Auto-E2E auto-approves ALL candidate rules (accelerator mode) — the manual wizard is the governed review path; Settings toggles can show/hide either.
+- Auto-E2E reruns purge prior same-pipeline artifacts (idempotent) — version history accumulates via manual publish path.
+- AI provider currently MockAI (SIM badge) — `requirements-llm.txt` + `.env` creds enable live Databricks Model Serving.
+- `demo_mongo_claims.json` = MongoDB-style documents via JSON source; native mongo-spark connector ingestion is roadmap.
 - DELTA needs Databricks/EMR jars; TABLE needs registered catalog tables (temp views work locally).
 - P4 cloud execution not done — platform labels verified locally only.
+- Formal schema-contract enforcement (expected-schema → hard drift reject) is a noted gap; ODCS import + profile-driven rules cover most of it.

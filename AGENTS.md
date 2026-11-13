@@ -12,8 +12,37 @@ Last updated: 2026-07-14
 
 - Local Spark engine, UI, CLI, onboarding, rule versioning, quarantine, reports,
   and lifecycle are working.
-- Real Databricks Model Serving remediation was verified earlier.
+- Real Databricks Model Serving remediation was verified earlier; live LLM
+  currently falls back to MockAI (SIM badge) until `requirements-llm.txt` +
+  `.env` creds are installed.
 - Credentials belong in gitignored `.env`; never commit them.
+- **Auto E2E (primary demo path):** Onboard top card runs profile → candidate
+  rules → auto-approve → publish silver+gold rulesets → manifest → governed
+  run (full BRONZE→SILVER→GOLD) in ONE job. Supports browse/upload any
+  CSV/Parquet/JSON, data preview, live JobStatus + bottom Live activity feed
+  (per-job progress_log step history). Idempotent — purges prior same-pipeline
+  artifacts before finalize.
+- **Live progress everywhere:** `on_phase` hooks through profiler (per Spark
+  job messages), engine.run (6 phases), MedallionRunner (`[BRONZE]/[SILVER]/
+  [GOLD]` stage tags) → `_prog()` → jobs.py `progress_cb` → `_prog_hist`
+  (60-msg log) → `progress_log` in `/api/jobs` → LiveJobsFeed on Onboard.
+- **Job result normalization:** `J.get()` flattens nested `result.run` to
+  input/accepted/quarantined/gate_passed/report_path — all dashboard widgets
+  (health score, journey, trends, approvals) include `auto_e2e` kind.
+- **UI toggles:** Settings → Sidebar tabs (nav pages) + Onboard page sections
+  (Auto run pipeline / Manual run pipeline) — localStorage `dq_nav`,
+  `dq_onboard_vis`, `dq_widgets`.
+- **Rule Sets → Rules (N) panel:** `GET /api/rulesets/{rid}/rules` reads via
+  registry `get()` per version (file + NoSQL backends) with YAML file-scan
+  fallback — full rule table: id, name, type, column, severity, confidence,
+  status, description.
+- **Verified demo datasets** (`data/uploads/`, all Auto-E2E tested):
+  insurance 20K (18 rules, 780 quar), hospital 50K (full B→S→G, 1,595 quar),
+  bank_loans 60K, airline 80K, retail 120K, ecommerce 300K (9,510 quar),
+  telco 1M (CSV+parquet, SAMPLE profiling, 25,286 quar), mongo_claims 20K
+  JSON docs (MongoDB-style `_id`+nested — NoSQL-data-via-JSON proof).
+- **Sample manifest:** `docs/sample_pipeline_manifest.yaml` — manual YAML
+  onboarding reference (platform labels, dq_mode, rulesets, test_data).
 - **P0–P3 complete and verified** on `sample_data/minimal/patients_minimal.csv`:
   physical medallion persistence (`MedallionRunner` + `/api/pipelines/{id}/run`),
   managed Bronze ingest manifest, `outcome_audit` terminal outcomes, and

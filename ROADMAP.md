@@ -486,11 +486,15 @@ otherwise. Remote cloud execution is still unverified.
 
 | # | Item | Why | Effort |
 |---|---|---|---|
-| B1 | **Detailed onboarding progress + per-step history** | Onboarding wizard shows only coarse phase names (`phase=spark`); for 200MB+ files users can't see sub-steps. Add profiler progress callbacks (schema read → null rates → distinct counts → anomaly scan), live counters, per-phase elapsed in job history, and profile-preview as soon as profiling finishes | Medium |
+| ~~B1~~ | ~~Detailed onboarding progress + per-step history~~ | **DONE** — profiler per-Spark-job `_emit()` messages, MedallionRunner `on_phase` → `[BRONZE]/[SILVER]/[GOLD]` stage detail, `progress_log` history → bottom Live activity feed on Onboard | — |
 | B2 | Delta local verification | `format: delta` + `catalog:` plumbed; needs a machine with Maven access or pre-staged jars to verify `scripts/verify_delta.py` | Small |
 | B3 | Cloud cluster run evidence | Real Databricks/EMR execution — deployment task, not code | External |
 | B4 | Streaming DQ mode | Batch-only today | Large |
 | B5 | Production auth/multi-tenancy | Local POC | Large |
+| B6 | **Native MongoDB/document-store ingestion** | `demo_mongo_claims.json` proves document-shaped data via JSON source; real `spark-mongo` connector needs cluster JVM deps. Add `format: MONGO` in `_read_any_source` + manifest schema | Medium |
+| B7 | **Formal schema-contract enforcement** | Expected-schema YAML → hard drift rejection (Great-Expectations-style `expect_column_to_exist`). ODCS import + profile-driven DATA_TYPE rules cover ~90%; strict contract gate is the gap | Medium |
+| B8 | **Auto-E2E confidence floor + version accumulation** | Auto-E2E auto-approves ALL candidates (`approve_confidence=0`) and purges prior artifacts for idempotency — fine for demo, but a confidence floor (>0) and version-preserving reruns would strengthen the governance story | Small |
+| B9 | **Rule-batching perf** | Validation runs ~1 Spark job per rule phase; batching row-level rule flags into fewer actions could cut local run time 3–5× | Medium |
 
 ---
 

@@ -2,11 +2,33 @@
 
 Client-facing walkthrough. Everything below was executed against the running
 app (`DQ_start.bat` → backend :8000, frontend :5173). Screenshots should show
-the **Run DQ** page and the **Onboard** wizard.
+the **Onboard** page (Auto E2E card) and the **Run DQ** page.
 
 ---
 
-## Part A — Onboard a user dataset (5 steps, ~3 minutes)
+## Part 0 — One-click onboarding: Auto E2E (primary demo path, ~2–5 min)
+
+The **Auto E2E** card at the top of Onboard does the entire governed lifecycle
+in one job — no wizard steps needed:
+
+| UI action | What happens | What to say |
+|---|---|---|
+| Pick dataset (or **Browse / upload…** any CSV/Parquet/JSON) | Auto-fills source + pipeline ID | "Any file — the engine profiles it automatically." |
+| **Preview data** | First 20 rows table | "Raw input with defects visible — Bronze stays sacred." |
+| **▶ Run auto E2E** (mode REMEDIATE) | Live phases: profile → rules → publish → **[BRONZE]→[SILVER]→[GOLD]** → reports | "One click: profile, generate rules, publish immutably, generate Gold ruleset, run full medallion." |
+| Watch **bottom Live activity feed** | Step history per job, updates every 3s | "Every step is visible live — not a black box." |
+| Result card → **View auto-created profile →** / **View ruleset + versions →** | Profiles tab / Rule Sets tab | "Here's the auto-created profile and the versioned ruleset it generated." |
+
+**Verified datasets** (`data/uploads/` — all appear in the dropdown):
+`demo_insurance_claims` (20K, primary), `demo_hospital_encounters` (50K),
+`demo_bank_loans` (60K), `demo_airline_flights` (80K), `demo_retail_inventory`
+(120K), `demo_ecommerce_orders` (300K), `demo_telco_events` (1M, use `.parquet`
+for speed), `demo_mongo_claims` (20K MongoDB-style JSON docs).
+
+> Settings → **Onboard page sections** can hide the Auto E2E card or the manual
+> wizard independently — useful for focusing the demo on one flow.
+
+## Part A — Manual onboarding wizard (governance path, ~3 minutes)
 
 The wizard mirrors what a client's data engineer will do. Use
 `sample_data/bronze/goat_herd_animals.csv` for the live demo, or any client
@@ -26,7 +48,17 @@ Result: pipeline shows `REGISTERED → TESTED → ACTIVE` with its ruleset
 > Tip: reject `STRING_LENGTH` and unverified `DATA_TYPE` candidates — learned
 > min/max length and inferred types produce false positives on real data.
 
-## Part B — The demo run (the money shot)
+## Part B — Inspect the evidence (profiles, rules, reports)
+
+| Page | Show | Say |
+|---|---|---|
+| **Profiles** | Auto-created profile per dataset | "Profiler ran automatically — column stats, anomalies, PII suspects, drift baseline." |
+| **Rule Sets → Rules (N)** | Click Rules on any ruleset card | "The actual generated rules — type, column, confidence, evidence-based description." |
+| **Rule Sets** | Versions, checksums, diff, activate/rollback | "Immutable, versioned, diffable — rules are data, not code." |
+| **Reports → Stage data preview** | BRONZE/SILVER/GOLD/QUARANTINE | "Real rows per layer — quarantine shows exactly what was rejected and why." |
+| **Reports → AI activity** | Per-record AI fixes | "Every AI decision auditable — SIM/LIVE badge shows real LLM vs fallback." |
+
+## Part C — The demo run (the money shot)
 
 Run DQ → select the pipeline → **▶▶ Run all stages** → mode `REMEDIATE`.
 
@@ -67,7 +99,7 @@ Outcome evidence — **every path exercised with the real Databricks LLM**
 - `NO_SAFE_PROPOSAL` ×6 — missing tags/dates, weight outlier → quarantined
   for human review.
 
-## Part C — Talking points (30-second versions)
+## Part D — Talking points (30-second versions)
 
 1. **"We don't rewrite your pipeline."** Engine plugs into an existing
    Spark DataFrame; host keeps its SparkSession. 6 lines of integration.
@@ -85,7 +117,7 @@ Outcome evidence — **every path exercised with the real Databricks LLM**
    Fabric, EMR, Dataproc, standalone — verified identical results under all
    platform labels on local Spark.
 
-## Part D — Pre-demo checklist
+## Part E — Pre-demo checklist
 
 - [ ] `DQ_start.bat` launched; backend `:8000/api/health` = ok
 - [ ] `.env` present (Databricks LLM creds) — `GET /api/ai/status` →
@@ -95,7 +127,7 @@ Outcome evidence — **every path exercised with the real Databricks LLM**
 - [ ] Browser on `http://localhost:5173`, Run DQ page open
 - [ ] Reports dir has prior runs for trend charts
 
-## Part E — If asked harder questions
+## Part F — If asked harder questions
 
 | Question | Answer |
 |---|---|
