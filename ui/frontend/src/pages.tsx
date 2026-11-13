@@ -2205,7 +2205,6 @@ export function Settings() {
         <label style={{ fontSize: 12 }}>Backend</label>
         <select value={metaBackend} onChange={e => setMetaBackend(e.target.value)} style={{ padding: '4px 8px' }}>
           <option value="file">file (YAML/JSON registry)</option>
-          <option value="sqlite">sqlite</option>
           <option value="nosql">nosql (document store)</option>
         </select>
         {metaBackend === 'nosql' && <>
