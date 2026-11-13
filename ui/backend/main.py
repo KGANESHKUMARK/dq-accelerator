@@ -391,7 +391,7 @@ _RUN_PHASE_LABELS = {
 @app.get("/api/datasets")
 def datasets() -> list[dict[str, Any]]:
     out: list[dict[str, str]] = []
-    for d in (ROOT / "sample_data" / "bronze", ROOT / "data" / "uploads"):
+    for d in (ROOT / "sample_data" / "bronze", ROOT / "sample_data" / "demo", ROOT / "data" / "uploads"):
         if not d.exists():
             continue
         for p in sorted(d.glob("*.csv")) + sorted(d.glob("*.parquet")) + sorted(d.glob("*.json")):

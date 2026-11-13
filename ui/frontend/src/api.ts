@@ -18,6 +18,7 @@ export const api = {
   profiles: () => fetch(`${B}/profiles`).then(j),
   profileDetail: (dataset: string) => fetch(`${B}/profiles/${encodeURIComponent(dataset)}`).then(j),
   aiActivity: () => fetch(`${B}/ai/activity`).then(j),
+  autoRun: (body: any) => fetch(`${B}/auto/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   publishRuleset: (ruleset_yaml: string, activate = true) => fetch(`${B}/rulesets/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ruleset_yaml, activate }) }).then(j),
   rulesetAction: (id: string, action: string, version: string) => fetch(`${B}/rulesets/${id}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version }) }).then(j),
   rulesetDiff: (id: string) => fetch(`${B}/rulesets/${id}/diff`).then(j),

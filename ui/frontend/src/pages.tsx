@@ -968,8 +968,53 @@ export function Onboard() {
   }
   const confColor = (c: number) => c >= 0.9 ? 'var(--success)' : c >= 0.7 ? 'var(--warn)' : 'var(--danger)'
 
+  // ── Auto E2E — one-click onboard + governed run ──
+  const [autoJobId, setAutoJobId] = useState<string | null>(null)
+  const autoJob = usePoll(autoJobId)
+  const [autoSrc, setAutoSrc] = useState(''); const [autoPid, setAutoPid] = useState(''); const [autoMode, setAutoMode] = useState('REMEDIATE')
+  const runAuto = async () => {
+    setErr('')
+    const stem = (autoSrc.split('/').pop() || '').replace(/\.[^.]+$/, '')
+    const dsName = stem.toLowerCase()
+    const pid = autoPid || `${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`
+    try {
+      const r = await api.autoRun({ source: autoSrc, dataset: dsName, pipeline_id: pid, mode: autoMode, stage, source_format: 'AUTO', policy: 'config/policies/default.yaml', approve_confidence: 0 })
+      setAutoJobId(r.job_id)
+    } catch (e: any) { setErr(e.message) }
+  }
+  const autoRes = autoJob?.status === 'COMPLETED' ? autoJob.result : null
+
   return <>
     <div className="section-title">Onboard a pipeline</div>
+
+    <div className="card" style={{ borderColor: 'var(--accent, #4f8cff)' }}>
+      <h3>⚡ Auto E2E — one click: profile → rules → publish → run</h3>
+      <div className="info-box" style={{ marginBottom: 8 }}>Skips manual review — profiles the source, auto-approves all candidate rules, publishes the ruleset, onboards the pipeline, then runs governed DQ. Watch live progress below.</div>
+      <div className="form-grid">
+        <div className="field"><label>Source file</label>
+          <select value={autoSrc} onChange={e => { setAutoSrc(e.target.value); const s = (e.target.value.split('/').pop() || '').replace(/\.[^.]+$/, ''); setAutoPid(`${s.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`) }}>
+            <option value="">— pick a dataset —</option>
+            {datasets.map((d: any) => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
+          </select>
+        </div>
+        <div className="field"><label>Pipeline ID</label><input value={autoPid} onChange={e => setAutoPid(e.target.value)} placeholder="AUTO_GENERATED_PIPELINE" /></div>
+        <div className="field"><label>Mode</label>
+          <select value={autoMode} onChange={e => setAutoMode(e.target.value)}>
+            <option value="REMEDIATE">REMEDIATE — fix + quarantine</option>
+            <option value="ENFORCE">ENFORCE — gate only</option>
+            <option value="OBSERVE_ONLY">OBSERVE_ONLY — measure only</option>
+          </select>
+        </div>
+        <div className="field" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={runAuto} disabled={!autoSrc || !!(autoJob && (autoJob.status === 'RUNNING' || autoJob.status === 'QUEUED'))}>▶ Run auto E2E</button>
+        </div>
+      </div>
+      {autoJob && <div style={{ marginTop: 10 }}><JobStatus job={autoJob} /></div>}
+      {autoRes && <div className="info-box" style={{ marginTop: 8 }}>
+        ✅ Auto E2E done — <b>{autoRes.dataset}</b> · ruleset <b>{autoRes.ruleset}</b> · {autoRes.rules_approved} rules approved{autoRes.rules_rejected ? ` · ${autoRes.rules_rejected} rejected` : ''}
+        {(autoRes.run?.stages || []).map((s: any) => <div key={s.stage} style={{ marginTop: 2 }}>· {s.stage}: {s.status} — accepted {s.accepted ?? '—'} / quarantined {s.quarantined ?? '—'}</div>)}
+      </div>}
+    </div>
 
     <div className="card">
       <div className="steps" style={{ marginBottom: 16 }}>
