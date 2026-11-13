@@ -983,11 +983,16 @@ export function Onboard() {
     } catch (e: any) { setErr(e.message) }
   }
   const autoRes = autoJob?.status === 'COMPLETED' ? autoJob.result : null
+  const [onboardVis] = useState(() => {
+    try { return { auto: true, manual: true, ...JSON.parse(localStorage.getItem('dq_onboard_vis') || '{}') } } catch { return { auto: true, manual: true } }
+  })
+  const showAuto = onboardVis.auto !== false
+  const showManual = onboardVis.manual !== false
 
   return <>
     <div className="section-title">Onboard a pipeline</div>
 
-    <div className="card" style={{ borderColor: 'var(--accent, #4f8cff)' }}>
+    {showAuto && <div className="card" style={{ borderColor: 'var(--accent, #4f8cff)' }}>
       <h3>Auto E2E — one click: profile → rules → publish → run</h3>
       <div className="info-box" style={{ marginBottom: 8 }}>Skips manual review — profiles the source, auto-approves all candidate rules, publishes the ruleset, onboards the pipeline, then runs governed DQ. Watch live progress below.</div>
       <div className="form-grid">
@@ -1014,8 +1019,9 @@ export function Onboard() {
         ✅ Auto E2E done — <b>{autoRes.dataset}</b> · ruleset <b>{autoRes.ruleset}</b> · {autoRes.rules_approved} rules approved{autoRes.rules_rejected ? ` · ${autoRes.rules_rejected} rejected` : ''}
         {(autoRes.run?.stages || []).map((s: any) => <div key={s.stage} style={{ marginTop: 2 }}>· {s.stage}: {s.status} — accepted {s.accepted ?? '—'} / quarantined {s.quarantined ?? '—'}</div>)}
       </div>}
-    </div>
+    </div>}
 
+    {showManual && <>
     <div className="card">
       <div className="steps" style={{ marginBottom: 16 }}>
         {WIZ_STEPS.map((s, i) => <React.Fragment key={s}>
@@ -1170,6 +1176,7 @@ export function Onboard() {
         <button className="btn sec" onClick={() => { setStep(0); setSource(''); setJobId(null); setResult(null); setPipelineId('') }}>Onboard another</button>
       </div>
     </div>}
+    </>}
   </>
 }
 
@@ -1929,6 +1936,14 @@ export function Settings() {
     localStorage.setItem('dq_nav', JSON.stringify(next))
     return next
   })
+  const [onboardVis, setOnboardVis] = useState<Record<string, boolean>>(() => {
+    try { return { auto: true, manual: true, ...JSON.parse(localStorage.getItem('dq_onboard_vis') || '{}') } } catch { return { auto: true, manual: true } }
+  })
+  const toggleOnboardVis = (key: string) => setOnboardVis(prev => {
+    const next = { ...prev, [key]: !(prev[key] ?? true) }
+    localStorage.setItem('dq_onboard_vis', JSON.stringify(next))
+    return next
+  })
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
@@ -2047,6 +2062,20 @@ export function Settings() {
           ))}
         </div>
         <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>Settings stays visible so you can always re-enable tabs.</div>
+      </div>
+      <div className="card">
+        <h3>Onboard page sections <span className="muted">— show/hide auto vs manual run pipeline (saved locally)</span></h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={onboardVis.auto !== false} onChange={() => toggleOnboardVis('auto')} />
+            Auto run pipeline — Auto E2E card
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={onboardVis.manual !== false} onChange={() => toggleOnboardVis('manual')} />
+            Manual run pipeline — step-by-step wizard
+          </label>
+        </div>
+        <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>Hide one to demo a single flow — e.g. only Auto E2E, or only the manual wizard.</div>
       </div>
       <h3>Metadata store <span className="badge">{meta?.backend ?? '—'}{meta?.metadata_engine ? ' / ' + meta.metadata_engine : ''}</span></h3>
       {meta && <div className="form-grid" style={{ marginBottom: 12 }}>
