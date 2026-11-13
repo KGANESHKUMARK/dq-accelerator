@@ -990,12 +990,13 @@ export function Onboard() {
   const showAuto = onboardVis.auto !== false
   const showManual = onboardVis.manual !== false
   const [autoPeek, setAutoPeek] = useState<any>(null); const [autoPeekBusy, setAutoPeekBusy] = useState(false); const [autoUpBusy, setAutoUpBusy] = useState(false)
+  const clearAutoIfDone = () => { if (!autoJob || ['COMPLETED', 'FAILED', 'CANCELLED'].includes(autoJob.status)) setAutoJobId(null) }
   const autoUpload = async (f: File) => {
     setAutoUpBusy(true); setErr('')
     try {
       const r = await api.upload(f)
       const stem = (r.filename || f.name).replace(/\.[^.]+$/, '').toLowerCase()
-      setAutoSrc(r.path); setAutoPid(`${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`); setAutoPeek(null)
+      setAutoSrc(r.path); setAutoPid(`${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`); setAutoPeek(null); clearAutoIfDone()
     } catch (e: any) { setErr(e.message) } finally { setAutoUpBusy(false) }
   }
   const peekAuto = async () => { setAutoPeekBusy(true); try { setAutoPeek(await api.sourcePreview(autoSrc)) } catch (e: any) { setAutoPeek({ error: e.message }) } finally { setAutoPeekBusy(false) } }
@@ -1008,7 +1009,7 @@ export function Onboard() {
       <div className="info-box" style={{ marginBottom: 8 }}>Skips manual review — profiles the source, auto-approves all candidate rules, publishes the ruleset, onboards the pipeline, then runs governed DQ. Watch live progress below.</div>
       <div className="form-grid">
         <div className="field"><label>Source file</label>
-          <select value={autoSrc} onChange={e => { setAutoSrc(e.target.value); setAutoPeek(null); const s = (e.target.value.split('/').pop() || '').replace(/\.[^.]+$/, ''); setAutoPid(`${s.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`) }}>
+          <select value={autoSrc} onChange={e => { setAutoSrc(e.target.value); setAutoPeek(null); clearAutoIfDone(); const s = (e.target.value.split('/').pop() || '').replace(/\.[^.]+$/, ''); setAutoPid(`${s.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`) }}>
             <option value="">— pick a dataset —</option>
             {datasets.map((d: any) => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
           </select>
