@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: DEMO_INSURANCE_CLAIMS_PIPELINE
+  pipeline_name: Demo Insurance Claims Pipeline
+  platform: STANDALONE_SPARK
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: auto-e2e
+  description: Onboarded via UI wizard from demo_insurance_claims.csv (20000 rows profiled)
+  policy: config/policies/default.yaml
+  datasets:
+  - dataset_id: demo_insurance_claims
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    rulesets:
+      SILVER: ../rulesets/demo_insurance_claims_v1.yaml
+    test_data: ../../data/uploads/demo_insurance_claims.csv
+    test_data_format: CSV

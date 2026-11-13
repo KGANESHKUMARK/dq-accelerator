@@ -1725,7 +1725,37 @@ def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
         platform=plat, stage=body.stage, dq_mode=body.mode,
         policy=body.policy, owner=body.owner, source=body.source,
         source_format=body.source_format, publish=True, onboard=True, force=True))
-    _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()}")
+    # ── Gold stage: stricter re-validation — full Bronze→Silver→Gold in one run ──
+    try:
+        _prog("phase=validate | auto-e2e: building GOLD ruleset (stricter re-check)")
+        import yaml as _yaml
+        from dq_core.metadata.models import RuleSet as _RS
+        from dq_core.metadata.serialization import dump_yaml as _dump
+        approved_set = set(approved)
+        gold_dict = {"ruleset_id": f"{ds}_gold", "version": "1.0", "stage": "GOLD",
+                     "dataset": ds, "rules": []}
+        for c in res["candidates"]:
+            if c["rule_id"] in approved_set and isinstance(c.get("raw"), dict):
+                raw = dict(c["raw"]); raw["stage"] = "GOLD"; raw["ruleset_id"] = f"{ds}_gold"
+                raw["status"] = "APPROVED"
+                gold_dict["rules"].append(raw)
+        if gold_dict["rules"]:
+            gold_rs = _RS.from_dict(gold_dict)
+            gpath = ROOT / "config" / "rulesets" / f"{ds}_gold_v1.yaml"
+            from dq_core.metadata.serialization import save_ruleset as _sv
+            _sv(gold_rs, gpath)
+            _registry("rulesets").publish(gold_rs, published_by=body.owner or "auto-e2e", activate=True)
+            mpath = ROOT / "config" / "pipelines" / f"{body.pipeline_id.upper()}.yaml"
+            m = _yaml.safe_load(mpath.read_text(encoding="utf-8"))
+            rel = os.path.relpath(gpath, mpath.parent).replace("\\", "/")
+            m["pipeline"]["datasets"][0]["rulesets"]["GOLD"] = rel
+            if "GOLD" not in m["pipeline"]["datasets"][0].get("stages", []):
+                m["pipeline"]["datasets"][0].setdefault("stages", []).append("GOLD")
+            _dump(m, mpath)
+            fout["gold_ruleset"] = f"{ds}_gold@1.0"
+    except Exception as exc:
+        print(f"[auto-e2e] gold setup failed (silver still runs): {exc}")
+    _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()} (bronze→silver→gold)")
     run = _do_pipeline_run(body.pipeline_id.upper(), PipelineRunIn(dataset_id=ds, mode=body.mode))
     return {"dataset": ds, "ruleset": fout.get("ruleset"), "rules_approved": len(approved),
             "rules_rejected": fout.get("rules_rejected"), "run": run}

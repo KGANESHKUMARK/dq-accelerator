@@ -27,8 +27,15 @@ const PAGES: Page[] = [
   { id: 'settings',   label: 'Settings',        icon: '⚙', section: 'SYSTEM',     component: Settings },
 ]
 
+// Demo-scoped nav: admin/internal tabs hidden by default; Settings → Sidebar tabs
+// can re-enable any of them (stored in localStorage dq_nav).
+const DEMO_HIDE = new Set(['profiles', 'rulesets', 'pipelines'])
 const navVisible = (id: string): boolean => {
-  try { const n = JSON.parse(localStorage.getItem('dq_nav') || '{}'); return n[id] !== false } catch { return true }
+  try {
+    const n = JSON.parse(localStorage.getItem('dq_nav') || 'null')
+    if (n && typeof n === 'object' && id in n) return n[id] !== false
+    return !DEMO_HIDE.has(id)
+  } catch { return !DEMO_HIDE.has(id) }
 }
 
 export default function App() {
