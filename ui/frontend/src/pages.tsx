@@ -1047,6 +1047,11 @@ export function Onboard() {
     {step === 3 && preview && <div className="card">
       <h3>Step 4 · Review candidate rules</h3>
       <div className="info-box">{approved.size} of {preview.candidate_count} rules approved. Unchecked rules are excluded from the published ruleset. Colour = confidence (green ≥ 0.9 / amber ≥ 0.7 / red &lt; 0.7 — review carefully).</div>
+      <div className="btn-row" style={{ margin: '8px 0' }}>
+        <button className="btn sm sec" onClick={() => setApproved(new Set(preview.candidates.map((c: any) => c.rule_id)))}>Select all</button>
+        <button className="btn sm sec" onClick={() => setApproved(new Set())}>Clear all</button>
+        <button className="btn sm sec" onClick={() => setApproved(new Set(preview.candidates.filter((c: any) => (c.confidence ?? 0) >= 0.9).map((c: any) => c.rule_id)))}>High confidence (≥0.9) only</button>
+      </div>
       <div style={{ marginTop: 10 }}>
         {preview.candidates.map((c: any) => (
           <label className="rule-check-row" key={c.rule_id}>
