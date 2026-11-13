@@ -38,6 +38,12 @@ const navVisible = (id: string): boolean => {
   } catch { return !DEMO_HIDE.has(id) }
 }
 
+const SparkBadge = () => {
+  const [master, setMaster] = useState('…')
+  useEffect(() => { api.getConfig().then(c => setMaster(c?.runtime?.spark_master ?? 'local')).catch(() => setMaster('local')) }, [])
+  return <span className="muted" style={{ fontSize: 12 }}>Spark {master}</span>
+}
+
 export default function App() {
   const [pageId, setPageId] = useState('dashboard')
   const [pipeFocus, setPipeFocus] = useState<string | null>(null)
@@ -103,7 +109,7 @@ export default function App() {
             <b>{page.label}</b>
           </div>
           <div className="top-bar-right">
-            <span className="muted" style={{ fontSize: 12 }}>Spark local[8]</span>
+            <SparkBadge />
           </div>
         </div>
         <div className="page-content">
