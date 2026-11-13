@@ -279,6 +279,13 @@ def ruleset_files() -> list[str]:
     return sorted(p.name for p in d.glob("*.yaml")) if d.exists() else []
 
 
+@app.get("/api/policies/files")
+def policy_files() -> list[str]:
+    """YAML filenames in config/policies — for policy dropdowns."""
+    d = ROOT / "config" / "policies"
+    return sorted(p.name for p in d.glob("*.yaml")) if d.exists() else []
+
+
 class RulesetIn(BaseModel):
     ruleset_yaml: str
     activate: bool = True
@@ -382,11 +389,22 @@ _RUN_PHASE_LABELS = {
 
 
 @app.get("/api/datasets")
-def datasets() -> list[dict[str, str]]:
-    d = ROOT / "sample_data" / "bronze"
-    files = sorted(d.glob("*.csv")) + sorted(d.glob("*.parquet"))
-    return [{"id": p.stem, "path": str(p.relative_to(ROOT)).replace("\\", "/")}
-            for p in files]
+def datasets() -> list[dict[str, Any]]:
+    out: list[dict[str, str]] = []
+    for d in (ROOT / "sample_data" / "bronze", ROOT / "data" / "uploads"):
+        if not d.exists():
+            continue
+        for p in sorted(d.glob("*.csv")) + sorted(d.glob("*.parquet")) + sorted(d.glob("*.json")):
+            rows = None
+            if p.suffix.lower() == ".parquet":
+                try:
+                    import pyarrow.parquet as _pq
+                    rows = _pq.read_metadata(str(p)).num_rows
+                except Exception:
+                    pass
+            out.append({"id": p.stem, "path": str(p.relative_to(ROOT)).replace("\\", "/"),
+                        "size_mb": round(p.stat().st_size / 1e6, 1), "rows": rows})
+    return out
 
 
 class RunIn(BaseModel):

@@ -99,6 +99,12 @@ const JobStatus = ({ job }: { job: Job | null }) => {
         </span>
         <span className="muted" style={{ fontSize: 11 }}>{job.job_id}</span>
       </div>
+      {job.status === 'FAILED' && job.error && (
+        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid var(--danger)', borderRadius: 6, padding: '8px 10px', marginBottom: 10 }}>
+          <div style={{ color: 'var(--danger)', fontWeight: 700, fontSize: 12, marginBottom: 4 }}>✕ JOB FAILED{job.progress ? ` — stopped at: ${job.progress}` : ''}</div>
+          <pre className="err" style={{ margin: 0, maxHeight: 200, overflow: 'auto', fontSize: 11, whiteSpace: 'pre-wrap' }}>{job.error}</pre>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         {PHASE_LABELS.map((_, i) => chip(i))}
       </div>
@@ -108,7 +114,7 @@ const JobStatus = ({ job }: { job: Job | null }) => {
       {phases && <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
         phase timings: {Object.entries(phases).map(([k, v]) => `${k} ${(v / 1000).toFixed(1)}s`).join(' · ')}
       </div>}
-      {job.error && <pre className="err" style={{ marginTop: 8 }}>{job.error}</pre>}
+      {job.error && job.status !== 'FAILED' && <pre className="err" style={{ marginTop: 8 }}>{job.error}</pre>}
       {job.result?.summary && <pre style={{ marginTop: 8 }}>{job.result.summary}</pre>}
     </div>
   )
@@ -928,6 +934,8 @@ export function Onboard() {
   const [pipelineId, setPipelineId] = useState(''); const [platform, setPlatform] = useState('DATABRICKS')
   const [stage, setStage] = useState('SILVER'); const [dqMode, setDqMode] = useState('OBSERVE_ONLY')
   const [policy, setPolicy] = useState('../policies/default.yaml'); const [owner, setOwner] = useState('')
+  const [polFiles, setPolFiles] = useState<string[]>([])
+  useEffect(() => { api.policyFiles().then(setPolFiles).catch(() => {}) }, [])
   const [pub, setPub] = useState(true); const [onb, setOnb] = useState(true); const [force, setForce] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
   const [approved, setApproved] = useState<Set<string>>(new Set())
@@ -1015,8 +1023,10 @@ export function Onboard() {
           <option>OBSERVE_ONLY</option><option>ENFORCE</option><option>REMEDIATE</option>
         </select></div>
         <div className="field"><label>Policy reference</label><select value={policy} onChange={e => setPolicy(e.target.value)}>
+          {polFiles.length ? polFiles.map(f => <option key={f} value={`../policies/${f}`}>{f.replace(/\.yaml$/, '')}</option>) : <>
           <option value="../policies/default.yaml">Default (banking)</option>
           <option value="../policies/healthcare.yaml">Healthcare (PHI)</option>
+          </>}
         </select></div>
         <div className="field span2"><label>Owner email</label><input value={owner} onChange={e => setOwner(e.target.value)} placeholder="team@example.com" /></div>
       </div>
@@ -1115,7 +1125,9 @@ export function RunDQ() {
   const [govDs, setGovDs] = useState<any[]>([])
   const [rsOpts, setRsOpts] = useState<{ label: string; value: string }[]>([])
   const [rsFiles, setRsFiles] = useState<string[]>([])
+  const [polFiles, setPolFiles] = useState<string[]>([])
   useEffect(() => { api.rulesetFiles().then(setRsFiles).catch(() => {}) }, [])
+  useEffect(() => { api.policyFiles().then(setPolFiles).catch(() => {}) }, [])
   const [src, setSrc] = useState(''); const [rs, setRs] = useState('config/rulesets/customers_v1.yaml')
   const [mode, setMode] = useState('OBSERVE_ONLY'); const [ds, setDs] = useState('customers')
   const [pid, setPid] = useState('UI_RUN'); const [pol, setPol] = useState('config/policies/default.yaml')
@@ -1187,7 +1199,7 @@ export function RunDQ() {
                 {govDs.map((d: any) => <option key={d.dataset_id} value={d.dataset_id}>{d.dataset_id}</option>)}
               </select>
             : <select value={src} onChange={e => { setSrc(e.target.value); setDs(e.target.selectedOptions[0].text.split(' — ')[0]) }}>
-                {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}</option>)}
+                {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
               </select>}
         </div>
         {governed && <div className="field"><label>Source (test_data)</label><input value={src} readOnly /></div>}
@@ -1198,8 +1210,10 @@ export function RunDQ() {
         </div>
         <div className="field"><label>Policy{governed ? ' (from manifest, locked)' : ''}</label>
           <select value={pol} onChange={e => setPol(e.target.value)} disabled={governed}>
+            {polFiles.length ? polFiles.map(f => <option key={f} value={`config/policies/${f}`}>{f.replace(/\.yaml$/, '')}</option>) : <>
             <option value="config/policies/default.yaml">Default (banking)</option>
             <option value="config/policies/healthcare.yaml">Healthcare (PHI)</option>
+            </>}
           </select>
         </div>
         <div className="field"><label>Mode</label>
@@ -1212,8 +1226,8 @@ export function RunDQ() {
         </div>
         <div className="field"><label>View past result</label>
           <select value="" onChange={e => { const id = e.target.value; if (!id) return; if (past.find(x => x.job_id === id)?.kind === 'profile') setPjob(id); else setJobId(id); e.target.value = '' }}>
-            <option value="">— completed jobs —</option>
-            {past.filter(x => x.status === 'COMPLETED').map(x => <option key={x.job_id} value={x.job_id}>{x.job_id} · {x.kind}</option>)}
+            <option value="">— past jobs (incl. failed) —</option>
+            {past.filter(x => x.status === 'COMPLETED' || x.status === 'FAILED').map(x => <option key={x.job_id} value={x.job_id}>{x.job_id} · {x.kind}{x.status === 'FAILED' ? ' ✗ FAILED' : ''}</option>)}
           </select>
         </div>
       </div>
@@ -1383,6 +1397,30 @@ export function Approvals() {
         ))}
       </> : <p className="muted" style={{ marginTop: 8 }}>No decisions recorded yet.</p>}
     </div>
+
+    {decisions && (() => {
+      const seen = new Map<string, any>()
+      for (const a of decisions.approvals ?? []) {
+        const k = `${a.dataset}|${a.column}|${a.original_value}|${a.approved_value}`
+        const cur = seen.get(k)
+        seen.set(k, cur ? { ...cur, count: cur.count + 1 } : { ...a, count: 1 })
+      }
+      const mem = [...seen.values()]
+      if (!mem.length) return null
+      return <div className="card">
+        <h3>Remembered corrections <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— auto-applied on future runs (HUMAN_APPROVED_AI)</span></h3>
+        <div className="info-box" style={{ marginTop: 6 }}>Steward-approved fixes the engine remembers — same bad value is corrected automatically without re-asking. {mem.length} unique correction{mem.length === 1 ? '' : 's'}.</div>
+        {mem.map((a: any, i: number) => (
+          <div key={i} className="approval-row" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
+            <span className="tag">{a.dataset}</span>
+            <span className="muted">{a.column}</span>
+            <span className="val-orig">{a.original_value}</span>
+            <span className="val-new">{a.approved_value}</span>
+            <span className="muted" style={{ fontSize: 11 }}>×{a.count} approved · {String(a.approved_at ?? '').slice(0, 10)}</span>
+          </div>
+        ))}
+      </div>
+    })()}
   </>
 }
 
