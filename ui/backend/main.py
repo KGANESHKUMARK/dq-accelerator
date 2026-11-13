@@ -1163,13 +1163,14 @@ def pipeline_journey(pid: str) -> dict[str, Any]:
     rows = J.list_jobs(limit=200)
     runs: list[dict[str, Any]] = []
     for r in rows:
-        if r.get("kind") not in ("pipeline_run", "dq_run") or r.get("status") != "COMPLETED":
+        if r.get("kind") not in ("pipeline_run", "dq_run", "auto_e2e") or r.get("status") != "COMPLETED":
             continue
         j = J.get(r["job_id"])
         res = (j or {}).get("result") or {}
-        if res.get("pipeline_id") != pid:
+        res_pid = res.get("pipeline_id") or (res.get("run") or {}).get("pipeline_id")
+        if res_pid != pid:
             continue
-        stages = res.get("stages") or []
+        stages = res.get("stages") or (res.get("run") or {}).get("stages") or []
         if not stages:  # dq_run single-stage results carry scores differently
             score = ((res.get("quality_gate") or {}).get("quality_score")
                      or (res.get("summary") or {}).get("quality_score"))
