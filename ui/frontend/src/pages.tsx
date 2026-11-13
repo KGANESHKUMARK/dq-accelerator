@@ -988,6 +988,16 @@ export function Onboard() {
   })
   const showAuto = onboardVis.auto !== false
   const showManual = onboardVis.manual !== false
+  const [autoPeek, setAutoPeek] = useState<any>(null); const [autoPeekBusy, setAutoPeekBusy] = useState(false); const [autoUpBusy, setAutoUpBusy] = useState(false)
+  const autoUpload = async (f: File) => {
+    setAutoUpBusy(true); setErr('')
+    try {
+      const r = await api.upload(f)
+      const stem = (r.filename || f.name).replace(/\.[^.]+$/, '').toLowerCase()
+      setAutoSrc(r.path); setAutoPid(`${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`); setAutoPeek(null)
+    } catch (e: any) { setErr(e.message) } finally { setAutoUpBusy(false) }
+  }
+  const peekAuto = async () => { setAutoPeekBusy(true); try { setAutoPeek(await api.sourcePreview(autoSrc)) } catch (e: any) { setAutoPeek({ error: e.message }) } finally { setAutoPeekBusy(false) } }
 
   return <>
     <div className="section-title">Onboard a pipeline</div>
@@ -997,10 +1007,14 @@ export function Onboard() {
       <div className="info-box" style={{ marginBottom: 8 }}>Skips manual review — profiles the source, auto-approves all candidate rules, publishes the ruleset, onboards the pipeline, then runs governed DQ. Watch live progress below.</div>
       <div className="form-grid">
         <div className="field"><label>Source file</label>
-          <select value={autoSrc} onChange={e => { setAutoSrc(e.target.value); const s = (e.target.value.split('/').pop() || '').replace(/\.[^.]+$/, ''); setAutoPid(`${s.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`) }}>
+          <select value={autoSrc} onChange={e => { setAutoSrc(e.target.value); setAutoPeek(null); const s = (e.target.value.split('/').pop() || '').replace(/\.[^.]+$/, ''); setAutoPid(`${s.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`) }}>
             <option value="">— pick a dataset —</option>
             {datasets.map((d: any) => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
           </select>
+          <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+            <label className="btn sm sec" style={{ cursor: 'pointer', margin: 0 }}>{autoUpBusy ? 'Uploading…' : 'Browse / upload…'}<input type="file" accept=".csv,.parquet,.json" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && autoUpload(e.target.files[0])} /></label>
+            {autoSrc && <button className="btn sm sec" onClick={peekAuto} disabled={autoPeekBusy}>{autoPeekBusy ? 'Loading…' : 'Preview data'}</button>}
+          </div>
         </div>
         <div className="field"><label>Pipeline ID</label><input value={autoPid} onChange={e => setAutoPid(e.target.value)} placeholder="AUTO_GENERATED_PIPELINE" /></div>
         <div className="field"><label>Mode</label>
@@ -1014,6 +1028,23 @@ export function Onboard() {
           <button className="btn" onClick={runAuto} disabled={!autoSrc || !!(autoJob && (autoJob.status === 'RUNNING' || autoJob.status === 'QUEUED'))}>▶ Run auto E2E</button>
         </div>
       </div>
+      {autoPeek && <div className="card" style={{ marginTop: 10 }}>
+        <h3>Source data preview <span className="muted">— first {autoPeek.shown ?? 0} rows of {autoSrc}</span></h3>
+        {autoPeek.error && <div className="warn-box">{autoPeek.error}</div>}
+        {autoPeek.rows?.length > 0 && <>
+          <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{autoPeek.columns.length} columns · sample only — full profiling happens during the run</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr>{autoPeek.columns.map((c: string) => <th key={c}>{c}</th>)}</tr></thead>
+              <tbody>
+                {autoPeek.rows.map((r: any, i: number) => (
+                  <tr key={i}>{autoPeek.columns.map((c: string) => <td key={c}>{r[c] == null ? '∅' : String(r[c])}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>}
+      </div>}
       {autoJob && <div style={{ marginTop: 10 }}><JobStatus job={autoJob} /></div>}
       {autoRes && <div className="info-box" style={{ marginTop: 8 }}>
         ✅ Auto E2E done — <b>{autoRes.dataset}</b> · ruleset <b>{autoRes.ruleset}</b> · {autoRes.rules_approved} rules approved{autoRes.rules_rejected ? ` · ${autoRes.rules_rejected} rejected` : ''}
