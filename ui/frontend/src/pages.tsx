@@ -988,7 +988,7 @@ export function Onboard() {
     <div className="section-title">Onboard a pipeline</div>
 
     <div className="card" style={{ borderColor: 'var(--accent, #4f8cff)' }}>
-      <h3>⚡ Auto E2E — one click: profile → rules → publish → run</h3>
+      <h3>Auto E2E — one click: profile → rules → publish → run</h3>
       <div className="info-box" style={{ marginBottom: 8 }}>Skips manual review — profiles the source, auto-approves all candidate rules, publishes the ruleset, onboards the pipeline, then runs governed DQ. Watch live progress below.</div>
       <div className="form-grid">
         <div className="field"><label>Source file</label>
