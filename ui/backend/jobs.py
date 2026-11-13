@@ -55,6 +55,7 @@ class JobCancelled(Exception):
 
 
 _cancel: set[str] = set()
+_prog_hist: dict[str, list[str]] = {}
 
 
 def request_cancel(job_id: str) -> None:
@@ -147,8 +148,11 @@ def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
         rows = _conn.execute(
             "SELECT job_id,kind,status,submitted_at,finished_at,progress FROM jobs "
             "ORDER BY submitted_at DESC LIMIT ?", (limit,)).fetchall()
-    return [dict(zip(("job_id", "kind", "status", "submitted_at",
-                      "finished_at", "progress"), r)) for r in rows]
+    out = [dict(zip(("job_id", "kind", "status", "submitted_at",
+                     "finished_at", "progress"), r)) for r in rows]
+    for j in out:
+        j["progress_log"] = _prog_hist.get(j["job_id"], [])[-10:]
+    return out
 
 
 def stream(job_id: str, timeout: float = 0.5) -> Iterator[str]:
@@ -182,6 +186,9 @@ def progress_cb(job_id: str, msg: str) -> None:
     if job_id in _cancel:
         raise JobCancelled(f"job {job_id} cancelled by user")
     _update(job_id, progress=msg)
+    h = _prog_hist.setdefault(job_id, [])
+    h.append(msg)
+    del h[:-60]
     _emit(job_id, "progress", {"progress": msg})
 
 

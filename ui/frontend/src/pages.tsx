@@ -944,11 +944,16 @@ const LiveJobsFeed = () => {
   return <div className="card" style={{ marginTop: 12 }}>
     <h3>Live activity <span className="muted">— recent jobs & live steps</span></h3>
     {jobs.map(j => (
-      <div key={j.job_id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '5px 0', borderBottom: '1px solid var(--border, #2a2a2a)', fontSize: 12 }}>
-        <span className={`badge ${j.status === 'COMPLETED' ? 'COMPLETED' : j.status === 'FAILED' ? 'FAILED' : j.status === 'CANCELLED' ? 'FAILED' : 'REGISTERED'}`}>{j.status}</span>
-        <code style={{ fontSize: 11 }}>{j.job_id}</code>
-        <span className="tag">{j.kind}</span>
-        <span className="muted" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.progress || '—'}</span>
+      <div key={j.job_id} style={{ padding: '5px 0', borderBottom: '1px solid var(--border, #2a2a2a)', fontSize: 12 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+          <span className={`badge ${j.status === 'COMPLETED' ? 'COMPLETED' : j.status === 'FAILED' ? 'FAILED' : j.status === 'CANCELLED' ? 'FAILED' : 'REGISTERED'}`}>{j.status}</span>
+          <code style={{ fontSize: 11 }}>{j.job_id}</code>
+          <span className="tag">{j.kind}</span>
+          <span className="muted" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.progress || '—'}</span>
+        </div>
+        {(j.progress_log || []).slice(-4).map((m: string, i: number) => (
+          <div key={i} className="muted" style={{ fontSize: 11, paddingLeft: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↳ {m}</div>
+        ))}
       </div>
     ))}
   </div>
