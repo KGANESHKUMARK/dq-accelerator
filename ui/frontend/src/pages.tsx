@@ -1049,6 +1049,10 @@ export function Onboard() {
       {autoRes && <div className="info-box" style={{ marginTop: 8 }}>
         ✅ Auto E2E done — <b>{autoRes.dataset}</b> · ruleset <b>{autoRes.ruleset}</b> · {autoRes.rules_approved} rules approved{autoRes.rules_rejected ? ` · ${autoRes.rules_rejected} rejected` : ''}
         {(autoRes.run?.stages || []).map((s: any) => <div key={s.stage} style={{ marginTop: 2 }}>· {s.stage}: {s.status} — accepted {s.accepted ?? '—'} / quarantined {s.quarantined ?? '—'}</div>)}
+        <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+          <button className="btn sm sec" onClick={() => window.dispatchEvent(new CustomEvent('dq:navigate', { detail: 'profiles' }))}>View auto-created profile →</button>
+          <button className="btn sm sec" onClick={() => window.dispatchEvent(new CustomEvent('dq:navigate', { detail: 'rulesets' }))}>View ruleset + versions →</button>
+        </div>
       </div>}
     </div>}
 
