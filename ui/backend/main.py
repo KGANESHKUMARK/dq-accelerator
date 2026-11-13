@@ -1757,8 +1757,16 @@ def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
         print(f"[auto-e2e] gold setup failed (silver still runs): {exc}")
     _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()} (bronze→silver→gold)")
     run = _do_pipeline_run(body.pipeline_id.upper(), PipelineRunIn(dataset_id=ds, mode=body.mode))
+    stages = run.get("stages") or []
+    silver = next((s for s in stages if s.get("stage") == "SILVER"), {})
+    import glob as _g
+    reps = sorted(_g.glob(str(ROOT / "reports" / f"{ds}*silver*.json")), key=os.path.getmtime)
     return {"dataset": ds, "ruleset": fout.get("ruleset"), "rules_approved": len(approved),
-            "rules_rejected": fout.get("rules_rejected"), "run": run}
+            "rules_rejected": fout.get("rules_rejected"), "run": run,
+            "input": silver.get("input") or silver.get("input_rows"),
+            "accepted": silver.get("accepted"), "quarantined": silver.get("quarantined"),
+            "gate_passed": run.get("gate_passed"),
+            "report_path": reps[-1] if reps else ""}
 
 
 # ------------------------------------------------------------------ onboarding wizard

@@ -1,0 +1,22 @@
+pipeline:
+  pipeline_id: HOSPITAL_ENCOUNTERS_PIPELINE
+  pipeline_name: Hospital Encounters Pipeline
+  platform: STANDALONE_SPARK
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: auto-e2e
+  description: Onboarded via UI wizard from demo_hospital_encounters.csv (50000 rows profiled)
+  policy: config/policies/default.yaml
+  datasets:
+  - dataset_id: demo_hospital_encounters
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    - GOLD
+    rulesets:
+      SILVER: ../rulesets/demo_hospital_encounters_v1.yaml
+      GOLD: ../rulesets/demo_hospital_encounters_gold_v1.yaml
+    test_data: ../../data/uploads/demo_hospital_encounters.csv
+    test_data_format: CSV

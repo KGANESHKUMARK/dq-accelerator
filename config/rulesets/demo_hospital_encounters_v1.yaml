@@ -1,0 +1,540 @@
+ruleset:
+  ruleset_id: demo_hospital_encounters_silver
+  dataset: demo_hospital_encounters
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates demo_hospital_encounters_silver@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_001
+    name: encounter_id_not_null
+    description: encounter_id is populated in 100.0% of rows
+    dataset: demo_hospital_encounters
+    column: encounter_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50000
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_002
+    name: encounter_id_unique
+    description: encounter_id looks like an identifier (99.2% unique)
+    dataset: demo_hospital_encounters
+    column: encounter_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 0.9917
+        duplicate_value_count: 416
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_003
+    name: encounter_id_regex
+    description: encounter_id follows the structural pattern AAA-999999
+    dataset: demo_hospital_encounters
+    column: encounter_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{3}\-[0-9]{6}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA-999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_004
+    name: encounter_id_string_length
+    description: encounter_id length observed between 10 and 10
+    dataset: demo_hospital_encounters
+    column: encounter_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 10
+      max: 10
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 10
+        max_length: 10
+        avg_length: 10.0
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_005
+    name: patient_name_not_null
+    description: patient_name is populated in 98.5% of rows
+    dataset: demo_hospital_encounters
+    column: patient_name
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 764
+        null_percentage: 1.53
+        rows: 50000
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_006
+    name: patient_name_string_length
+    description: patient_name length observed between 7 and 18
+    dataset: demo_hospital_encounters
+    column: patient_name
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 7
+      max: 18
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 7
+        max_length: 18
+        avg_length: 10.73692
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_007
+    name: admission_date_not_null
+    description: admission_date is populated in 100.0% of rows
+    dataset: demo_hospital_encounters
+    column: admission_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50000
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_008
+    name: admission_date_date_format
+    description: admission_date is a date in yyyy-MM-dd
+    dataset: demo_hospital_encounters
+    column: admission_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9795
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 97.95
+          dd/MM/yyyy: 0.03
+          MM/dd/yyyy: 0.27
+        date_min: '2025-01-01'
+        date_max: '2025-12-28'
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_009
+    name: diagnosis_code_not_null
+    description: diagnosis_code is populated in 100.0% of rows
+    dataset: demo_hospital_encounters
+    column: diagnosis_code
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50000
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_010
+    name: diagnosis_code_allowed_values
+    description: diagnosis_code has 9 frequent categorical values
+    dataset: demo_hospital_encounters
+    column: diagnosis_code
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - J18.9
+      - K21.9
+      - J06.9
+      - I10
+      - M54.5
+      - N18.3
+      - E11.9
+      - H10.9
+      - XX.99
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          J18.9: 6215
+          K21.9: 6213
+          J06.9: 6205
+          I10: 6195
+          M54.5: 6131
+          N18.3: 6054
+          E11.9: 6020
+          H10.9: 5940
+          XX.99: 1027
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_011
+    name: los_days_not_null
+    description: los_days is populated in 100.0% of rows
+    dataset: demo_hospital_encounters
+    column: los_days
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50000
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_012
+    name: los_days_data_type
+    description: los_days holds whole numbers stored as text
+    dataset: demo_hospital_encounters
+    column: los_days
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_013
+    name: los_days_range
+    description: los_days typically between -10 and 30
+    dataset: demo_hospital_encounters
+    column: los_days
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: -10
+      max: 30
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -10.0
+        observed_max: 30.0
+        p25: 7.0
+        p75: 22.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_014
+    name: bill_amount_not_null
+    description: bill_amount is populated in 100.0% of rows
+    dataset: demo_hospital_encounters
+    column: bill_amount
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 50000
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_015
+    name: bill_amount_data_type
+    description: bill_amount holds decimal numbers stored as text
+    dataset: demo_hospital_encounters
+    column: bill_amount
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_016
+    name: bill_amount_range
+    description: bill_amount typically between 500.47 and 229428.9
+    dataset: demo_hospital_encounters
+    column: bill_amount
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 500.47
+      max: 229428.9
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 500.47
+        observed_max: 9997790.47
+        p25: 38869.5
+        p75: 115093.26
+        outliers: 835
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_017
+    name: status_not_null
+    description: status is populated in 99.2% of rows
+    dataset: demo_hospital_encounters
+    column: status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 378
+        null_percentage: 0.76
+        rows: 50000
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_018
+    name: status_allowed_values
+    description: status has 9 frequent categorical values
+    dataset: demo_hospital_encounters
+    column: status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - ADMITTED
+      - ICU
+      - TRANSFERRED
+      - DISCHARGED
+      - OBSERVATION
+      - released
+      - UNKNOWN
+      - 'Admitted '
+      - admitted
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          ADMITTED: 9751
+          ICU: 9747
+          TRANSFERRED: 9615
+          DISCHARGED: 9541
+          OBSERVATION: 9537
+          released: 373
+          UNKNOWN: 365
+          'Admitted ': 347
+          admitted: 346
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_019
+    name: doctor_allowed_values
+    description: doctor has 6 frequent categorical values
+    dataset: demo_hospital_encounters
+    column: doctor
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - Dr. Nair
+      - Dr. Rao
+      - Dr. Mehta
+      - Dr. Iyer
+      - Dr. Bose
+      - Dr. Khan
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          Dr. Nair: 7951
+          Dr. Rao: 7935
+          Dr. Mehta: 7919
+          Dr. Iyer: 7884
+          Dr. Bose: 7871
+          Dr. Khan: 7863
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_HOSPITAL_ENCOUNTERS_020
+    name: demo_hospital_encounters_schema_validation
+    description: schema observed at profiling time
+    dataset: demo_hospital_encounters
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: encounter_id
+        type: string
+      - name: patient_name
+        type: string
+      - name: admission_date
+        type: string
+      - name: diagnosis_code
+        type: string
+      - name: los_days
+        type: string
+      - name: bill_amount
+        type: string
+      - name: status
+        type: string
+      - name: doctor
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 8
+      profiled_at: '2026-11-13T13:41:05Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-13T13:42:45Z'
+  change_log:
+  - approved 20 of 20 candidate rules
