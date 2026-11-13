@@ -12,8 +12,9 @@ engine:
     metadata:                                # used when backend=nosql
       engine: tinydb                         # tinydb (embedded) | mongodb | dynamodb
       db_path: ../data/metadata.nosql.json   # tinydb JSON document store
-      # engine: mongodb → uri: mongodb://host:27017, db_name: dq_metadata
       # engine: dynamodb → region/table_prefix/endpoint_url (DynamoDB Local) / aws_profile
+      #   e.g. endpoint_url: http://localhost:8002 + dummy AWS creds env vars
+      #   NOTE: ruleset publish→enforce chain has a DynamoDB bug (B-backlog) — tinydb is demo-safe
     rulesets_path: ../registry/rulesets       # used when backend=file
     pipelines_path: ../registry/pipelines     # used when backend=file
     enforce_published_immutability: true      # file content must match the published checksum

@@ -29,7 +29,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_002
     name: loan_id_unique
@@ -50,7 +50,7 @@ ruleset:
       evidence:
         distinct_count: 31
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_003
     name: loan_id_regex
@@ -73,7 +73,7 @@ ruleset:
         dominant_pattern: A99999
         share: 1.0
         other_patterns: []
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_004
     name: loan_id_string_length
@@ -97,7 +97,7 @@ ruleset:
         min_length: 6
         max_length: 6
         avg_length: 6.0
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_005
     name: borrower_id_not_null
@@ -119,7 +119,7 @@ ruleset:
         null_count: 1
         null_percentage: 3.23
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_006
     name: borrower_id_unique
@@ -140,7 +140,7 @@ ruleset:
       evidence:
         unique_ratio: 0.9667
         duplicate_value_count: 1
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_007
     name: borrower_id_regex
@@ -163,7 +163,7 @@ ruleset:
         dominant_pattern: A9999
         share: 1.0
         other_patterns: []
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_008
     name: borrower_id_string_length
@@ -187,7 +187,7 @@ ruleset:
         min_length: 5
         max_length: 5
         avg_length: 5.0
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_009
     name: product_not_null
@@ -209,7 +209,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_010
     name: product_allowed_values
@@ -237,7 +237,7 @@ ruleset:
           AUTO: 10
           HOME: 9
         excluded_rare_values: []
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_011
     name: principal_not_null
@@ -259,7 +259,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_012
     name: principal_data_type
@@ -280,7 +280,7 @@ ruleset:
       confidence: 1.0
       evidence:
         numeric_castable_percentage: 100.0
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_013
     name: principal_range
@@ -308,7 +308,7 @@ ruleset:
         p75: 262000.0
         outliers: 0
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_014
     name: apr_not_null
@@ -330,7 +330,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_015
     name: apr_data_type
@@ -351,7 +351,7 @@ ruleset:
       confidence: 1.0
       evidence:
         numeric_castable_percentage: 100.0
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_016
     name: apr_range
@@ -379,7 +379,7 @@ ruleset:
         p75: 12.0
         outliers: 0
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_017
     name: term_months_not_null
@@ -401,7 +401,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_018
     name: term_months_data_type
@@ -422,7 +422,7 @@ ruleset:
       confidence: 1.0
       evidence:
         integer_castable_percentage: 100.0
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_019
     name: term_months_range
@@ -450,7 +450,7 @@ ruleset:
         p75: 360.0
         outliers: 0
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_020
     name: origination_date_not_null
@@ -472,7 +472,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_021
     name: origination_date_date_format
@@ -497,7 +497,7 @@ ruleset:
           yyyy/MM/dd: 3.23
         date_min: '2024-01-05'
         date_max: '2024-03-17'
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_022
     name: credit_score_not_null
@@ -519,7 +519,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_023
     name: credit_score_data_type
@@ -540,7 +540,7 @@ ruleset:
       confidence: 0.9677
       evidence:
         integer_castable_percentage: 96.77
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_024
     name: credit_score_range
@@ -568,7 +568,7 @@ ruleset:
         p75: 776.0
         outliers: 0
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_025
     name: state_not_null
@@ -590,7 +590,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_026
     name: state_string_length
@@ -614,7 +614,7 @@ ruleset:
         min_length: 2
         max_length: 2
         avg_length: 2.0
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_027
     name: status_not_null
@@ -636,7 +636,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_028
     name: status_allowed_values
@@ -664,7 +664,7 @@ ruleset:
           CLOSED: 1
         excluded_rare_values:
         - CLOSED
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_029
     name: officer_email_not_null
@@ -686,7 +686,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_030
     name: officer_email_regex
@@ -707,7 +707,7 @@ ruleset:
       confidence: 0.9677
       evidence:
         email_match_percentage: 96.77
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_031
     name: disbursement_date_not_null
@@ -729,7 +729,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_032
     name: disbursement_date_date_format
@@ -753,7 +753,7 @@ ruleset:
           yyyy-MM-dd: 100.0
         date_min: '2024-01-08'
         date_max: '2024-03-20'
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_033
     name: loans_schema_validation
@@ -799,12 +799,12 @@ ruleset:
       confidence: 0.9
       evidence:
         column_count: 12
-      profiled_at: '2026-11-13T14:27:23Z'
+      profiled_at: '2026-11-13T17:37:34Z'
       profile_mode: FULL
   status: DRAFT
   created_by: ''
   created_at: ''
   approved_by: ui-onboard
-  approved_at: '2026-11-13T14:27:53Z'
+  approved_at: '2026-11-13T17:38:05Z'
   change_log:
   - approved 33 of 33 candidate rules

@@ -578,6 +578,22 @@ def _load_pipeline_manifest(pid: str):
     raise HTTPException(404, f"pipeline manifest not found for {pid}")
 
 
+def _cfg(p: str | None) -> str:
+    """Resolve a manifest config path (policy/ruleset) — repairs paths that were
+    resolved relative to config/pipelines/ producing config/pipelines/config/..."""
+    if not p:
+        return ""
+    s = str(p).replace("\\", "/")
+    marker = "/config/pipelines/config/"
+    if marker in s:
+        s = "config/" + s.split(marker, 1)[1]
+        return str(ROOT / s)
+    if Path(p).exists():
+        return str(p)
+    alt = ROOT / s
+    return str(alt) if alt.exists() else str(p)
+
+
 def _stage_prog(stage: str, key: str) -> None:
     tag, _, text = _RUN_PHASE_LABELS.get(key, "phase=validate | step").partition(" | ")
     _prog(f"{tag} | [{stage}] {text}")
@@ -616,17 +632,17 @@ def _do_pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, Any]:
     else:
         df = _read_source(spark, sp)
     mode = body.mode or getattr(mf.dq_mode, "value", str(mf.dq_mode))
-    policy = str(mf.policy) if mf.policy else str(ROOT / "config" / "policies" / "default.yaml")
+    policy = _cfg(str(mf.policy)) if mf.policy else str(ROOT / "config" / "policies" / "default.yaml")
     pipe_run_id = f"{pid}-{int(t0)}"
     platform = getattr(mf.platform, "value", mf.platform) if mf.platform else "LOCAL"
 
     _out = engine.config.outputs
     paths = StoragePaths(str(_output_base()), catalog=getattr(_out, "catalog", "") or "")
     sink = StorageSink(fmt=getattr(_out, "format", "parquet") or "parquet")
-    silver_ruleset = ds.rulesets.get("SILVER")
+    silver_ruleset = _cfg(ds.rulesets.get("SILVER"))
     if not silver_ruleset:
         raise HTTPException(400, f"{pid}/{ds.dataset_id} has no SILVER ruleset")
-    gold_ruleset = ds.rulesets.get("GOLD")
+    gold_ruleset = _cfg(ds.rulesets.get("GOLD"))
     _prog(f"phase=read | landing raw data and running persisted medallion stages under {paths.base_path}")
     result = MedallionRunner(engine, paths, sink).run(
         df, ds.dataset_id, pipeline_id=pid, pipeline_run_id=pipe_run_id,

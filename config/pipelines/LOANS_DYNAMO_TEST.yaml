@@ -1,6 +1,6 @@
 pipeline:
-  pipeline_id: LOANS_PIPELINE
-  pipeline_name: Loans Pipeline
+  pipeline_id: LOANS_DYNAMO_TEST
+  pipeline_name: Loans Dynamo Test
   platform: STANDALONE_SPARK
   runtime: PYSPARK
   integration_mode: INLINE
@@ -14,9 +14,7 @@ pipeline:
     stages:
     - BRONZE
     - SILVER
-    - GOLD
     rulesets:
       SILVER: ../rulesets/loans_v1.yaml
-      GOLD: ../rulesets/loans_gold_v1.yaml
     test_data: ../../sample_data/bronze/loans.csv
     test_data_format: CSV
