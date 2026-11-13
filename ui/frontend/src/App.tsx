@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { api } from './api'
 import {
   Dashboard, Pipelines, Onboard, RunDQ,
-  Anomalies, Approvals, RuleSets, Reports, Settings, ChatPanel
+  Anomalies, Profiles, Approvals, RuleSets, Reports, Settings, ChatPanel
 } from './pages'
 
 type Page = {
@@ -20,6 +20,7 @@ const PAGES: Page[] = [
   { id: 'onboard',    label: 'Onboard',         icon: '＋', component: Onboard },
   { id: 'rundq',      label: 'Run DQ',          icon: '▶', component: RunDQ },
   { id: 'anomalies',  label: 'Anomalies',       icon: '⚠', section: 'OBSERVE',    component: Anomalies },
+  { id: 'profiles',   label: 'Profiles',        icon: '∿', component: Profiles },
   { id: 'approvals',  label: 'Approvals',       icon: '✓', component: Approvals },
   { id: 'rulesets',   label: 'Rule Sets',       icon: '⊞', section: 'CONFIGURE',  component: RuleSets },
   { id: 'reports',    label: 'Reports',         icon: '▤', component: Reports },

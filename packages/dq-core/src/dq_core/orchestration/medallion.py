@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from pyspark import StorageLevel
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
@@ -106,7 +107,7 @@ class MedallionRunner:
         # --- BRONZE ---------------------------------------------------------------
         with Stopwatch() as sw:
             bronze_path = self.paths.bronze(dataset)
-            bronze_rows = raw_df.cache().count()
+            bronze_rows = raw_df.persist(StorageLevel.MEMORY_AND_DISK).count()
             if write_bronze:
                 self.sink.write(raw_df, bronze_path)
                 written["bronze"] = bronze_path

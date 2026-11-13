@@ -15,7 +15,7 @@ const usePoll = (jobId: string | null, ms = 2500) => {
     es.addEventListener('status', ev => {
       const d = JSON.parse(ev.data)
       setJob(prev => prev ? { ...prev, status: d.status, progress: d.progress } : prev)
-      if (d.status === 'COMPLETED' || d.status === 'FAILED') {
+      if (d.status === 'COMPLETED' || d.status === 'FAILED' || d.status === 'CANCELLED') {
         es.close(); api.job(jobId).then(j => { if (!dead) setJob(j) }).catch(() => {})
       }
     })
@@ -26,7 +26,7 @@ const usePoll = (jobId: string | null, ms = 2500) => {
     es.onerror = () => {
       es.close(); if (pollTimer !== undefined) return
       pollTimer = window.setInterval(async () => {
-        try { const j = await api.job(jobId); if (!dead) setJob(j); if (j.status === 'COMPLETED' || j.status === 'FAILED') window.clearInterval(pollTimer) }
+        try { const j = await api.job(jobId); if (!dead) setJob(j); if (j.status === 'COMPLETED' || j.status === 'FAILED' || j.status === 'CANCELLED') window.clearInterval(pollTimer) }
         catch { /* keep polling */ }
       }, ms)
     }
@@ -63,6 +63,9 @@ const fmtClock = (ms: number) => {
 const JobStatus = ({ job }: { job: Job | null }) => {
   const [now, setNow] = useState(() => Date.now())
   const active = !!job && (job.status === 'RUNNING' || job.status === 'QUEUED')
+  const progRef = useRef(Date.now())
+  useEffect(() => { progRef.current = Date.now() }, [job?.progress])
+  const stallSec = active ? Math.max(0, Math.floor((now - progRef.current) / 1000)) : 0
   useEffect(() => {
     if (!active) return
     const t = window.setInterval(() => setNow(Date.now()), 1000)
@@ -76,7 +79,7 @@ const JobStatus = ({ job }: { job: Job | null }) => {
     let style: React.CSSProperties
     let marker = '○'
     if (job.status === 'COMPLETED') { style = { background: 'var(--success)', color: '#fff' }; marker = '✓' }
-    else if (job.status === 'FAILED') {
+    else if (job.status === 'FAILED' || job.status === 'CANCELLED') {
       if (i < cur) { style = { background: 'var(--success)', color: '#fff' }; marker = '✓' }
       else if (i === cur) { style = { background: 'var(--danger)', color: '#fff' }; marker = '✕' }
       else { style = { background: 'var(--border)', color: 'var(--muted)' } }
@@ -89,7 +92,7 @@ const JobStatus = ({ job }: { job: Job | null }) => {
   }
   const phases = job.result?.phases as Record<string, number> | undefined
   return (
-    <div className="card" style={{ borderLeft: `4px solid ${job.status === 'FAILED' ? 'var(--danger)' : 'var(--info)'}` }}>
+    <div className="card" style={{ borderLeft: `4px solid ${job.status === 'FAILED' ? 'var(--danger)' : job.status === 'CANCELLED' ? 'var(--warn)' : 'var(--info)'}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <span className={`badge ${job.status}`} style={{ fontSize: 12 }}>{job.status}</span>
         {active && <span className="spin" />}
@@ -98,8 +101,10 @@ const JobStatus = ({ job }: { job: Job | null }) => {
           {active ? `elapsed ${fmtClock(now - t0)}` : job.finished_at ? `took ${fmtClock(t1 - t0)}` : ''}
         </span>
         <span className="muted" style={{ fontSize: 11 }}>{job.job_id}</span>
+        {active && <button className="btn sm sec" onClick={() => api.cancelJob(job.job_id).catch(() => {})}>Cancel</button>}
       </div>
-      {job.status === 'FAILED' && job.error && (
+      {stallSec > 240 && <div className="warn-box" style={{ marginBottom: 8, fontSize: 12 }}>No phase update for {Math.floor(stallSec / 60)}m — the job may be stuck on a heavy Spark phase. You can cancel it safely.</div>}
+      {(job.status === 'FAILED' || job.status === 'CANCELLED') && job.error && (
         <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid var(--danger)', borderRadius: 6, padding: '8px 10px', marginBottom: 10 }}>
           <div style={{ color: 'var(--danger)', fontWeight: 700, fontSize: 12, marginBottom: 4 }}>✕ JOB FAILED{job.progress ? ` — stopped at: ${job.progress}` : ''}</div>
           <pre className="err" style={{ margin: 0, maxHeight: 200, overflow: 'auto', fontSize: 11, whiteSpace: 'pre-wrap' }}>{job.error}</pre>
@@ -166,7 +171,7 @@ const loadWidgets = (): Record<string, boolean> => {
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard' }, { key: 'pipelines', label: 'Pipelines' },
   { key: 'onboard', label: 'Onboard' }, { key: 'rundq', label: 'Run DQ' },
-  { key: 'anomalies', label: 'Anomalies' }, { key: 'approvals', label: 'Approvals' },
+  { key: 'anomalies', label: 'Anomalies' }, { key: 'profiles', label: 'Profiles' }, { key: 'approvals', label: 'Approvals' },
   { key: 'rulesets', label: 'Rule Sets' }, { key: 'reports', label: 'Reports' },
 ]
 const loadNav = (): Record<string, boolean> => {
@@ -948,6 +953,8 @@ export function Onboard() {
 
   const pickDs = (path: string, name: string) => { setSource(path); setDataset(name); setSourceFormat('AUTO'); if (!pipelineId) setPipelineId(`${name.toUpperCase()}_PIPELINE`) }
   const upload = async (f: File) => { setErr(''); try { const r = await api.upload(f); pickDs(r.path, r.filename.replace(/\.[^.]+$/, '').toLowerCase()) } catch (e: any) { setErr(e.message) } }
+  const [srcPeek, setSrcPeek] = useState<any>(null); const [srcPeekBusy, setSrcPeekBusy] = useState(false)
+  const peekSrc = async () => { setSrcPeekBusy(true); try { setSrcPeek(await api.sourcePreview(source)) } catch (e: any) { setSrcPeek({ error: e.message }) } finally { setSrcPeekBusy(false) } }
   const runPreview = async () => { setErr(''); setResult(null); try { setJobId((await api.onboardPreview({ source, dataset, stage, source_format: sourceFormat })).job_id); setStep(2) } catch (e: any) { setErr(e.message) } }
   const [finishing, setFinishing] = useState(false)
   const previewBusy = !!job && (job.status === 'RUNNING' || job.status === 'QUEUED')
@@ -983,7 +990,7 @@ export function Onboard() {
       <div className="field"><label>Sample datasets (sample_data/bronze)</label>
         <select value={source} onChange={e => pickDs(e.target.value, e.target.selectedOptions[0].dataset.n ?? '')}>
           <option value="">— choose a sample dataset —</option>
-          {datasets.map(d => <option key={d.id} value={d.path} data-n={d.id}>{d.id} — {d.path}</option>)}
+          {datasets.map(d => <option key={d.id} value={d.path} data-n={d.id}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''}{d.size_mb != null ? ` · ${d.size_mb} MB` : ''}</option>)}
         </select></div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '14px 0' }}>
         <div className="divider" style={{ flex: 1 }} /><span className="muted">or upload your own file</span><div className="divider" style={{ flex: 1 }} />
@@ -1004,7 +1011,25 @@ export function Onboard() {
         </div>
         {sourceFormat !== 'AUTO' && <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Runs spark.read.{sourceFormat === 'TABLE' ? 'table' : 'format'} — works on Databricks, Fabric, EMR, Dataproc</div>}
       </div>
-      {source && <div className="success-box">Source: <code>{source}</code>{sourceFormat !== 'AUTO' ? ` [${sourceFormat}]` : ''}</div>}
+      {source && <div className="success-box">Source: <code>{source}</code>{sourceFormat !== 'AUTO' ? ` [${sourceFormat}]` : ''} <button className="btn sm sec" style={{ marginLeft: 10 }} onClick={peekSrc} disabled={srcPeekBusy}>{srcPeekBusy ? 'Loading…' : 'Preview data'}</button></div>}
+      {srcPeek && <div className="card" style={{ marginTop: 10 }}>
+        <h3>Source data preview <span className="muted">— first {srcPeek.shown ?? 0} rows</span></h3>
+        {srcPeek.error && <div className="warn-box">{srcPeek.error}</div>}
+        {srcPeek.rows?.length > 0 && <>
+          <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{srcPeek.columns.length} columns · sample only</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr>{srcPeek.columns.map((c: string) => <th key={c}>{c}</th>)}</tr></thead>
+              <tbody>
+                {srcPeek.rows.map((r: any, i: number) => (
+                  <tr key={i}>{srcPeek.columns.map((c: string) => <td key={c} className="muted" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r[c] ?? '∅')}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>}
+        {srcPeek.rows?.length === 0 && <div className="empty-state"><p>No rows readable from this source.</p></div>}
+      </div>}
       <div className="btn-row"><button className="btn" disabled={!source} onClick={() => setStep(1)}>Next: set options →</button></div>
     </div>}
 
@@ -1126,8 +1151,10 @@ export function RunDQ() {
   const [rsOpts, setRsOpts] = useState<{ label: string; value: string }[]>([])
   const [rsFiles, setRsFiles] = useState<string[]>([])
   const [polFiles, setPolFiles] = useState<string[]>([])
+  const [srcPrev, setSrcPrev] = useState<any>(null); const [srcPrevBusy, setSrcPrevBusy] = useState(false)
   useEffect(() => { api.rulesetFiles().then(setRsFiles).catch(() => {}) }, [])
   useEffect(() => { api.policyFiles().then(setPolFiles).catch(() => {}) }, [])
+  const previewSrc = async () => { setSrcPrevBusy(true); try { setSrcPrev(await api.sourcePreview(src)) } catch (e: any) { setSrcPrev({ error: e.message }) } finally { setSrcPrevBusy(false) } }
   const [src, setSrc] = useState(''); const [rs, setRs] = useState('config/rulesets/customers_v1.yaml')
   const [mode, setMode] = useState('OBSERVE_ONLY'); const [ds, setDs] = useState('customers')
   const [pid, setPid] = useState('UI_RUN'); const [pol, setPol] = useState('config/policies/default.yaml')
@@ -1198,9 +1225,12 @@ export function RunDQ() {
             ? <select value={ds} onChange={e => applyDs(govDs.find((x: any) => x.dataset_id === e.target.value))}>
                 {govDs.map((d: any) => <option key={d.dataset_id} value={d.dataset_id}>{d.dataset_id}</option>)}
               </select>
-            : <select value={src} onChange={e => { setSrc(e.target.value); setDs(e.target.selectedOptions[0].text.split(' — ')[0]) }}>
-                {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
-              </select>}
+            : <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select value={src} onChange={e => { setSrc(e.target.value); setDs(e.target.selectedOptions[0].text.split(' — ')[0]); setSrcPrev(null) }} style={{ flex: 1 }}>
+                  {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
+                </select>
+                {src && <button className="btn sm sec" onClick={previewSrc} disabled={srcPrevBusy}>{srcPrevBusy ? 'Loading…' : 'Preview data'}</button>}
+              </span>}
         </div>
         {governed && <div className="field"><label>Source (test_data)</label><input value={src} readOnly /></div>}
         <div className="field"><label>Rule set</label>
@@ -1231,6 +1261,24 @@ export function RunDQ() {
           </select>
         </div>
       </div>
+      {srcPrev && <div className="card">
+        <h3>Source data preview <span className="muted">— first {srcPrev.shown ?? 0} rows of {srcPrev.source}</span></h3>
+        {srcPrev.error && <div className="warn-box">{srcPrev.error}</div>}
+        {srcPrev.rows?.length > 0 && <>
+          <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{srcPrev.columns.length} columns · sample only — full profiling happens during the run</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr>{srcPrev.columns.map((c: string) => <th key={c}>{c}</th>)}</tr></thead>
+              <tbody>
+                {srcPrev.rows.map((r: any, i: number) => (
+                  <tr key={i}>{srcPrev.columns.map((c: string) => <td key={c} className="muted" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r[c] ?? '∅')}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>}
+        {srcPrev.rows?.length === 0 && <div className="empty-state"><p>No rows readable from this source.</p></div>}
+      </div>}
       {governed && <div className="info-box">Governed mode — dataset, source, ruleset and policy are locked to the manifest. Only the execution mode is adjustable.</div>}
       {err && <div className="warn-box">{err}</div>}
       <div className="btn-row">
@@ -1421,6 +1469,70 @@ export function Approvals() {
         ))}
       </div>
     })()}
+  </>
+}
+
+/* ============================================================
+   PROFILES — stored profile baselines
+   ============================================================ */
+export function Profiles() {
+  const [list, setList] = useState<any[]>([])
+  const [sel, setSel] = useState(''); const [det, setDet] = useState<any>(null); const [err, setErr] = useState('')
+  useEffect(() => { api.profiles().then(setList).catch(() => {}) }, [])
+  const load = async (ds: string) => {
+    setSel(ds); setDet(null); setErr('')
+    try { setDet(await api.profileDetail(ds)) } catch (e: any) { setErr(e.message) }
+  }
+  const prof = det?.profile || {}
+  const colEntries = Object.entries(prof.columns || {}) as [string, any][]
+  const statKeys = [...new Set(colEntries.flatMap(([, c]) => Object.keys(c || {}).filter(k => ['string', 'number', 'boolean'].includes(typeof (c || {})[k]))))].slice(0, 14)
+  const anomalies = prof.anomalies || det?.anomalies || []
+  return <>
+    <div className="section-title">Profiles</div>
+    <div className="card">
+      <h3>Stored profile baselines</h3>
+      <div className="info-box">Column statistics captured during onboarding — also used as drift-detection baselines on re-onboard. {list.length} profile{list.length === 1 ? '' : 's'} stored.</div>
+      <div className="form-grid" style={{ marginTop: 10 }}>
+        <div className="field"><label>Dataset</label>
+          <select value={sel} onChange={e => load(e.target.value)}>
+            <option value="">— choose a profiled dataset —</option>
+            {list.map((p: any) => <option key={`${p.dataset}-${p.profiled_at}`} value={p.dataset}>{p.dataset} · {p.profile_mode} · {String(p.profiled_at || '').slice(0, 10)}</option>)}
+          </select>
+        </div>
+      </div>
+      {err && <div className="warn-box">{err}</div>}
+      {det && <>
+        <div className="kv" style={{ marginTop: 8 }}>
+          <span>dataset</span><b>{det.dataset}</b>
+          <span>ruleset</span><b>{det.ruleset_id}</b>
+          <span>stage</span><b>{det.stage}</b>
+          <span>rows</span><b>{det.row_count?.toLocaleString?.() ?? det.row_count ?? '—'}</b>
+          <span>mode</span><b>{det.profile_mode}</b>
+          <span>profiled at</span><b className="muted">{String(det.profiled_at || '').replace('T', ' ').slice(0, 19)}</b>
+        </div>
+        {anomalies.length > 0 && <div style={{ marginTop: 10 }}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Anomalies ({anomalies.length})</div>
+          {anomalies.slice(0, 20).map((a: any, i: number) => (
+            <div key={i} className="approval-row" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
+              <span className={`badge ${a.severity === 'ERROR' ? 'FAILED' : 'REGISTERED'}`}>{a.severity || 'INFO'}</span>
+              <span>{a.column ? `${a.column} — ` : ''}{a.type || a.anomaly_type || ''} {a.detail || a.message || ''}</span>
+              <span className="muted" style={{ fontSize: 11 }}>{a.confidence != null ? `${Math.round(a.confidence * 100)}%` : ''}</span>
+            </div>
+          ))}
+        </div>}
+        {colEntries.length > 0 && <div style={{ marginTop: 12, overflowX: 'auto' }}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Column statistics ({colEntries.length} columns)</div>
+          <table>
+            <thead><tr><th>column</th>{statKeys.map(k => <th key={k}>{k}</th>)}</tr></thead>
+            <tbody>
+              {colEntries.map(([name, c]: any) => (
+                <tr key={name}><td><b>{name}</b></td>{statKeys.map(k => <td key={k} className="muted" style={{ fontSize: 11 }}>{String(c?.[k] ?? '—')}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>}
+      </>}
+    </div>
   </>
 }
 

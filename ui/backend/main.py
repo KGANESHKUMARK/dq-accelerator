@@ -675,6 +675,17 @@ def jobs() -> list[dict[str, Any]]:
     return J.list_jobs()
 
 
+@app.post("/api/jobs/{jid}/cancel")
+def job_cancel(jid: str) -> dict[str, Any]:
+    j = J.get(jid)
+    if not j:
+        raise HTTPException(404, "job not found")
+    if j.get("status") not in ("QUEUED", "RUNNING"):
+        raise HTTPException(400, f"job is {j.get('status')} — cannot cancel")
+    J.request_cancel(jid)
+    return {"ok": True, "job_id": jid}
+
+
 @app.get("/api/jobs/{jid}/stream")
 def job_stream(jid: str):
     """Server-Sent Events stream — real-time job progress for the UI."""
@@ -1539,6 +1550,44 @@ def data_preview(dataset: str, stage: str = "silver", limit: int = 50) -> dict[s
             "rows": rows, "shown": len(rows)}
 
 
+@app.get("/api/data/source-preview")
+def source_preview(source: str, limit: int = 20) -> dict[str, Any]:
+    """Quick peek at any source — columns + first N rows (no full scan)."""
+    spark = J.get_spark()
+    df = _read_any_source(spark, source, "AUTO")
+    rows = [r.asDict(recursive=True) for r in df.limit(min(limit, 100)).collect()]
+    return {"source": source, "columns": df.columns, "rows": rows, "shown": len(rows)}
+
+
+@app.get("/api/profiles")
+def profiles_list() -> list[dict[str, Any]]:
+    """Stored profile baselines (written during onboard preview) — newest first."""
+    from dq_core.metadata import resolver as _res
+    store = _res.store_from_engine(J.get_engine())
+    if store is None:
+        return []
+    docs = store.collection("profiles").find({})
+    docs.sort(key=lambda d: str(d.get("profiled_at") or ""), reverse=True)
+    return [{"dataset": d.get("dataset"), "ruleset_id": d.get("ruleset_id"),
+             "stage": d.get("stage"), "profiled_at": d.get("profiled_at"),
+             "row_count": d.get("row_count"), "profile_mode": d.get("profile_mode")}
+            for d in docs]
+
+
+@app.get("/api/profiles/{dataset}")
+def profile_detail(dataset: str) -> dict[str, Any]:
+    """Latest stored profile for a dataset — full column statistics."""
+    from dq_core.metadata import resolver as _res
+    store = _res.store_from_engine(J.get_engine())
+    if store is None:
+        raise HTTPException(404, "metadata store unavailable")
+    docs = [d for d in store.collection("profiles").find({"dataset": dataset})]
+    if not docs:
+        raise HTTPException(404, f"no profile for {dataset}")
+    docs.sort(key=lambda d: str(d.get("profiled_at") or ""), reverse=True)
+    return docs[0]
+
+
 # ------------------------------------------------------------------ onboarding wizard
 @app.post("/api/onboard/upload")
 async def onboard_upload(file: UploadFile = File(...)) -> dict[str, Any]:
@@ -1608,6 +1657,18 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
         pass
     _prog("phase=profile | generating candidate rules from profile")
     ruleset_id = f"{ds}_{body.stage.lower()}"
+    # persist profile baseline — feeds drift detection + Profiles viewer (best-effort)
+    try:
+        from dq_core.metadata import resolver as _res
+        from dq_core.runtime.utils import utc_now_iso
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            store.collection("profiles").insert_one({
+                "dataset": ds, "ruleset_id": ruleset_id, "stage": body.stage,
+                "profiled_at": utc_now_iso(), "row_count": getattr(rep, "row_count", None),
+                "profile_mode": mode, "profile": rep.to_dict()})
+    except Exception as exc:
+        print(f"[onboard] profile persist failed: {exc}")
     candidates = CandidateRuleGenerator().generate(rep, ruleset_id=ruleset_id,
                                                    version="1.0", stage=body.stage)
     cand = []
@@ -1736,8 +1797,8 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
                     "dataset": body.dataset, "ruleset_id": body.ruleset_id,
                     "profiled_at": prof.get("profiled_at") if isinstance(prof, dict) else None,
                     "row_count": res.get("row_count"), "profile": prof})
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"[onboard] finalize persist failed: {exc}")
     out = {"ok": True, "ruleset": f"{body.ruleset_id}@1.0",
            "ruleset_path": str(ruleset_path.relative_to(ROOT)).replace("\\", "/"),
            "manifest_path": str(manifest_path.relative_to(ROOT)).replace("\\", "/"),

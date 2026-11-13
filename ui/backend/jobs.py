@@ -50,6 +50,20 @@ class JobConflict(Exception):
     """Raised when a job is submitted while another job is still active."""
 
 
+class JobCancelled(Exception):
+    """Raised inside a running job when a cancel was requested."""
+
+
+_cancel: set[str] = set()
+
+
+def request_cancel(job_id: str) -> None:
+    """Flag a job for cancellation — takes effect at the next progress checkpoint."""
+    with _lock:
+        _cancel.add(job_id)
+    _emit(job_id, "status", {"status": "CANCELLED", "progress": "cancel requested"})
+
+
 def _emit(job_id: str, event: str, data: dict[str, Any]) -> None:
     with _econd:
         _events.setdefault(job_id, []).append({"event": event, "data": data})
@@ -89,10 +103,17 @@ def submit(kind: str, fn: Callable[[], dict[str, Any]]) -> str:
             result = fn()
             _update(job_id, status="COMPLETED", finished_at=_now(), progress="done", result=result)
             _emit(job_id, "status", {"status": "COMPLETED", "progress": "done", "result": result})
+        except JobCancelled:
+            _update(job_id, status="CANCELLED", finished_at=_now(), progress="cancelled",
+                    error="cancelled by user")
+            _emit(job_id, "status", {"status": "CANCELLED", "progress": "cancelled",
+                                     "error": "cancelled by user"})
         except Exception as exc:  # noqa: BLE001
             err = f"{type(exc).__name__}: {exc}\n{traceback.format_exc(limit=5)}"
             _update(job_id, status="FAILED", finished_at=_now(), progress="failed", error=err)
             _emit(job_id, "status", {"status": "FAILED", "progress": "failed", "error": err})
+        finally:
+            _cancel.discard(job_id)
 
     threading.Thread(target=_run, daemon=True, name=f"dq-job-{job_id}").start()
     return job_id
@@ -149,6 +170,8 @@ def stream(job_id: str, timeout: float = 0.5) -> Iterator[str]:
 
 
 def progress_cb(job_id: str, msg: str) -> None:
+    if job_id in _cancel:
+        raise JobCancelled(f"job {job_id} cancelled by user")
     _update(job_id, progress=msg)
     _emit(job_id, "progress", {"progress": msg})
 
