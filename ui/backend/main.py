@@ -379,6 +379,12 @@ def _read_source(spark: Any, src: Path):
 
 
 _RUN_PHASE_LABELS = {
+    "bronze": "phase=read | persisting raw bronze layer + ingest manifest",
+    "silver_setup": "phase=validate | loading silver ruleset + profiling",
+    "silver_write": "phase=report | writing silver accepted + quarantine outputs",
+    "gold_setup": "phase=validate | loading gold ruleset (strict re-check)",
+    "gold_write": "phase=report | writing gold accepted + quarantine outputs",
+    "reports": "phase=report | writing run reports (silver/gold/profile JSON)",
     "profiling": "phase=profile | profiling dataset statistics",
     "validation": "phase=validate | validating all rules against the data",
     "remediation_deterministic": "phase=remediate | applying deterministic fixes",
@@ -573,7 +579,8 @@ def _do_pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, Any]:
     result = MedallionRunner(engine, paths, sink).run(
         df, ds.dataset_id, pipeline_id=pid, pipeline_run_id=pipe_run_id,
         silver_ruleset=silver_ruleset, policy=policy, silver_mode=mode,
-        gold_ruleset=gold_ruleset, source_path=src, profile=False, platform=str(platform))
+        gold_ruleset=gold_ruleset, source_path=src, profile=False, platform=str(platform),
+        on_phase=_stage_prog)
     stages_out = [
         {"stage": "BRONZE", "status": "PERSISTED", "rows": result.bronze_rows,
          "written_paths": {"raw": result.written_paths.get("bronze", paths.bronze(ds.dataset_id))}},

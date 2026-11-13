@@ -1,0 +1,563 @@
+ruleset:
+  ruleset_id: demo_retail_inventory_gold
+  dataset: demo_retail_inventory
+  version: '1.0'
+  stage: GOLD
+  description: ''
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_001
+    name: sku_not_null
+    description: sku is populated in 100.0% of rows
+    dataset: demo_retail_inventory
+    column: sku
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 120000
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_002
+    name: sku_regex
+    description: sku follows the structural pattern AAA-99999
+    dataset: demo_retail_inventory
+    column: sku
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      pattern: ^[A-Z]{3}\-[0-9]{5}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.999
+      evidence:
+        dominant_pattern: AAA-99999
+        share: 0.999
+        other_patterns:
+        - pattern: AAA-999999
+          count: 81
+          percentage: 0.07
+        - pattern: AAA-9999
+          count: 35
+          percentage: 0.03
+        - pattern: AAA-999
+          count: 6
+          percentage: 0.01
+        - pattern: AAA-99
+          count: 1
+          percentage: 0.0
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_003
+    name: sku_string_length
+    description: sku length observed between 6 and 10
+    dataset: demo_retail_inventory
+    column: sku
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 6
+      max: 10
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 6
+        max_length: 10
+        avg_length: 9.000258
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_004
+    name: product_not_null
+    description: product is populated in 100.0% of rows
+    dataset: demo_retail_inventory
+    column: product
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 120000
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_005
+    name: product_string_length
+    description: product length observed between 6 and 8
+    dataset: demo_retail_inventory
+    column: product
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 6
+      max: 8
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 6
+        max_length: 8
+        avg_length: 7.782833
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_006
+    name: category_not_null
+    description: category is populated in 100.0% of rows
+    dataset: demo_retail_inventory
+    column: category
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 120000
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_007
+    name: category_allowed_values
+    description: category has 7 frequent categorical values
+    dataset: demo_retail_inventory
+    column: category
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - HOME
+      - GROCERY
+      - BEAUTY
+      - SPORTS
+      - APPAREL
+      - ELECTRONICS
+      - UNKNOWN
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          HOME: 19672
+          GROCERY: 19660
+          BEAUTY: 19647
+          SPORTS: 19616
+          APPAREL: 19592
+          ELECTRONICS: 19419
+          UNKNOWN: 2394
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_008
+    name: qty_on_hand_not_null
+    description: qty_on_hand is populated in 100.0% of rows
+    dataset: demo_retail_inventory
+    column: qty_on_hand
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 120000
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_009
+    name: qty_on_hand_data_type
+    description: qty_on_hand holds whole numbers stored as text
+    dataset: demo_retail_inventory
+    column: qty_on_hand
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_010
+    name: qty_on_hand_range
+    description: qty_on_hand typically between -500 and 5000
+    dataset: demo_retail_inventory
+    column: qty_on_hand
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      min: -500
+      max: 5000
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -500.0
+        observed_max: 5000.0
+        p25: 1187.0
+        p75: 3733.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_011
+    name: reorder_level_not_null
+    description: reorder_level is populated in 100.0% of rows
+    dataset: demo_retail_inventory
+    column: reorder_level
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 120000
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_012
+    name: reorder_level_data_type
+    description: reorder_level holds whole numbers stored as text
+    dataset: demo_retail_inventory
+    column: reorder_level
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_013
+    name: reorder_level_range
+    description: reorder_level typically between -97 and 200
+    dataset: demo_retail_inventory
+    column: reorder_level
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      min: -97
+      max: 200
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -100.0
+        observed_max: 200.0
+        p25: 52.0
+        p75: 151.0
+        outliers: 665
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_014
+    name: unit_cost_not_null
+    description: unit_cost is populated in 100.0% of rows
+    dataset: demo_retail_inventory
+    column: unit_cost
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 120000
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_015
+    name: unit_cost_data_type
+    description: unit_cost holds decimal numbers stored as text
+    dataset: demo_retail_inventory
+    column: unit_cost
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_016
+    name: unit_cost_range
+    description: unit_cost typically between 10.03 and 7655.47
+    dataset: demo_retail_inventory
+    column: unit_cost
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      min: 10.03
+      max: 7655.47
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 10.03
+        observed_max: 99953879.24
+        p25: 1278.42
+        p75: 3829.24
+        outliers: 1793
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_017
+    name: warehouse_not_null
+    description: warehouse is populated in 98.0% of rows
+    dataset: demo_retail_inventory
+    column: warehouse
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 2394
+        null_percentage: 2.0
+        rows: 120000
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_018
+    name: warehouse_allowed_values
+    description: warehouse has 5 frequent categorical values
+    dataset: demo_retail_inventory
+    column: warehouse
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - WH-South
+      - WH-North
+      - WH-West
+      - WH-East
+      - WH-Central
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          WH-South: 23765
+          WH-North: 23599
+          WH-West: 23462
+          WH-East: 23396
+          WH-Central: 23384
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_019
+    name: supplier_not_null
+    description: supplier is populated in 100.0% of rows
+    dataset: demo_retail_inventory
+    column: supplier
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 120000
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_020
+    name: supplier_allowed_values
+    description: supplier has 6 frequent categorical values
+    dataset: demo_retail_inventory
+    column: supplier
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - Supp-E
+      - Supp-D
+      - Supp-C
+      - Supp-B
+      - Supp-A
+      - N/A
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          Supp-E: 23142
+          Supp-D: 23130
+          Supp-C: 23102
+          Supp-B: 22944
+          Supp-A: 22823
+          N/A: 4859
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_RETAIL_INVENTORY_021
+    name: demo_retail_inventory_schema_validation
+    description: schema observed at profiling time
+    dataset: demo_retail_inventory
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      expected_columns:
+      - name: sku
+        type: string
+      - name: product
+        type: string
+      - name: category
+        type: string
+      - name: qty_on_hand
+        type: string
+      - name: reorder_level
+        type: string
+      - name: unit_cost
+        type: string
+      - name: warehouse
+        type: string
+      - name: supplier
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 8
+      profiled_at: '2026-11-13T14:14:49Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ''
+  approved_at: ''
+  change_log: []

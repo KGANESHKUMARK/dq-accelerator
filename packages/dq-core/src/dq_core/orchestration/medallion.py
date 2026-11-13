@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from pyspark import StorageLevel
 from pyspark.sql import DataFrame
@@ -98,13 +98,19 @@ class MedallionRunner:
             source_path: str | Path | None = None,
             profile: bool = True, write_bronze: bool = True, write_silver: bool = True,
             write_gold: bool = True, write_quarantine: bool = True, write_reports: bool = True,
-            platform: str = "LOCAL") -> MedallionResult:
+            platform: str = "LOCAL",
+            on_phase: Callable[[str, str], None] | None = None) -> MedallionResult:
         started = utc_now_iso()
         phases: dict[str, float] = {}
         written: dict[str, str] = {}
         spark = get_spark(raw_df)
 
+        def _emit(stage: str, key: str) -> None:
+            if on_phase is not None:
+                on_phase(stage, key)
+
         # --- BRONZE ---------------------------------------------------------------
+        _emit("BRONZE", "bronze")
         with Stopwatch() as sw:
             bronze_path = self.paths.bronze(dataset)
             bronze_rows = raw_df.persist(StorageLevel.MEMORY_AND_DISK).count()
@@ -117,6 +123,7 @@ class MedallionRunner:
         log_event(_logger, "bronze_complete", dataset=dataset, rows=bronze_rows, path=bronze_path)
 
         # --- SILVER ---------------------------------------------------------------
+        _emit("SILVER", "silver_setup")
         with Stopwatch() as sw:
             silver_ctx = PipelineContext(pipeline_id=pipeline_id, pipeline_run_id=pipeline_run_id,
                                          dataset=dataset, stage=Stage.SILVER, platform=platform)
@@ -126,8 +133,10 @@ class MedallionRunner:
         phases["silver_setup"] = sw.elapsed_ms
 
         with Stopwatch() as sw:
-            silver_result = self.engine.run(raw_df, silver_rs, silver_pol, silver_ctx, mode=silver_mode)
+            silver_result = self.engine.run(raw_df, silver_rs, silver_pol, silver_ctx, mode=silver_mode,
+                                            on_phase=lambda k: _emit("SILVER", k))
         phases["silver_dq"] = sw.elapsed_ms
+        _emit("SILVER", "silver_write")
         if write_silver:
             with Stopwatch() as sw:
                 p = self.paths.silver(dataset)
@@ -152,6 +161,7 @@ class MedallionRunner:
         # --- GOLD -----------------------------------------------------------------
         gold_result: DQResult | None = None
         if gold_ruleset is not None:
+            _emit("GOLD", "gold_setup")
             with Stopwatch() as sw:
                 gold_ctx = PipelineContext(pipeline_id=pipeline_id, pipeline_run_id=pipeline_run_id,
                                            dataset=dataset, stage=Stage.GOLD, platform=platform)
@@ -159,8 +169,10 @@ class MedallionRunner:
                 gold_pol = self.engine.load_policy(policy)
                 ref = dict(gold_reference_data or {})
                 gold_result = self.engine.run(silver_result.accepted_dataframe, gold_rs, gold_pol, gold_ctx,
-                                              mode=IntegrationMode.ENFORCE, reference_data=ref)
+                                              mode=IntegrationMode.ENFORCE, reference_data=ref,
+                                              on_phase=lambda k: _emit("GOLD", k))
             phases["gold_dq"] = sw.elapsed_ms
+            _emit("GOLD", "gold_write")
             if write_gold:
                 with Stopwatch() as sw:
                     gp = self.paths.gold(dataset)
@@ -177,6 +189,7 @@ class MedallionRunner:
                       gate_passed=gold_result.quality_gate.passed)
 
         # --- REPORTS --------------------------------------------------------------
+        _emit("REPORT", "reports")
         if write_reports and self.engine.config.outputs.reports_path:
             rp = Path(self.engine.config.outputs.reports_path)
             rp.mkdir(parents=True, exist_ok=True)
