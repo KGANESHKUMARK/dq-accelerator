@@ -130,6 +130,15 @@ def get(job_id: str) -> dict[str, Any] | None:
     for k in ("result",):
         if j.get(k):
             j[k] = json.loads(j[k])
+    r = j.get("result")
+    if isinstance(r, dict) and "run" in r and "accepted" not in r:
+        run = r.get("run") or {}
+        stages = run.get("stages") or []
+        silver = next((s for s in stages if s.get("stage") == "SILVER"), {})
+        r.update({"pipeline_id": r.get("pipeline_id") or run.get("pipeline_id"),
+                  "input": silver.get("input") or silver.get("input_rows"),
+                  "accepted": silver.get("accepted"), "quarantined": silver.get("quarantined"),
+                  "gate_passed": run.get("gate_passed")})
     return j
 
 

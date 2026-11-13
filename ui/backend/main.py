@@ -893,7 +893,7 @@ def metadata_switch(body: MetadataSwitchIn) -> dict[str, Any]:
 def health_score() -> dict[str, Any]:
     """Overall DQ health 0-100 from recent completed dq_run jobs."""
     rows = J.list_jobs(limit=50)
-    runs = [r for r in rows if r.get("kind") == "dq_run" and r.get("status") == "COMPLETED"]
+    runs = [r for r in rows if r.get("kind") in ("dq_run", "auto_e2e") and r.get("status") == "COMPLETED"]
     if not runs:
         return {"score": None, "runs": 0, "message": "No completed DQ runs yet"}
     full = [J.get(r["job_id"]) for r in runs[:20]]
@@ -905,7 +905,7 @@ def health_score() -> dict[str, Any]:
     gate_pass_rate = round(sum(1 for g in gates if g) / len(gates) * 100, 1) if gates else None
     return {"score": score, "gate_pass_rate": gate_pass_rate, "runs": len(runs),
             "total_input": total_in, "total_accepted": total_acc, "total_quarantined": total_q,
-            "total_failed_runs": sum(1 for r in rows if r.get("kind") == "dq_run" and r.get("status") == "FAILED")}
+            "total_failed_runs": sum(1 for r in rows if r.get("kind") in ("dq_run", "auto_e2e") and r.get("status") == "FAILED")}
 
 
 # ------------------------------------------------------------------ dashboard summary (real data from reports)
@@ -1131,7 +1131,7 @@ def pipeline_trend(pid: str) -> list[dict[str, Any]]:
             run2pid[rid] = m["pipeline_id"]
     out = []
     for r in rows:
-        if r.get("kind") != "dq_run" or r.get("status") != "COMPLETED":
+        if r.get("kind") not in ("dq_run", "auto_e2e") or r.get("status") != "COMPLETED":
             continue
         j = J.get(r["job_id"])
         if not j:
@@ -1387,7 +1387,7 @@ def _load_quarantine_pending() -> list[dict[str, Any]]:
     """Scan last 10 completed REMEDIATE jobs — read ai_decisions from report JSON
     and return rows with decision == REQUIRES_APPROVAL (PENDING_HUMAN_APPROVAL)."""
     rows = J.list_jobs(limit=100)
-    runs = [r for r in rows if r.get("kind") == "dq_run" and r.get("status") == "COMPLETED"][:10]
+    runs = [r for r in rows if r.get("kind") in ("dq_run", "auto_e2e") and r.get("status") == "COMPLETED"][:10]
     pending: list[dict[str, Any]] = []
     seen: set[str] = set()
     strict_keys, loose_keys = _actioned_keys()
