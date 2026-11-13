@@ -969,7 +969,8 @@ export function Onboard() {
   const confColor = (c: number) => c >= 0.9 ? 'var(--success)' : c >= 0.7 ? 'var(--warn)' : 'var(--danger)'
 
   // ── Auto E2E — one-click onboard + governed run ──
-  const [autoJobId, setAutoJobId] = useState<string | null>(null)
+  const [autoJobId, setAutoJobIdState] = useState<string | null>(() => localStorage.getItem('dq_auto_job'))
+  const setAutoJobId = (id: string | null) => { setAutoJobIdState(id); if (id) localStorage.setItem('dq_auto_job', id); else localStorage.removeItem('dq_auto_job') }
   const autoJob = usePoll(autoJobId)
   const [autoSrc, setAutoSrc] = useState(''); const [autoPid, setAutoPid] = useState(''); const [autoMode, setAutoMode] = useState('REMEDIATE')
   const runAuto = async () => {
@@ -979,7 +980,7 @@ export function Onboard() {
     const pid = autoPid || `${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`
     try {
       const r = await api.autoRun({ source: autoSrc, dataset: dsName, pipeline_id: pid, mode: autoMode, stage, source_format: 'AUTO', policy: 'config/policies/default.yaml', approve_confidence: 0 })
-      setAutoJobId(r.job_id)
+      setAutoPeek(null); setAutoJobId(r.job_id)
     } catch (e: any) { setErr(e.message) }
   }
   const autoRes = autoJob?.status === 'COMPLETED' ? autoJob.result : null

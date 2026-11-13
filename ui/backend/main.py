@@ -1733,6 +1733,9 @@ def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
     approved = [c["rule_id"] for c in res["candidates"]
                 if (c.get("confidence") or 0) >= body.approve_confidence]
     ds = body.dataset or res["dataset"]
+    _prog(f"phase=profile | profiled {res.get('row_count') or '?'} rows · "
+          f"{len(res.get('anomalies') or [])} anomalies · {len(res.get('candidates') or [])} candidate rules · "
+          f"{len(approved)} auto-approved")
     _purge_pipeline_artifacts(res["ruleset_id"], body.pipeline_id.upper())
     _prog(f"phase=validate | auto-e2e: {len(approved)}/{res['candidate_count']} rules approved — writing ruleset + manifest")
     plat = body.platform.upper()
@@ -1774,6 +1777,9 @@ def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
             fout["gold_ruleset"] = f"{ds}_gold@1.0"
     except Exception as exc:
         print(f"[auto-e2e] gold setup failed (silver still runs): {exc}")
+    _prog(f"phase=validate | ruleset {fout.get('ruleset')} + manifest written · "
+          f"pipeline {body.pipeline_id.upper()} registered · gold ruleset "
+          f"{fout.get('gold_ruleset') or 'n/a'}")
     _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()} (bronze→silver→gold)")
     run = _do_pipeline_run(body.pipeline_id.upper(), PipelineRunIn(dataset_id=ds, mode=body.mode))
     stages = run.get("stages") or []
