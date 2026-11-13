@@ -1658,7 +1658,8 @@ export function Reports() {
   const [reps, setReps] = useState<any[]>([]); const [sel, setSel] = useState<any>(null); const [selName, setSelName] = useState('')
   const [avail, setAvail] = useState<any>(null); const [dpStage, setDpStage] = useState('silver')
   const [dpDs, setDpDs] = useState(''); const [dp, setDp] = useState<any>(null); const [dpBusy, setDpBusy] = useState(false)
-  useEffect(() => { api.reports().then(setReps); api.dataAvailable().then(setAvail).catch(() => {}) }, [])
+  const [aiAct, setAiAct] = useState<any>(null)
+  useEffect(() => { api.reports().then(setReps); api.dataAvailable().then(setAvail).catch(() => {}); api.aiActivity().then(setAiAct).catch(() => {}) }, [])
   const open = async (name: string) => { const d = await api.report(name); setSel(d); setSelName(name) }
   const loadPreview = async () => { setDpBusy(true); try { setDp(await api.dataPreview(dpDs, dpStage)) } catch (e: any) { setDp({ error: e.message }) } finally { setDpBusy(false) } }
   const stageDs = (avail?.[dpStage] ?? []) as string[]
@@ -1686,6 +1687,39 @@ export function Reports() {
           ))}
         </tbody>
       </table>
+    </div>
+
+    {/* ── AI activity — what the AI remediation actually did ── */}
+    <div className="card">
+      <h3>AI activity <span className="muted">— remediation decisions &amp; outcomes across runs</span></h3>
+      {aiAct?.provider && <div className="info-box" style={{ marginBottom: 8 }}>
+        Provider: <b>{aiAct.provider.provider}</b> · {aiAct.provider.model_endpoint}
+        {aiAct.provider.simulated ? ' · ⚠ SIMULATED (MockAI)' : ' · live LLM'}
+        {aiAct.provider.simulated === false && ' · real Databricks call'}
+      </div>}
+      {!aiAct?.records?.length && <div className="empty-state"><p>No AI activity yet — run DQ in REMEDIATE mode on data with fixable violations.</p></div>}
+      {aiAct?.records?.length > 0 && <>
+        <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{aiAct.total} records · newest first</div>
+        <div style={{ overflowX: 'auto', maxHeight: 420, overflowY: 'auto' }}>
+          <table>
+            <thead><tr><th>kind</th><th>dataset</th><th>column</th><th>value</th><th>proposal</th><th>confidence</th><th>outcome</th><th>sim</th></tr></thead>
+            <tbody>
+              {aiAct.records.map((r: any, i: number) => (
+                <tr key={i}>
+                  <td><span className={`badge ${r.kind === 'AI_DECISION' ? 'REGISTERED' : 'COMPLETED'}`}>{r.kind === 'AI_DECISION' ? 'AI' : 'OUT'}</span></td>
+                  <td className="muted" style={{ fontSize: 11 }}>{r.dataset}</td>
+                  <td><b style={{ fontSize: 11 }}>{r.column ?? '—'}</b></td>
+                  <td className="muted" style={{ fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r.original_value ?? r.value ?? '—')}</td>
+                  <td className="muted" style={{ fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r.proposed_value ?? r.corrected_value ?? r.proposal ?? '—')}</td>
+                  <td style={{ fontSize: 11, fontWeight: 700, color: (r.confidence ?? 0) >= 0.9 ? 'var(--success)' : (r.confidence ?? 0) >= 0.7 ? 'var(--warn)' : 'var(--danger)' }}>{r.confidence != null ? `${Math.round(r.confidence * 100)}%` : '—'}</td>
+                  <td><span className={`badge ${String(r.outcome ?? r.decision ?? r.status ?? '').includes('APPLIED') || String(r.outcome ?? '').includes('ACCEPTED') ? 'COMPLETED' : String(r.outcome ?? r.decision ?? '').includes('QUAR') || String(r.outcome ?? '').includes('APPROVAL') ? 'REGISTERED' : 'FAILED'}`}>{r.outcome ?? r.decision ?? r.status ?? '—'}</span></td>
+                  <td>{r.simulated ? <span className="badge FAILED" style={{ fontSize: 9 }}>SIM</span> : <span className="badge COMPLETED" style={{ fontSize: 9 }}>LIVE</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>}
     </div>
 
     {/* ── Stage data preview — actual output rows ── */}

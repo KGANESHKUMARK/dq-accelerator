@@ -1597,6 +1597,100 @@ def profile_detail(dataset: str) -> dict[str, Any]:
     return docs[0]
 
 
+@app.get("/api/tables")
+def tables() -> list[str]:
+    """Tables/views visible to the shared Spark session."""
+    spark = J.get_spark()
+    return [r.tableName for r in spark.catalog.listTables()]
+
+
+class TableIn(BaseModel):
+    source: str                  # repo-relative file to register as a view
+    view_name: str
+
+
+@app.post("/api/tables/register")
+def register_table(body: TableIn) -> dict[str, Any]:
+    """Register a local file as a Spark temp view — makes TABLE sources work locally."""
+    spark = J.get_spark()
+    src = (ROOT / body.source).resolve()
+    if not str(src).startswith(str(ROOT.resolve())) or not src.exists():
+        raise HTTPException(400, f"source not found under repo: {body.source}")
+    df = _read_source(spark, src)
+    df.createOrReplaceTempView(body.view_name)
+    return {"ok": True, "view": body.view_name, "rows": df.count()}
+
+
+@app.get("/api/ai/activity")
+def ai_activity(limit: int = 150) -> dict[str, Any]:
+    """Flattened AI remediation activity across recent reports — decisions + outcomes."""
+    out: list[dict[str, Any]] = []
+    rdir = ROOT / "reports"
+    files = sorted(rdir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:30] if rdir.exists() else []
+    prov: dict[str, Any] = {}
+    for f in files:
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        rr = d.get("remediation_results") or {}
+        prov = (rr.get("summary") or {}).get("ai_provider") or prov
+        sim = rr.get("ai_outputs_are_simulated", prov.get("simulated"))
+        for dec in (rr.get("ai_decisions") or []):
+            out.append({"report": f.stem, "dataset": d.get("dataset"), "kind": "AI_DECISION",
+                        **dec, "simulated": sim})
+        for it in ((rr.get("outcome_audit") or {}).get("items") or []):
+            out.append({"report": f.stem, "dataset": d.get("dataset"), "kind": "OUTCOME",
+                        **it, "simulated": sim})
+        if len(out) >= limit:
+            break
+    return {"total": len(out), "records": out[:limit], "provider": prov}
+
+
+# ------------------------------------------------------------------ auto end-to-end
+class AutoIn(BaseModel):
+    source: str
+    dataset: str | None = None
+    pipeline_id: str
+    stage: str = "SILVER"
+    source_format: str = "AUTO"
+    platform: str = "STANDALONE_SPARK"
+    policy: str = "config/policies/default.yaml"
+    owner: str = "auto-e2e"
+    mode: str = "REMEDIATE"
+    approve_confidence: float = 0.0   # auto-approve candidates at/above this
+
+
+@app.post("/api/auto/run")
+def auto_run(body: AutoIn) -> dict[str, Any]:
+    """One-shot E2E: profile -> auto-approve rules -> publish+onboard -> governed DQ run."""
+    jid = J.submit("auto_e2e", lambda: _do_auto_e2e(body))
+    return {"job_id": jid}
+
+
+def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
+    _prog("phase=profile | auto-e2e: profiling source")
+    res = _do_bootstrap_preview(PreviewIn(source=body.source, dataset=body.dataset,
+                                        stage=body.stage, source_format=body.source_format))
+    approved = [c["rule_id"] for c in res["candidates"]
+                if (c.get("confidence") or 0) >= body.approve_confidence]
+    ds = body.dataset or res["dataset"]
+    _prog(f"phase=validate | auto-e2e: {len(approved)}/{res['candidate_count']} rules approved — writing ruleset + manifest")
+    plat = body.platform.upper()
+    if plat in ("LOCAL", "LOCAL_SPARK", "SPARK"):
+        plat = "STANDALONE_SPARK"
+    fout = onboard_finalize(FinalizeIn(
+        preview_result=res, approved_rule_ids=approved, dataset=ds,
+        ruleset_id=res["ruleset_id"], pipeline_id=body.pipeline_id.upper(),
+        platform=plat, stage=body.stage, dq_mode=body.mode,
+        policy=body.policy, owner=body.owner, source=body.source,
+        source_format=body.source_format, publish=True, onboard=True, force=True))
+    _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()}")
+    run = _do_pipeline_run(body.pipeline_id.upper(), PipelineRunIn(dataset_id=ds, mode=body.mode))
+    return {"dataset": ds, "ruleset": fout.get("ruleset"), "rules_approved": len(approved),
+            "rules_rejected": fout.get("rules_rejected"), "run": run}
+
+
 # ------------------------------------------------------------------ onboarding wizard
 @app.post("/api/onboard/upload")
 async def onboard_upload(file: UploadFile = File(...)) -> dict[str, Any]:
@@ -1705,7 +1799,8 @@ def onboard_preview(body: PreviewIn) -> dict[str, str]:
 
 
 class FinalizeIn(BaseModel):
-    preview_job_id: str
+    preview_job_id: str | None = None
+    preview_result: dict | None = None   # inline result for auto-e2e (skips job lookup)
     approved_rule_ids: list[str]
     dataset: str
     ruleset_id: str
@@ -1719,6 +1814,7 @@ class FinalizeIn(BaseModel):
     owner: str = ""
     description: str = ""
     source: str                  # path relative to repo root — used as manifest test_data
+    source_format: str = "AUTO"  # AUTO|CSV|PARQUET|JSON|DELTA|TABLE
     approved_by: str = "ui-onboard"
     publish: bool = False
     onboard: bool = False
@@ -1734,10 +1830,13 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
     from dq_core.metadata.serialization import dump_yaml, save_ruleset
     from dq_core.pipelines.manifest import PipelineManifest
 
-    job = J.get(body.preview_job_id)
-    if not job or job.get("kind") != "bootstrap_preview" or job.get("status") != "COMPLETED":
-        raise HTTPException(400, "preview job not found or not completed")
-    res = job["result"]
+    if body.preview_result is not None:
+        res = body.preview_result
+    else:
+        job = J.get(body.preview_job_id or "")
+        if not job or job.get("kind") != "bootstrap_preview" or job.get("status") != "COMPLETED":
+            raise HTTPException(400, "preview job not found or not completed")
+        res = job["result"]
     if res["ruleset_id"] != body.ruleset_id or res["dataset"] != body.dataset:
         raise HTTPException(400, "preview does not match requested ruleset/dataset")
 
