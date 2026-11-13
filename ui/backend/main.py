@@ -272,6 +272,13 @@ def rulesets() -> list[dict[str, Any]]:
     return out
 
 
+@app.get("/api/rulesets/files")
+def ruleset_files() -> list[str]:
+    """YAML filenames in config/rulesets — for ad-hoc run dropdown."""
+    d = ROOT / "config" / "rulesets"
+    return sorted(p.name for p in d.glob("*.yaml")) if d.exists() else []
+
+
 class RulesetIn(BaseModel):
     ruleset_yaml: str
     activate: bool = True
@@ -1717,11 +1724,20 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
            "ruleset_path": str(ruleset_path.relative_to(ROOT)).replace("\\", "/"),
            "manifest_path": str(manifest_path.relative_to(ROOT)).replace("\\", "/"),
            "rules_approved": len(rs.rules), "rules_rejected": len(cand_rs.rules) - len(rs.rules)}
+    warnings: list[str] = []
     if body.publish:
-        entry = _registry("rulesets").publish(rs, published_by=body.approved_by, activate=True)
-        out["published"] = {"checksum": entry["checksum"][:12]}
+        try:
+            entry = _registry("rulesets").publish(rs, published_by=body.approved_by, activate=True)
+            out["published"] = {"checksum": entry["checksum"][:12]}
+        except Exception as exc:
+            warnings.append(f"publish failed: {str(exc)[:200]}")
     if body.onboard:
-        entry = _registry("pipelines").onboard(mf, actor=body.approved_by)
-        out["onboarded"] = {"pipeline_id": pid, "state": entry["state"]}
+        try:
+            entry = _registry("pipelines").onboard(mf, actor=body.approved_by)
+            out["onboarded"] = {"pipeline_id": pid, "state": entry["state"]}
+        except Exception as exc:
+            warnings.append(f"onboard failed: {str(exc)[:200]}")
+    if warnings:
+        out["warnings"] = warnings
     out["manifest_yaml"] = manifest_path.read_text(encoding="utf-8")
     return out

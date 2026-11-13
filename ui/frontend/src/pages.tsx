@@ -1078,6 +1078,7 @@ export function Onboard() {
         {result.published && <> · published <code>{result.published.checksum}</code></>}
         {result.onboarded && <> · <b>{result.onboarded.pipeline_id}</b> → <span className={`badge ${result.onboarded.state}`}>{result.onboarded.state}</span></>}
       </div>
+      {result.warnings?.length > 0 && <div className="warn-box" style={{ marginTop: 8 }}>{result.warnings.map((w: string, i: number) => <div key={i}>⚠ {w}</div>)}</div>}
       <div className="form-grid" style={{ marginTop: 12 }}>
         <div className="kv"><span>Ruleset file</span><code>{result.ruleset_path}</code></div>
         <div className="kv"><span>Manifest file</span><code>{result.manifest_path}</code></div>
@@ -1113,6 +1114,8 @@ export function RunDQ() {
   const [pipeSel, setPipeSel] = useState('ADHOC')
   const [govDs, setGovDs] = useState<any[]>([])
   const [rsOpts, setRsOpts] = useState<{ label: string; value: string }[]>([])
+  const [rsFiles, setRsFiles] = useState<string[]>([])
+  useEffect(() => { api.rulesetFiles().then(setRsFiles).catch(() => {}) }, [])
   const [src, setSrc] = useState(''); const [rs, setRs] = useState('config/rulesets/customers_v1.yaml')
   const [mode, setMode] = useState('OBSERVE_ONLY'); const [ds, setDs] = useState('customers')
   const [pid, setPid] = useState('UI_RUN'); const [pol, setPol] = useState('config/policies/default.yaml')
@@ -1161,7 +1164,9 @@ export function RunDQ() {
     try { const r = await api.pipelineRun(pipeSel, { dataset_id: ds, mode }); setJobId(r.job_id) }
     catch (e: any) { setErr(e.message) }
   }
-  const rsOptions = governed ? rsOpts : ADHOC_RS.map(([l, v]) => ({ label: l, value: v }))
+  const rsOptions = governed ? rsOpts : (rsFiles.length
+    ? rsFiles.map(f => ({ label: f.replace(/\.yaml$/, ''), value: `config/rulesets/${f}` }))
+    : ADHOC_RS.map(([l, v]) => ({ label: l, value: v })))
 
   return <>
     <div className="section-title">Run Data Quality</div>

@@ -11,6 +11,7 @@ export const api = {
   onboard: (manifest_yaml: string) => fetch(`${B}/pipelines/onboard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ manifest_yaml }) }).then(j),
   pipelineAction: (id: string, action: string, reason = 'via UI') => fetch(`${B}/pipelines/${id}/${action}?reason=${encodeURIComponent(reason)}`, { method: 'POST' }).then(j),
   rulesets: () => fetch(`${B}/rulesets`).then(j),
+  rulesetFiles: () => fetch(`${B}/rulesets/files`).then(j),
   publishRuleset: (ruleset_yaml: string, activate = true) => fetch(`${B}/rulesets/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ruleset_yaml, activate }) }).then(j),
   rulesetAction: (id: string, action: string, version: string) => fetch(`${B}/rulesets/${id}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version }) }).then(j),
   rulesetDiff: (id: string) => fetch(`${B}/rulesets/${id}/diff`).then(j),
