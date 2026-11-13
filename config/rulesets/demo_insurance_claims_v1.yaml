@@ -1,0 +1,473 @@
+ruleset:
+  ruleset_id: demo_insurance_claims_silver
+  dataset: demo_insurance_claims
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates demo_insurance_claims_silver@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_001
+    name: claim_id_not_null
+    description: claim_id is populated in 100.0% of rows
+    dataset: demo_insurance_claims
+    column: claim_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 20000
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_002
+    name: claim_id_unique
+    description: claim_id looks like an identifier (99.2% unique)
+    dataset: demo_insurance_claims
+    column: claim_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 0.9915
+        duplicate_value_count: 170
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_003
+    name: claim_id_regex
+    description: claim_id follows the structural pattern AAA-99999
+    dataset: demo_insurance_claims
+    column: claim_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{3}\-[0-9]{5}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA-99999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_004
+    name: claim_id_string_length
+    description: claim_id length observed between 9 and 9
+    dataset: demo_insurance_claims
+    column: claim_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 9
+      max: 9
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 9
+        max_length: 9
+        avg_length: 9.0
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_005
+    name: policy_no_not_null
+    description: policy_no is populated in 100.0% of rows
+    dataset: demo_insurance_claims
+    column: policy_no
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 20000
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_006
+    name: policy_no_regex
+    description: policy_no follows the structural pattern AAA-999999
+    dataset: demo_insurance_claims
+    column: policy_no
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{3}\-[0-9]{6}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9853
+      evidence:
+        dominant_pattern: AAA-999999
+        share: 0.9853
+        other_patterns:
+        - pattern: aaaaaa99999
+          count: 149
+          percentage: 0.74
+        - pattern: aaaaaa9999
+          count: 130
+          percentage: 0.65
+        - pattern: aaaaaa999
+          count: 10
+          percentage: 0.05
+        - pattern: aaaaaa99
+          count: 4
+          percentage: 0.02
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_007
+    name: policy_no_string_length
+    description: policy_no length observed between 8 and 11
+    dataset: demo_insurance_claims
+    column: policy_no
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 8
+      max: 11
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 8
+        max_length: 11
+        avg_length: 10.00655
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_008
+    name: claimant_name_not_null
+    description: claimant_name is populated in 98.8% of rows
+    dataset: demo_insurance_claims
+    column: claimant_name
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 236
+        null_percentage: 1.18
+        rows: 20000
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_009
+    name: claimant_name_string_length
+    description: claimant_name length observed between 10 and 19
+    dataset: demo_insurance_claims
+    column: claimant_name
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 10
+      max: 19
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 10
+        max_length: 19
+        avg_length: 13.874368
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_010
+    name: claim_date_not_null
+    description: claim_date is populated in 100.0% of rows
+    dataset: demo_insurance_claims
+    column: claim_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 20000
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_011
+    name: claim_date_date_format
+    description: claim_date is a date in yyyy-MM-dd
+    dataset: demo_insurance_claims
+    column: claim_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.98
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 98.0
+          dd-MM-yyyy: 0.03
+        date_min: '2024-01-01'
+        date_max: '2024-12-28'
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_012
+    name: amount_claimed_not_null
+    description: amount_claimed is populated in 100.0% of rows
+    dataset: demo_insurance_claims
+    column: amount_claimed
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 20000
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_013
+    name: amount_claimed_data_type
+    description: amount_claimed holds decimal numbers stored as text
+    dataset: demo_insurance_claims
+    column: amount_claimed
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_014
+    name: amount_claimed_range
+    description: amount_claimed typically between 508.04 and 381156.76
+    dataset: demo_insurance_claims
+    column: amount_claimed
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 508.04
+      max: 381156.76
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 508.04
+        observed_max: 9993104.47
+        p25: 62762.03
+        p75: 190119.92
+        outliers: 322
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_015
+    name: status_not_null
+    description: status is populated in 99.2% of rows
+    dataset: demo_insurance_claims
+    column: status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 151
+        null_percentage: 0.76
+        rows: 20000
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_016
+    name: status_allowed_values
+    description: status has 8 frequent categorical values
+    dataset: demo_insurance_claims
+    column: status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - SETTLED
+      - PENDING_REVIEW
+      - OPEN
+      - APPROVED
+      - DENIED
+      - open
+      - X
+      - 'APPROVED '
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          SETTLED: 3976
+          PENDING_REVIEW: 3914
+          OPEN: 3895
+          APPROVED: 3846
+          DENIED: 3765
+          open: 156
+          X: 151
+          'APPROVED ': 146
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_017
+    name: adjuster_string_length
+    description: adjuster length observed between 10 and 19
+    dataset: demo_insurance_claims
+    column: adjuster
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 10
+      max: 19
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 10
+        max_length: 19
+        avg_length: 13.891647
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_INSURANCE_CLAIMS_018
+    name: demo_insurance_claims_schema_validation
+    description: schema observed at profiling time
+    dataset: demo_insurance_claims
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: claim_id
+        type: string
+      - name: policy_no
+        type: string
+      - name: claimant_name
+        type: string
+      - name: claim_date
+        type: string
+      - name: amount_claimed
+        type: string
+      - name: status
+        type: string
+      - name: adjuster
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 7
+      profiled_at: '2026-11-13T05:30:31Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-13T05:31:10Z'
+  change_log:
+  - approved 18 of 18 candidate rules

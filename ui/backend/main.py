@@ -1668,6 +1668,45 @@ def auto_run(body: AutoIn) -> dict[str, Any]:
     return {"job_id": jid}
 
 
+def _purge_pipeline_artifacts(ruleset_id: str, pipeline_id: str) -> None:
+    """Remove prior ruleset/manifest/pipeline artifacts so auto-e2e reruns are idempotent.
+
+    Published ruleset versions are immutable — a regenerated ruleset for the same
+    ruleset_id gets a different checksum (fresh profile evidence), so re-publishing
+    @1.0 would fail verification. Purging first gives each auto run a clean slate.
+    """
+    import json as _json
+    from dq_core.metadata import resolver as _res
+    store = _res.store_from_engine(J.get_engine())
+    if store is not None:
+        for coll in ("ruleset_versions", "ruleset_index", "pipelines", "manifests"):
+            try:
+                col = store.collection(coll)
+                for d in col.find({}):
+                    if ruleset_id.lower() in _json.dumps(d).lower() or pipeline_id.lower() in _json.dumps(d).lower():
+                        for m in ("delete_one", "remove_one", "remove", "delete"):
+                            if hasattr(col, m):
+                                try:
+                                    q = {"_id": d["_id"]} if "_id" in d else {
+                                        k: d[k] for k in ("ruleset_id", "version", "pipeline_id") if k in d}
+                                    getattr(col, m)(q)
+                                    break
+                                except Exception:
+                                    pass
+            except Exception:
+                pass
+    ds_name = ruleset_id.rsplit("_", 1)[0].lower()   # ruleset_id = "<dataset>_<stage>"
+    for p in (ROOT / "config" / "rulesets", ROOT / "config" / "pipelines"):
+        if p.exists():
+            for f in p.glob("*.yaml"):
+                stem = f.stem.lower()
+                if stem.startswith(ds_name) or pipeline_id.lower() in stem:
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+
+
 def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
     _prog("phase=profile | auto-e2e: profiling source")
     res = _do_bootstrap_preview(PreviewIn(source=body.source, dataset=body.dataset,
@@ -1675,6 +1714,7 @@ def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
     approved = [c["rule_id"] for c in res["candidates"]
                 if (c.get("confidence") or 0) >= body.approve_confidence]
     ds = body.dataset or res["dataset"]
+    _purge_pipeline_artifacts(res["ruleset_id"], body.pipeline_id.upper())
     _prog(f"phase=validate | auto-e2e: {len(approved)}/{res['candidate_count']} rules approved — writing ruleset + manifest")
     plat = body.platform.upper()
     if plat in ("LOCAL", "LOCAL_SPARK", "SPARK"):

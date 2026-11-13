@@ -123,6 +123,9 @@ def build_row_check(rule: RuleDefinition, index: int, available: Sequence[str],
             hi = F.to_date(F.lit(str(cfg["max"]))) if cfg.get("max") is not None else None
         else:
             type_sql = validate_cast_type(data_type)
+            if type_sql.upper() in ("INT", "INTEGER") and any(
+                    b is not None and abs(float(b)) > 2147483647 for b in (cfg.get("min"), cfg.get("max"))):
+                type_sql = "BIGINT"
             typed = safe_cast(c, type_sql)
             lo = F.lit(cfg["min"]).cast(type_sql) if cfg.get("min") is not None else None
             hi = F.lit(cfg["max"]).cast(type_sql) if cfg.get("max") is not None else None
