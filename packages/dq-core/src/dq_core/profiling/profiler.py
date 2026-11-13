@@ -14,7 +14,7 @@ never collected. A profile normally costs 4-5 Spark jobs regardless of the numbe
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from pyspark import StorageLevel
 from pyspark.sql import DataFrame
@@ -50,11 +50,17 @@ class DataProfiler:
         self.settings = settings or ProfilingSettings()
 
     def profile(self, df: DataFrame, dataset: str, *, mode: str | None = None,
-                sample_fraction: float | None = None) -> ProfileReport:
+                sample_fraction: float | None = None,
+                on_phase: Callable[[str], None] | None = None) -> ProfileReport:
         s = self.settings
         mode = (mode or s.mode).upper()
         fraction = sample_fraction or s.sample_fraction
         started = utc_now_iso()
+
+        def _emit(msg: str) -> None:
+            if on_phase is not None:
+                on_phase(msg)
+
         jobs = 0
         with Stopwatch() as sw:
             source_rows: int | None = None
@@ -96,11 +102,13 @@ class DataProfiler:
                         aggs.append(F.count(safe_to_timestamp(x, fmt)).alias(f"df{i}_{j}"))
                     parsed = safe_to_date(x, CANDIDATE_DATE_FORMATS[0])
                     aggs += [F.min(parsed).cast("string").alias(f"dmn{i}"), F.max(parsed).cast("string").alias(f"dmx{i}")]
+            _emit(f"spark job · column statistics for {len(columns)} columns (nulls, distinct, min/max, formats)")
             stats = data.agg(*aggs).collect()[0].asDict()
             jobs += 1
             rows = int(stats["__rows"])
 
             # ---------------------------------------------------------------- job 2: duplicates
+            _emit("spark job · duplicate-row detection across all columns")
             dup = (data.groupBy(*[col(c) for c in columns]).count().where(F.col("count") > 1)
                    .agg(F.count(F.lit(1)).alias("groups"), F.sum("count").alias("rows")).collect()[0])
             jobs += 1
@@ -113,6 +121,7 @@ class DataProfiler:
             top_values: dict[str, list[dict[str, Any]]] = {c: [] for c in columns}
             unique_counts: dict[str, int | None] = {c: None for c in columns}
             if freq_cols and rows:
+                _emit(f"spark job · top values + cardinality for {len(freq_cols)} columns")
                 pairs = F.explode(F.array(*[F.struct(F.lit(c).alias("column"), col(c).cast("string").alias("value"))
                                             for c in freq_cols]))
                 vc = (data.select(pairs.alias("p")).select("p.column", "p.value").where(F.col("value").isNotNull())
@@ -131,6 +140,7 @@ class DataProfiler:
             # ---------------------------------------------------------------- job 4: patterns
             top_patterns: dict[str, list[dict[str, Any]]] = {c: [] for c in columns}
             if strings and rows:
+                _emit(f"spark job · string pattern detection for {len(strings)} text columns")
                 pairs = F.explode(F.array(*[F.struct(F.lit(c).alias("column"), structural_pattern(col(c)).alias("pattern"))
                                             for c in strings]))
                 pc = (data.select(pairs.alias("p")).select("p.column", "p.pattern").where(F.col("pattern").isNotNull())
@@ -152,6 +162,7 @@ class DataProfiler:
             outlier_targets = {c: p for c, p in profiles.items() if p.mean is not None and p.stddev not in (None, 0.0)
                                and (_is_numeric(p.data_type) or (p.numeric_castable_percentage or 0) >= 100 * s.semantic_match_rate)}
             if outlier_targets and rows:
+                _emit(f"spark job · numeric outlier counts for {len(outlier_targets)} columns")
                 exprs = []
                 robust_targets: dict[str, tuple[float, float]] = {}
                 for c, p in outlier_targets.items():
@@ -173,6 +184,7 @@ class DataProfiler:
                 jobs += 1
             data.unpersist()
 
+            _emit("building anomaly report — null rates, outliers, PII suspects, drift")
             anomalies, schema_anomalies = self._anomalies(profiles, rows, columns)
             pk = [c for c, p in profiles.items() if rows and p.null_count == 0 and p.distinct_count == rows and not approximate]
             near = [{"column": c, "unique_ratio": round(p.distinct_count / p.non_null_count, 4), "null_count": p.null_count,

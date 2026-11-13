@@ -92,8 +92,10 @@ class DataQualityEngine:
 
     # ------------------------------------------------------------------ profiling & generation
     def profile(self, dataframe: DataFrame, dataset: str, *, mode: str | None = None,
-                sample_fraction: float | None = None) -> ProfileReport:
-        return self.profiler.profile(dataframe, dataset, mode=mode, sample_fraction=sample_fraction)
+                sample_fraction: float | None = None,
+                on_phase: Callable[[str], None] | None = None) -> ProfileReport:
+        return self.profiler.profile(dataframe, dataset, mode=mode, sample_fraction=sample_fraction,
+                                     on_phase=on_phase)
 
     def generate_candidate_rules(self, profile: ProfileReport, *, related_profiles: Mapping[str, ProfileReport] | None = None,
                                  stage: Stage | str = Stage.SILVER, version: str = "0.1") -> RuleSet:

@@ -5,8 +5,7 @@ ruleset:
   stage: SILVER
   description: Approved from candidates loans_silver@1.0
   owner: ''
-  record_key:
-  - loan_id
+  record_key: []
   lookups: {}
   parent_version: null
   rules:
@@ -30,7 +29,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_002
     name: loan_id_unique
@@ -51,7 +50,7 @@ ruleset:
       evidence:
         distinct_count: 31
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_003
     name: loan_id_regex
@@ -74,7 +73,7 @@ ruleset:
         dominant_pattern: A99999
         share: 1.0
         other_patterns: []
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_004
     name: loan_id_string_length
@@ -98,7 +97,7 @@ ruleset:
         min_length: 6
         max_length: 6
         avg_length: 6.0
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_005
     name: borrower_id_not_null
@@ -120,7 +119,7 @@ ruleset:
         null_count: 1
         null_percentage: 3.23
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_006
     name: borrower_id_unique
@@ -141,7 +140,7 @@ ruleset:
       evidence:
         unique_ratio: 0.9667
         duplicate_value_count: 1
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_007
     name: borrower_id_regex
@@ -164,7 +163,7 @@ ruleset:
         dominant_pattern: A9999
         share: 1.0
         other_patterns: []
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_008
     name: borrower_id_string_length
@@ -188,7 +187,7 @@ ruleset:
         min_length: 5
         max_length: 5
         avg_length: 5.0
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_009
     name: product_not_null
@@ -210,7 +209,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_010
     name: product_allowed_values
@@ -238,7 +237,7 @@ ruleset:
           AUTO: 10
           HOME: 9
         excluded_rare_values: []
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_011
     name: principal_not_null
@@ -260,9 +259,30 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   - rule_id: GEN_LOANS_012
+    name: principal_data_type
+    description: principal holds decimal numbers stored as text
+    dataset: loans
+    column: principal
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-13T14:27:23Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_013
     name: principal_range
     description: principal typically between 5100.0 and 410000.0
     dataset: loans
@@ -288,9 +308,9 @@ ruleset:
         p75: 262000.0
         outliers: 0
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_013
+  - rule_id: GEN_LOANS_014
     name: apr_not_null
     description: apr is populated in 100.0% of rows
     dataset: loans
@@ -310,9 +330,30 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_014
+  - rule_id: GEN_LOANS_015
+    name: apr_data_type
+    description: apr holds decimal numbers stored as text
+    dataset: loans
+    column: apr
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-13T14:27:23Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_016
     name: apr_range
     description: apr typically between 4.6 and 15.9
     dataset: loans
@@ -338,9 +379,9 @@ ruleset:
         p75: 12.0
         outliers: 0
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_015
+  - rule_id: GEN_LOANS_017
     name: term_months_not_null
     description: term_months is populated in 100.0% of rows
     dataset: loans
@@ -360,9 +401,30 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_016
+  - rule_id: GEN_LOANS_018
+    name: term_months_data_type
+    description: term_months holds whole numbers stored as text
+    dataset: loans
+    column: term_months
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-13T14:27:23Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_019
     name: term_months_range
     description: term_months typically between 12 and 360
     dataset: loans
@@ -388,9 +450,9 @@ ruleset:
         p75: 360.0
         outliers: 0
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_017
+  - rule_id: GEN_LOANS_020
     name: origination_date_not_null
     description: origination_date is populated in 100.0% of rows
     dataset: loans
@@ -410,9 +472,9 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_018
+  - rule_id: GEN_LOANS_021
     name: origination_date_date_format
     description: origination_date is a date in yyyy-MM-dd
     dataset: loans
@@ -435,9 +497,9 @@ ruleset:
           yyyy/MM/dd: 3.23
         date_min: '2024-01-05'
         date_max: '2024-03-17'
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_019
+  - rule_id: GEN_LOANS_022
     name: credit_score_not_null
     description: credit_score is populated in 100.0% of rows
     dataset: loans
@@ -457,9 +519,9 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_020
+  - rule_id: GEN_LOANS_023
     name: credit_score_data_type
     description: credit_score holds whole numbers stored as text
     dataset: loans
@@ -469,7 +531,7 @@ ruleset:
     severity: ERROR
     stage: SILVER
     config:
-      data_type: int
+      data_type: bigint
     remediation: {}
     version: '1.0'
     status: APPROVED
@@ -478,9 +540,9 @@ ruleset:
       confidence: 0.9677
       evidence:
         integer_castable_percentage: 96.77
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_021
+  - rule_id: GEN_LOANS_024
     name: credit_score_range
     description: credit_score typically between 561 and 817
     dataset: loans
@@ -506,9 +568,9 @@ ruleset:
         p75: 776.0
         outliers: 0
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_022
+  - rule_id: GEN_LOANS_025
     name: state_not_null
     description: state is populated in 100.0% of rows
     dataset: loans
@@ -528,9 +590,9 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_023
+  - rule_id: GEN_LOANS_026
     name: state_string_length
     description: state length observed between 2 and 2
     dataset: loans
@@ -552,9 +614,9 @@ ruleset:
         min_length: 2
         max_length: 2
         avg_length: 2.0
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_024
+  - rule_id: GEN_LOANS_027
     name: status_not_null
     description: status is populated in 100.0% of rows
     dataset: loans
@@ -574,9 +636,9 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_025
+  - rule_id: GEN_LOANS_028
     name: status_allowed_values
     description: status has 2 frequent categorical values
     dataset: loans
@@ -602,9 +664,9 @@ ruleset:
           CLOSED: 1
         excluded_rare_values:
         - CLOSED
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_026
+  - rule_id: GEN_LOANS_029
     name: officer_email_not_null
     description: officer_email is populated in 100.0% of rows
     dataset: loans
@@ -624,9 +686,9 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_027
+  - rule_id: GEN_LOANS_030
     name: officer_email_regex
     description: officer_email contains e-mail addresses
     dataset: loans
@@ -645,9 +707,9 @@ ruleset:
       confidence: 0.9677
       evidence:
         email_match_percentage: 96.77
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_028
+  - rule_id: GEN_LOANS_031
     name: disbursement_date_not_null
     description: disbursement_date is populated in 100.0% of rows
     dataset: loans
@@ -667,9 +729,33 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 31
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
-  - rule_id: GEN_LOANS_029
+  - rule_id: GEN_LOANS_032
+    name: disbursement_date_date_format
+    description: disbursement_date is a date in yyyy-MM-dd
+    dataset: loans
+    column: disbursement_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 100.0
+        date_min: '2024-01-08'
+        date_max: '2024-03-20'
+      profiled_at: '2026-11-13T14:27:23Z'
+      profile_mode: FULL
+  - rule_id: GEN_LOANS_033
     name: loans_schema_validation
     description: schema observed at profiling time
     dataset: loans
@@ -687,11 +773,11 @@ ruleset:
       - name: product
         type: string
       - name: principal
-        type: double
+        type: string
       - name: apr
-        type: double
+        type: string
       - name: term_months
-        type: int
+        type: string
       - name: origination_date
         type: string
       - name: credit_score
@@ -703,7 +789,7 @@ ruleset:
       - name: officer_email
         type: string
       - name: disbursement_date
-        type: date
+        type: string
       allow_extra_columns: false
     remediation: {}
     version: '1.0'
@@ -713,12 +799,12 @@ ruleset:
       confidence: 0.9
       evidence:
         column_count: 12
-      profiled_at: '2026-11-07T06:45:07Z'
+      profiled_at: '2026-11-13T14:27:23Z'
       profile_mode: FULL
   status: DRAFT
-  created_by: dq-core-generator-0.1.0
+  created_by: ''
   created_at: ''
-  approved_by: dqctl-bootstrap
-  approved_at: '2026-11-07T06:45:38Z'
+  approved_by: ui-onboard
+  approved_at: '2026-11-13T14:27:53Z'
   change_log:
-  - approved 29 of 29 candidate rules
+  - approved 33 of 33 candidate rules

@@ -647,7 +647,7 @@ def _do_profile(body: ProfileIn) -> dict[str, Any]:
     mode = _profile_mode_for(src, body.mode, engine)
     ds = body.dataset or src.stem
     _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
-    rep = engine.profile(df, ds, mode=mode)
+    rep = engine.profile(df, ds, mode=mode, on_phase=lambda m: _prog(f"phase=profile | {m}"))
     out = ROOT / "reports"
     out.mkdir(exist_ok=True)
     p = out / f"ui_profile_{src.stem}.json"
@@ -1847,7 +1847,7 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     mode = _profile_mode_for(src_path, "FULL", engine) if src_path.suffix and src_path.exists() else "SAMPLE"
     df = _read_any_source(spark, body.source, body.source_format)
     _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
-    rep = engine.profile(df, ds, mode=mode)
+    rep = engine.profile(df, ds, mode=mode, on_phase=lambda m: _prog(f"phase=profile | {m}"))
     # drift vs last stored baseline profile (profiles collection — written at finalize)
     try:
         from dq_core.metadata import resolver as _res
