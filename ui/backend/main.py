@@ -346,32 +346,51 @@ def ruleset_diff(rid: str, from_: str = "", to: str = "") -> dict[str, Any]:
 
 @app.get("/api/rulesets/{rid}/rules")
 def ruleset_rules(rid: str) -> dict[str, Any]:
-    """Return the actual rule definitions for a ruleset (all published versions merged by rule_id)."""
-    import yaml as _yaml
+    """Return the actual rule definitions for a ruleset via the registry (works for file + NoSQL backends)."""
+    reg = _registry("rulesets")
     found: dict[str, dict[str, Any]] = {}
-    for base in (ROOT / "config" / "rulesets", ROOT / "registry" / "rulesets"):
-        if not base.exists():
-            continue
-        for p in base.rglob("*.yaml"):
+
+    def _add(rules: list[dict[str, Any]]) -> None:
+        for r in rules or []:
+            rule_key = r.get("rule_id")
+            if rule_key and rule_key not in found:
+                g = r.get("generation") or {}
+                found[rule_key] = {
+                    "rule_id": rule_key, "name": r.get("name"),
+                    "rule_type": r.get("rule_type"), "column": r.get("column"),
+                    "severity": r.get("severity"), "scope": r.get("scope"),
+                    "status": r.get("status"), "confidence": g.get("confidence"),
+                    "description": r.get("description"),
+                    "config": r.get("config") or {},
+                }
+
+    # primary: registry versions (file + NoSQL backends)
+    try:
+        for e in reg.list_versions(rid):
             try:
-                doc = _yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+                rs = reg.get(rid, e["version"])
+                d = rs.to_dict() if hasattr(rs, "to_dict") else {}
+                _add(d.get("rules"))
             except Exception:
                 continue
-            rs = doc.get("ruleset") or {}
-            if rs.get("ruleset_id") != rid:
+    except Exception:
+        pass
+
+    # fallback: scan YAML files directly (covers rulesets not yet in registry index)
+    if not found:
+        import yaml as _yaml
+        for base in (ROOT / "config" / "rulesets", ROOT / "registry" / "rulesets"):
+            if not base.exists():
                 continue
-            for r in rs.get("rules") or []:
-                rid_rule = r.get("rule_id")
-                if rid_rule and rid_rule not in found:
-                    g = r.get("generation") or {}
-                    found[rid_rule] = {
-                        "rule_id": rid_rule, "name": r.get("name"),
-                        "rule_type": r.get("rule_type"), "column": r.get("column"),
-                        "severity": r.get("severity"), "scope": r.get("scope"),
-                        "status": r.get("status"), "confidence": g.get("confidence"),
-                        "description": r.get("description"),
-                        "config": r.get("config") or {},
-                    }
+            for p in base.rglob("*.yaml"):
+                try:
+                    doc = _yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+                except Exception:
+                    continue
+                rs = doc.get("ruleset") or {}
+                if rs.get("ruleset_id") == rid:
+                    _add(rs.get("rules"))
+
     if not found:
         raise HTTPException(404, f"no rules found for ruleset {rid}")
     return {"ruleset_id": rid, "count": len(found), "rules": list(found.values())}
