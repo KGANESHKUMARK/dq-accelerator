@@ -14,7 +14,9 @@ pipeline:
     stages:
     - BRONZE
     - SILVER
+    - GOLD
     rulesets:
       SILVER: ../rulesets/demo_insurance_claims_v1.yaml
-    test_data: ../../data/uploads/demo_insurance_claims.csv
+      GOLD: ../rulesets/demo_insurance_claims_gold_v1.yaml
+    test_data: ../../sample_data/demo/demo_insurance_claims.csv
     test_data_format: CSV

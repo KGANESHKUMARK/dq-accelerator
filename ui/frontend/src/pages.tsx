@@ -931,6 +931,29 @@ const resolveRel = (rel: string) => {
   return out.join('/')
 }
 
+/* ---- Live activity feed — recent jobs with live step progress ---- */
+const LiveJobsFeed = () => {
+  const [jobs, setJobs] = useState<any[]>([])
+  useEffect(() => {
+    let dead = false
+    const load = () => api.jobs().then(j => { if (!dead) setJobs((j || []).slice(0, 6)) }).catch(() => {})
+    load(); const t = setInterval(load, 3000)
+    return () => { dead = true; clearInterval(t) }
+  }, [])
+  if (!jobs.length) return null
+  return <div className="card" style={{ marginTop: 12 }}>
+    <h3>Live activity <span className="muted">— recent jobs & live steps</span></h3>
+    {jobs.map(j => (
+      <div key={j.job_id} style={{ display: 'flex', gap: 10, alignItems: 'baseline', padding: '5px 0', borderBottom: '1px solid var(--border, #2a2a2a)', fontSize: 12 }}>
+        <span className={`badge ${j.status === 'COMPLETED' ? 'COMPLETED' : j.status === 'FAILED' ? 'FAILED' : j.status === 'CANCELLED' ? 'FAILED' : 'REGISTERED'}`}>{j.status}</span>
+        <code style={{ fontSize: 11 }}>{j.job_id}</code>
+        <span className="tag">{j.kind}</span>
+        <span className="muted" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.progress || '—'}</span>
+      </div>
+    ))}
+  </div>
+}
+
 export function Onboard() {
   const [step, setStep] = useState(0)
   const [datasets, setDatasets] = useState<any[]>([])
@@ -1214,6 +1237,8 @@ export function Onboard() {
       </div>
     </div>}
     </>}
+
+    <LiveJobsFeed />
   </>
 }
 
