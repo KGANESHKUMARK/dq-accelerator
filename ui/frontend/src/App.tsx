@@ -29,7 +29,7 @@ const PAGES: Page[] = [
 
 // Demo-scoped nav: admin/internal tabs hidden by default; Settings → Sidebar tabs
 // can re-enable any of them (stored in localStorage dq_nav).
-const DEMO_HIDE = new Set(['pipelines'])
+const DEMO_HIDE = new Set<string>()
 const navVisible = (id: string): boolean => {
   try {
     const n = JSON.parse(localStorage.getItem('dq_nav') || 'null')
