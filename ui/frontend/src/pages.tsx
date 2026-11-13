@@ -1152,6 +1152,7 @@ export function RunDQ() {
   const [rsFiles, setRsFiles] = useState<string[]>([])
   const [polFiles, setPolFiles] = useState<string[]>([])
   const [srcPrev, setSrcPrev] = useState<any>(null); const [srcPrevBusy, setSrcPrevBusy] = useState(false)
+  const [srcFmt, setSrcFmt] = useState('AUTO'); const [srcUri, setSrcUri] = useState('')
   useEffect(() => { api.rulesetFiles().then(setRsFiles).catch(() => {}) }, [])
   useEffect(() => { api.policyFiles().then(setPolFiles).catch(() => {}) }, [])
   const previewSrc = async () => { setSrcPrevBusy(true); try { setSrcPrev(await api.sourcePreview(src)) } catch (e: any) { setSrcPrev({ error: e.message }) } finally { setSrcPrevBusy(false) } }
@@ -1190,7 +1191,7 @@ export function RunDQ() {
   const busy = jobActive(job) || jobActive(prof)
   const submit = async () => {
     setErr('')
-    try { const r = await api.run({ source: src, ruleset: rs, mode, dataset: ds, pipeline_id: pid, policy: pol }); setJobId(r.job_id) }
+    try { const r = await api.run({ source: srcFmt !== 'AUTO' && ['TABLE', 'DELTA', 'JSON'].includes(srcFmt) ? srcUri : src, source_format: srcFmt === 'AUTO' ? 'AUTO' : srcFmt, ruleset: rs, mode, dataset: ds, pipeline_id: pid, policy: pol }); setJobId(r.job_id) }
     catch (e: any) { setErr(e.message) }
   }
   const submitProfile = async () => {
@@ -1225,12 +1226,33 @@ export function RunDQ() {
             ? <select value={ds} onChange={e => applyDs(govDs.find((x: any) => x.dataset_id === e.target.value))}>
                 {govDs.map((d: any) => <option key={d.dataset_id} value={d.dataset_id}>{d.dataset_id}</option>)}
               </select>
-            : <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <select value={src} onChange={e => { setSrc(e.target.value); setDs(e.target.selectedOptions[0].text.split(' — ')[0]); setSrcPrev(null) }} style={{ flex: 1 }}>
-                  {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
+            : <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select value={srcFmt} onChange={e => setSrcFmt(e.target.value)} style={{ minWidth: 105 }}>
+                  <option value="AUTO">File</option>
+                  <option value="TABLE">Table</option>
+                  <option value="DELTA">Delta</option>
+                  <option value="JSON">JSON</option>
                 </select>
-                {src && <button className="btn sm sec" onClick={previewSrc} disabled={srcPrevBusy}>{srcPrevBusy ? 'Loading…' : 'Preview data'}</button>}
-              </span>}
+                {['TABLE', 'DELTA', 'JSON'].includes(srcFmt)
+                  ? <input style={{ flex: 1 }} placeholder={srcFmt === 'TABLE' ? 'catalog.schema.table' : 'path or URI (dbfs:/, abfss://, /Volumes/…)'} value={srcUri} onChange={e => setSrcUri(e.target.value)} />
+                  : <>
+                      <select value={src} onChange={e => {
+                        const v = e.target.value; setSrc(v); setDs(e.target.selectedOptions[0].text.split(' — ')[0]); setSrcPrev(null)
+                        const stem = (v.split('/').pop() || '').replace(/\.[^.]+$/, '')
+                        if (!stem) return
+                        const cands = rsFiles.filter(f => f.startsWith(stem) && f.endsWith('.yaml'))
+                        const nonGold = cands.filter(f => !f.includes('gold'))
+                        const pool = (nonGold.length ? nonGold : cands).sort()
+                        if (pool.length) setRs(`config/rulesets/${pool[pool.length - 1]}`)
+                        setPid(`${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_ADHOC`)
+                        if (/patient|health|clinical|phi/i.test(stem) && polFiles.includes('healthcare.yaml')) setPol('config/policies/healthcare.yaml')
+                        else if (polFiles.includes('default.yaml')) setPol('config/policies/default.yaml')
+                      }} style={{ flex: 1 }}>
+                        {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
+                      </select>
+                      {src && <button className="btn sm sec" onClick={previewSrc} disabled={srcPrevBusy}>{srcPrevBusy ? 'Loading…' : 'Preview data'}</button>}
+                    </>}
+              </div>}
         </div>
         {governed && <div className="field"><label>Source (test_data)</label><input value={src} readOnly /></div>}
         <div className="field"><label>Rule set</label>

@@ -410,6 +410,7 @@ def datasets() -> list[dict[str, Any]]:
 class RunIn(BaseModel):
     source: str
     ruleset: str
+    source_format: str = "AUTO"
     policy: str = "config/policies/default.yaml"
     mode: str = "OBSERVE_ONLY"
     dataset: str | None = None
@@ -423,7 +424,10 @@ def _do_run(body: RunIn) -> dict[str, Any]:
     spark, engine = _spark_engine()
     rs = engine.load_ruleset(str(ROOT / body.ruleset))
     src = ROOT / body.source
-    df = _read_source(spark, src)
+    if (body.source_format or "AUTO").upper() in ("TABLE", "DELTA", "JSON") or not src.exists():
+        df = _read_any_source(spark, body.source, body.source_format)
+    else:
+        df = _read_source(spark, src)
     # Auto-sample large files using config thresholds (engine.yaml -> validation.*)
     val_cfg = engine.config.validation
     threshold_mb = val_cfg.large_file_threshold_mb
@@ -546,8 +550,13 @@ def _do_pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, Any]:
                if d.dataset_id == (body.dataset_id or mf.datasets[0].dataset_id)), None)
     if ds is None:
         raise HTTPException(400, f"dataset '{body.dataset_id}' not in manifest {pid}")
-    src = Path(ds.test_data)
-    df = _read_source(spark, src)
+    src = ds.test_data
+    sp = Path(src)
+    tfmt = (ds.test_data_format or "").upper()
+    if tfmt in ("TABLE", "DELTA", "JSON") or not sp.exists():
+        df = _read_any_source(spark, src, tfmt if tfmt in ("TABLE", "DELTA", "JSON") else "AUTO")
+    else:
+        df = _read_source(spark, sp)
     mode = body.mode or getattr(mf.dq_mode, "value", str(mf.dq_mode))
     policy = str(mf.policy) if mf.policy else str(ROOT / "config" / "policies" / "default.yaml")
     pipe_run_id = f"{pid}-{int(t0)}"
@@ -1756,6 +1765,10 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
     test_data = os.path.relpath(src, manifest_path.parent).replace("\\", "/") \
         if src.exists() else body.source
     pid = body.pipeline_id.upper()
+    src_fmt = (body.source_format or "AUTO").upper()
+    if src_fmt == "AUTO":
+        src_fmt = ({"csv": "CSV", "parquet": "PARQUET", "json": "JSON"}
+                   .get(src.suffix.lower().lstrip("."), "PARQUET") if src.exists() else "TABLE")
     manifest = {"pipeline": {
         "pipeline_id": pid,
         "pipeline_name": body.pipeline_name or re.sub(r"[_-]+", " ", pid).title(),
@@ -1767,12 +1780,12 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
         "policy": body.policy,
         "datasets": [{
             "dataset_id": body.dataset,
-            "format": "CSV" if src.suffix.lower() == ".csv" else "PARQUET",
+            "format": src_fmt,
             "stages": ["BRONZE", body.stage.upper()],
             "rulesets": {body.stage.upper(): os.path.relpath(ruleset_path,
                                                              manifest_path.parent).replace("\\", "/")},
             "test_data": test_data,
-            "test_data_format": "CSV" if src.suffix.lower() == ".csv" else "PARQUET",
+            "test_data_format": src_fmt,
         }],
     }}
     dump_yaml(manifest, manifest_path)
