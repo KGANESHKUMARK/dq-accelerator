@@ -676,6 +676,17 @@ def job_status(jid: str) -> dict[str, Any]:
     j = J.get(jid)
     if not j:
         raise HTTPException(404, "job not found")
+    r = j.get("result")
+    if isinstance(r, dict) and "run" in r and "accepted" not in r:
+        stages = (r.get("run") or {}).get("stages") or []
+        silver = next((s for s in stages if s.get("stage") == "SILVER"), {})
+        import glob as _g
+        ds = r.get("dataset") or ""
+        reps = sorted(_g.glob(str(ROOT / "reports" / f"{ds}*silver*.json")), key=os.path.getmtime)
+        r.update({"input": silver.get("input") or silver.get("input_rows"),
+                  "accepted": silver.get("accepted"), "quarantined": silver.get("quarantined"),
+                  "gate_passed": (r.get("run") or {}).get("gate_passed"),
+                  "report_path": reps[-1] if reps else ""})
     return j
 
 
