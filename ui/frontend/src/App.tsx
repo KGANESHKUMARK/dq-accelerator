@@ -103,7 +103,7 @@ export default function App() {
             <b>{page.label}</b>
           </div>
           <div className="top-bar-right">
-            <span className="muted" style={{ fontSize: 12 }}>Spark local[8] · SQLite registry</span>
+            <span className="muted" style={{ fontSize: 12 }}>Spark local[8]</span>
           </div>
         </div>
         <div className="page-content">
