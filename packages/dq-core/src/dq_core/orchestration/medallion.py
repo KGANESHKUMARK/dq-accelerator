@@ -110,10 +110,13 @@ class MedallionRunner:
                 on_phase(stage, key)
 
         # --- BRONZE ---------------------------------------------------------------
+        # Persist raw_df once here — reused by Bronze write, profiling, and Silver DQ.
+        # A single persist avoids repeated CSV/JSON re-reads for each downstream stage.
         _emit("BRONZE", "bronze")
         with Stopwatch() as sw:
             bronze_path = self.paths.bronze(dataset)
-            bronze_rows = raw_df.persist(StorageLevel.MEMORY_AND_DISK).count()
+            raw_df = raw_df.persist(StorageLevel.MEMORY_AND_DISK)
+            bronze_rows = raw_df.count()           # one count action on cached data
             if write_bronze:
                 self.sink.write(raw_df, bronze_path)
                 written["bronze"] = bronze_path
@@ -129,6 +132,7 @@ class MedallionRunner:
                                          dataset=dataset, stage=Stage.SILVER, platform=platform)
             silver_rs = self.engine.load_ruleset(silver_ruleset)
             silver_pol = self.engine.load_policy(policy)
+            # Profile runs on already-persisted raw_df — no re-read from disk
             profile_report = self.engine.profile(raw_df, dataset) if profile else None
         phases["silver_setup"] = sw.elapsed_ms
 
