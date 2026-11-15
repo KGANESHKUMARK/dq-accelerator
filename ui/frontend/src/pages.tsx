@@ -10,12 +10,13 @@ const usePoll = (jobId: string | null, ms = 2500) => {
   useEffect(() => {
     if (!jobId) { setJob(null); return }
     setJob({ job_id: jobId, kind: '', status: 'QUEUED', progress: 'submitting…', submitted_at: new Date().toISOString() } as Job)
-    let dead = false; let pollTimer: number | undefined
+    let dead = false
+    const TERMINAL = ['COMPLETED', 'FAILED', 'CANCELLED']
     const es = new EventSource(`/api/jobs/${jobId}/stream`)
     es.addEventListener('status', ev => {
       const d = JSON.parse(ev.data)
       setJob(prev => prev ? { ...prev, status: d.status, progress: d.progress } : prev)
-      if (d.status === 'COMPLETED' || d.status === 'FAILED' || d.status === 'CANCELLED') {
+      if (TERMINAL.includes(d.status)) {
         es.close(); api.job(jobId).then(j => { if (!dead) setJob(j) }).catch(() => {})
       }
     })
@@ -23,14 +24,17 @@ const usePoll = (jobId: string | null, ms = 2500) => {
       const d = JSON.parse(ev.data)
       setJob(prev => prev ? { ...prev, progress: d.progress } : prev)
     })
-    es.onerror = () => {
-      es.close(); if (pollTimer !== undefined) return
-      pollTimer = window.setInterval(async () => {
-        try { const j = await api.job(jobId); if (!dead) setJob(j); if (j.status === 'COMPLETED' || j.status === 'FAILED' || j.status === 'CANCELLED') window.clearInterval(pollTimer) }
-        catch { /* keep polling */ }
-      }, ms)
-    }
-    return () => { dead = true; es.close(); if (pollTimer !== undefined) window.clearInterval(pollTimer) }
+    // Safety-net poll: SSE can silently stall during long quiet Spark phases —
+    // reconcile with the job record so terminal states are never missed.
+    const pollTimer = window.setInterval(async () => {
+      try {
+        const j = await api.job(jobId)
+        if (dead) return
+        setJob(j)
+        if (TERMINAL.includes(j.status)) { es.close(); window.clearInterval(pollTimer) }
+      } catch { /* keep polling */ }
+    }, ms)
+    return () => { dead = true; es.close(); window.clearInterval(pollTimer) }
   }, [jobId])
   return job
 }
