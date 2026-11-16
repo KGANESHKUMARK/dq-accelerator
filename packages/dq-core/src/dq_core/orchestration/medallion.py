@@ -164,7 +164,7 @@ class MedallionRunner:
 
         # --- GOLD -----------------------------------------------------------------
         gold_result: DQResult | None = None
-        if gold_ruleset is not None:
+        if gold_ruleset:
             _emit("GOLD", "gold_setup")
             with Stopwatch() as sw:
                 gold_ctx = PipelineContext(pipeline_id=pipeline_id, pipeline_run_id=pipeline_run_id,
