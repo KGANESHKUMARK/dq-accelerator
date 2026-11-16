@@ -79,7 +79,7 @@ engine:
   # Override any value via env var: DQ_DRIVER_MEMORY, DQ_SPARK_MASTER, DQ_SHUFFLE_PARTITIONS
   runtime:
     spark_master: local[4]
-    driver_memory: 3g
+    driver_memory: 2g
     shuffle_partitions: 16
     # Executor memory only applies to standalone/cluster mode, not local[*]
     executor_memory: 2g

@@ -66,8 +66,19 @@ class DataProfiler:
             source_rows: int | None = None
             data = df.select(*[col(c) for c in user_columns(df.columns)])
             if mode == "SAMPLE":
-                source_rows = data.count()
-                jobs += 1
+                # Avoid full count() scan on large files — it reads every row just
+                # for a metadata number.  Use Parquet metadata when available
+                # (zero Spark jobs); fall back to count() only for non-Parquet sources.
+                try:
+                    src_plan = str(df._jdf.queryExecution().logical())
+                    if "parquet" in src_plan.lower():
+                        source_rows = int(df._jdf.queryExecution()
+                                          .optimizedPlan().stats().rowCount().getOrElse(None) or 0) or None
+                except Exception:
+                    source_rows = None
+                if source_rows is None:
+                    source_rows = data.count()
+                    jobs += 1
                 data = data.sample(withReplacement=False, fraction=fraction, seed=s.sample_seed)
             approximate = mode == "APPROXIMATE"
             data = data.persist(StorageLevel.MEMORY_AND_DISK)
