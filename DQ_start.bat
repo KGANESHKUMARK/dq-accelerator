@@ -102,49 +102,23 @@ if not exist "%VENV_PY%" (
 )
 "%VENV_PY%" -m pip install --upgrade pip -q
 
-rem Install deps only when requirements.txt changed (skip if hash matches)
-set "REQ_HASH=%ROOT%\.tmp\.req_hash"
-set "NEED_INSTALL=1"
-if exist "%REQ_HASH%" (
-    for /f "skip=1 tokens=*" %%h in ('certutil -hashfile "%ROOT%\requirements.txt" MD5 2^>nul') do set "CUR_HASH=%%h"
-    set "CUR_HASH=%CUR_HASH: =%"
-    set /p OLD_HASH=<"%REQ_HASH%"
-    if /i "%CUR_HASH%"=="%OLD_HASH%" set "NEED_INSTALL=0"
+rem Install deps (pip uses local cache — fast when nothing changed)
+echo      Installing requirements (first time: a few minutes; cached: seconds)...
+mkdir "%ROOT%\.tmp\pip-cache" 2>nul
+set "PIP_CACHE_DIR=%ROOT%\.tmp\pip-cache"
+"%VENV_PY%" -m pip install -r "%ROOT%\requirements.txt" -q
+if errorlevel 1 (
+    echo      [ERROR] pip install failed - check logs, then retry
+    pause & exit /b 1
 )
-if "%NEED_INSTALL%"=="1" (
-    echo      Installing requirements (first time or after change, a few minutes)...
-    mkdir "%ROOT%\.tmp\pip-cache" 2>nul
-    set "PIP_CACHE_DIR=%ROOT%\.tmp\pip-cache"
-    "%VENV_PY%" -m pip install -r "%ROOT%\requirements.txt" -q
-    if errorlevel 1 (
-        echo      [ERROR] pip install failed - check logs, then retry
-        pause & exit /b 1
-    )
-    certutil -hashfile "%ROOT%\requirements.txt" MD5 2>nul | findstr /v "hash CertUtil" > "%REQ_HASH%"
-    echo      [OK] Python deps installed
-) else (
-    echo      [OK] Python deps already installed - skipping pip check
-)
+echo      [OK] Python deps installed
 
 rem Optional: real LLM deps only when Databricks env vars are set
 if defined DATABRICKS_TOKEN (
-    set "LLM_HASH=%ROOT%\.tmp\.llm_hash"
-    set "LLM_INSTALL=1"
-    if exist "%LLM_HASH%" (
-        for /f "skip=1 tokens=*" %%h in ('certutil -hashfile "%ROOT%\requirements-llm.txt" MD5 2^>nul') do set "LLM_CUR=%%h"
-        set "LLM_CUR=%LLM_CUR: =%"
-        set /p LLM_OLD=<"%LLM_HASH%"
-        if /i "%LLM_CUR%"=="%LLM_OLD%" set "LLM_INSTALL=0"
-    )
-    if "!LLM_INSTALL!"=="1" (
-        echo      DATABRICKS_TOKEN detected - installing LLM deps...
-        "%VENV_PY%" -m pip install -r "%ROOT%\requirements-llm.txt" -q
-        if errorlevel 1 ( echo      [WARN] LLM dep install failed - MockAI fallback will be used )
-        certutil -hashfile "%ROOT%\requirements-llm.txt" MD5 2>nul | findstr /v "hash CertUtil" > "%LLM_HASH%"
-        echo      [OK] LLM deps ready
-    ) else (
-        echo      [OK] LLM deps already installed - skipping
-    )
+    echo      DATABRICKS_TOKEN detected - installing LLM deps...
+    "%VENV_PY%" -m pip install -r "%ROOT%\requirements-llm.txt" -q
+    if errorlevel 1 ( echo      [WARN] LLM dep install failed - MockAI fallback will be used )
+    echo      [OK] LLM deps ready
 ) else (
     echo      DATABRICKS_TOKEN not set - skipping LLM deps (MockAI mode)
 )
