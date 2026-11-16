@@ -1,0 +1,379 @@
+ruleset:
+  ruleset_id: contacts_500_silver
+  dataset: contacts_500
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates contacts_500_silver@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_CONTACTS_500_001
+    name: contact_id_not_null
+    description: contact_id is populated in 100.0% of rows
+    dataset: contacts_500
+    column: contact_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 500
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_002
+    name: contact_id_unique
+    description: contact_id is unique in the profiled data (primary key candidate)
+    dataset: contacts_500
+    column: contact_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 501
+        rows: 500
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_003
+    name: contact_id_regex
+    description: contact_id follows the structural pattern A99999
+    dataset: contacts_500
+    column: contact_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z][0-9]{5}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: A99999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_004
+    name: contact_id_string_length
+    description: contact_id length observed between 6 and 6
+    dataset: contacts_500
+    column: contact_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 6
+      max: 6
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 6
+        max_length: 6
+        avg_length: 6.0
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_005
+    name: name_not_null
+    description: name is populated in 100.0% of rows
+    dataset: contacts_500
+    column: name
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 500
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_006
+    name: name_string_length
+    description: name length observed between 7 and 11
+    dataset: contacts_500
+    column: name
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 7
+      max: 11
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 7
+        max_length: 11
+        avg_length: 10.028
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_007
+    name: email_not_null
+    description: email is populated in 100.0% of rows
+    dataset: contacts_500
+    column: email
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 500
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_008
+    name: email_regex
+    description: email contains e-mail addresses
+    dataset: contacts_500
+    column: email
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.966
+      evidence:
+        email_match_percentage: 96.6
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_009
+    name: phone_not_null
+    description: phone is populated in 100.0% of rows
+    dataset: contacts_500
+    column: phone
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 500
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_010
+    name: phone_range
+    description: phone typically between 6904665512 and 19996448693
+    dataset: contacts_500
+    column: phone
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 6904665512
+      max: 19996448693
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 0.0
+        observed_max: 19996448693.0
+        p25: 13643487550.0
+        p75: 18136035575.0
+        outliers: 14
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_011
+    name: status_not_null
+    description: status is populated in 100.0% of rows
+    dataset: contacts_500
+    column: status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 500
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_012
+    name: status_allowed_values
+    description: status has 4 frequent categorical values
+    dataset: contacts_500
+    column: status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - ACTIVE
+      - SUSPENDED
+      - PENDING
+      - INACTIVE
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          ACTIVE: 141
+          SUSPENDED: 130
+          PENDING: 118
+          INACTIVE: 111
+        excluded_rare_values: []
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_013
+    name: created_date_not_null
+    description: created_date is populated in 100.0% of rows
+    dataset: contacts_500
+    column: created_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 500
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_014
+    name: created_date_date_format
+    description: created_date is a date in yyyy-MM-dd
+    dataset: contacts_500
+    column: created_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 100.0
+        date_min: '2023-01-01'
+        date_max: '2025-12-31'
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  - rule_id: GEN_CONTACTS_500_015
+    name: contacts_500_schema_validation
+    description: schema observed at profiling time
+    dataset: contacts_500
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: contact_id
+        type: string
+      - name: name
+        type: string
+      - name: email
+        type: string
+      - name: phone
+        type: bigint
+      - name: status
+        type: string
+      - name: created_date
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 6
+      profiled_at: '2026-11-16T16:37:57Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-16T16:39:11Z'
+  change_log:
+  - approved 15 of 15 candidate rules

@@ -1,0 +1,22 @@
+pipeline:
+  pipeline_id: CONTACTS_AUTO_PIPELINE
+  pipeline_name: Contacts Auto Pipeline
+  platform: STANDALONE_SPARK
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: auto-e2e
+  description: Onboarded via UI wizard from contacts_500.parquet (500 rows profiled)
+  policy: config/policies/default.yaml
+  datasets:
+  - dataset_id: contacts_500
+    format: PARQUET
+    stages:
+    - BRONZE
+    - SILVER
+    - GOLD
+    rulesets:
+      SILVER: ../rulesets/contacts_500_v1.yaml
+      GOLD: ../rulesets/contacts_500_gold_v1.yaml
+    test_data: ../../data/uploads/contacts_500.parquet
+    test_data_format: PARQUET

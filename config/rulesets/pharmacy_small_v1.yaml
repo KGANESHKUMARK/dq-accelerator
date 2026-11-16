@@ -1,0 +1,1215 @@
+ruleset:
+  ruleset_id: pharmacy_small_gold
+  dataset: pharmacy_small
+  version: '1.0'
+  stage: GOLD
+  description: Approved from candidates pharmacy_small_gold@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_PHARMACY_SMALL_001
+    name: rx_id_not_null
+    description: rx_id is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: rx_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_002
+    name: rx_id_unique
+    description: rx_id looks like an identifier (99.6% unique)
+    dataset: pharmacy_small
+    column: rx_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 0.996
+        duplicate_value_count: 12
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_003
+    name: rx_id_regex
+    description: rx_id follows the structural pattern AA9999999999
+    dataset: pharmacy_small
+    column: rx_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      pattern: ^[A-Z]{2}[0-9]{10}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AA9999999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_004
+    name: rx_id_string_length
+    description: rx_id length observed between 12 and 12
+    dataset: pharmacy_small
+    column: rx_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 12
+      max: 12
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 12
+        max_length: 12
+        avg_length: 12.0
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_005
+    name: patient_id_not_null
+    description: patient_id is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: patient_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_006
+    name: patient_id_unique
+    description: patient_id looks like an identifier (99.6% unique)
+    dataset: pharmacy_small
+    column: patient_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 0.996
+        duplicate_value_count: 12
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_007
+    name: patient_id_regex
+    description: patient_id follows the structural pattern AA999999
+    dataset: pharmacy_small
+    column: patient_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      pattern: ^[A-Z]{2}[0-9]{6}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AA999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_008
+    name: patient_id_string_length
+    description: patient_id length observed between 8 and 8
+    dataset: pharmacy_small
+    column: patient_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 8
+      max: 8
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 8
+        max_length: 8
+        avg_length: 8.0
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_009
+    name: patient_name_not_null
+    description: patient_name is populated in 98.6% of rows
+    dataset: pharmacy_small
+    column: patient_name
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 43
+        null_percentage: 1.43
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_010
+    name: patient_name_string_length
+    description: patient_name length observed between 10 and 19
+    dataset: pharmacy_small
+    column: patient_name
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 10
+      max: 19
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 10
+        max_length: 19
+        avg_length: 13.708656
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_011
+    name: patient_dob_not_null
+    description: patient_dob is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: patient_dob
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_012
+    name: patient_dob_date_format
+    description: patient_dob is a date in yyyy-MM-dd
+    dataset: pharmacy_small
+    column: patient_dob
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 100.0
+        date_min: '1940-01-19'
+        date_max: '2022-02-10'
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_013
+    name: patient_phone_not_null
+    description: patient_phone is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: patient_phone
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_014
+    name: patient_phone_data_type
+    description: patient_phone holds whole numbers stored as text
+    dataset: pharmacy_small
+    column: patient_phone
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_015
+    name: patient_phone_range
+    description: patient_phone typically between 201370 and 9994318648
+    dataset: pharmacy_small
+    column: patient_phone
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      min: 201370
+      max: 9994318648
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 201370.0
+        observed_max: 9994318648.0
+        p25: 4055740596.0
+        p75: 8026308180.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_016
+    name: patient_email_not_null
+    description: patient_email is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: patient_email
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_017
+    name: patient_email_regex
+    description: patient_email contains e-mail addresses
+    dataset: pharmacy_small
+    column: patient_email
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      pattern: ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9861
+      evidence:
+        email_match_percentage: 98.61
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_018
+    name: drug_name_not_null
+    description: drug_name is populated in 99.8% of rows
+    dataset: pharmacy_small
+    column: drug_name
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 7
+        null_percentage: 0.23
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_019
+    name: drug_name_allowed_values
+    description: drug_name has 10 frequent categorical values
+    dataset: pharmacy_small
+    column: drug_name
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - OMEPRAZOLE 20MG
+      - LEVOTHYROXINE 50MCG
+      - ATORVASTATIN 20MG
+      - ALBUTEROL HFA 90MCG
+      - AMLODIPINE 5MG
+      - LISINOPRIL 10MG
+      - SERTRALINE 50MG
+      - METFORMIN 500MG
+      - IBUPROFEN 400MG
+      - METOPROLOL 25MG
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          OMEPRAZOLE 20MG: 330
+          LEVOTHYROXINE 50MCG: 314
+          ATORVASTATIN 20MG: 303
+          ALBUTEROL HFA 90MCG: 302
+          AMLODIPINE 5MG: 300
+          LISINOPRIL 10MG: 297
+          SERTRALINE 50MG: 294
+          METFORMIN 500MG: 292
+          IBUPROFEN 400MG: 291
+          METOPROLOL 25MG: 282
+        excluded_rare_values: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_020
+    name: drug_code_not_null
+    description: drug_code is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: drug_code
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_021
+    name: drug_code_allowed_values
+    description: drug_code has 11 frequent categorical values
+    dataset: pharmacy_small
+    column: drug_code
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - 00093-5334
+      - 00054-0459
+      - 00071-0161
+      - 00006-0539
+      - 00093-7154
+      - 00071-0155
+      - 00093-0058
+      - 00093-0044
+      - 00093-1048
+      - 00054-0329
+      - INVALID_NDC
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          00093-5334: 328
+          00054-0459: 314
+          00071-0161: 303
+          00006-0539: 302
+          00093-7154: 301
+          00071-0155: 297
+          00093-0058: 293
+          00093-0044: 292
+          00093-1048: 292
+          00054-0329: 282
+        excluded_rare_values: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_022
+    name: quantity_not_null
+    description: quantity is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: quantity
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_023
+    name: quantity_data_type
+    description: quantity holds whole numbers stored as text
+    dataset: pharmacy_small
+    column: quantity
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_024
+    name: quantity_range
+    description: quantity typically between -30 and 120
+    dataset: pharmacy_small
+    column: quantity
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      min: -30
+      max: 120
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -30.0
+        observed_max: 120.0
+        p25: 30.0
+        p75: 100.0
+        outliers: 2
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_025
+    name: dosage_mg_not_null
+    description: dosage_mg is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: dosage_mg
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_026
+    name: dosage_mg_data_type
+    description: dosage_mg holds whole numbers stored as text
+    dataset: pharmacy_small
+    column: dosage_mg
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_027
+    name: dosage_mg_range
+    description: dosage_mg typically between 5 and 100
+    dataset: pharmacy_small
+    column: dosage_mg
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      min: 5
+      max: 100
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 5.0
+        observed_max: 100.0
+        p25: 10.0
+        p75: 50.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_028
+    name: prescriber_id_not_null
+    description: prescriber_id is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: prescriber_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_029
+    name: prescriber_id_allowed_values
+    description: prescriber_id has 5 frequent categorical values
+    dataset: pharmacy_small
+    column: prescriber_id
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - DR_PATEL_003
+      - DR_SMITH_001
+      - DR_JONES_002
+      - DR_GARCIA_005
+      - DR_KUMAR_004
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          DR_PATEL_003: 629
+          DR_SMITH_001: 625
+          DR_JONES_002: 590
+          DR_GARCIA_005: 589
+          DR_KUMAR_004: 579
+        excluded_rare_values: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_030
+    name: prescriber_name_not_null
+    description: prescriber_name is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: prescriber_name
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_031
+    name: prescriber_name_allowed_values
+    description: prescriber_name has 5 frequent categorical values
+    dataset: pharmacy_small
+    column: prescriber_name
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - Dr. Patel 003
+      - Dr. Smith 001
+      - Dr. Jones 002
+      - Dr. Garcia 005
+      - Dr. Kumar 004
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          Dr. Patel 003: 629
+          Dr. Smith 001: 625
+          Dr. Jones 002: 590
+          Dr. Garcia 005: 589
+          Dr. Kumar 004: 579
+        excluded_rare_values: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_032
+    name: pharmacy_id_not_null
+    description: pharmacy_id is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: pharmacy_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_033
+    name: pharmacy_id_allowed_values
+    description: pharmacy_id has 5 frequent categorical values
+    dataset: pharmacy_small
+    column: pharmacy_id
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - PH_NORTH_01
+      - PH_SOUTH_02
+      - PH_WEST_04
+      - PH_CENTRAL_05
+      - PH_EAST_03
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          PH_NORTH_01: 632
+          PH_SOUTH_02: 613
+          PH_WEST_04: 613
+          PH_CENTRAL_05: 595
+          PH_EAST_03: 559
+        excluded_rare_values: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_034
+    name: fill_date_not_null
+    description: fill_date is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: fill_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_035
+    name: fill_date_date_format
+    description: fill_date is a date in yyyy-MM-dd
+    dataset: pharmacy_small
+    column: fill_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9973
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 99.73
+        date_min: '2025-01-01'
+        date_max: '2026-08-24'
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_036
+    name: refill_count_not_null
+    description: refill_count is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: refill_count
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_037
+    name: refill_count_data_type
+    description: refill_count holds whole numbers stored as text
+    dataset: pharmacy_small
+    column: refill_count
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_038
+    name: refill_count_range
+    description: refill_count typically between -3 and 5
+    dataset: pharmacy_small
+    column: refill_count
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      min: -3
+      max: 5
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -3.0
+        observed_max: 5.0
+        p25: 1.0
+        p75: 4.0
+        outliers: 6
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_039
+    name: copay_amount_not_null
+    description: copay_amount is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: copay_amount
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_040
+    name: copay_amount_data_type
+    description: copay_amount holds decimal numbers stored as text
+    dataset: pharmacy_small
+    column: copay_amount
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_041
+    name: copay_amount_range
+    description: copay_amount typically between -70.81 and 150.0
+    dataset: pharmacy_small
+    column: copay_amount
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      min: -70.81
+      max: 150.0
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -78.83
+        observed_max: 150.0
+        p25: 37.79
+        p75: 110.19
+        outliers: 5
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_042
+    name: insurance_id_not_null
+    description: insurance_id is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: insurance_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_043
+    name: insurance_id_allowed_values
+    description: insurance_id has 6 frequent categorical values
+    dataset: pharmacy_small
+    column: insurance_id
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - INS_CIGNA
+      - INS_MEDICARE
+      - INS_AETNA
+      - CASH_PAY
+      - INS_MEDICAID
+      - INS_UHC
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          INS_CIGNA: 519
+          INS_MEDICARE: 519
+          INS_AETNA: 512
+          CASH_PAY: 510
+          INS_MEDICAID: 493
+          INS_UHC: 459
+        excluded_rare_values: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_044
+    name: status_not_null
+    description: status is populated in 100.0% of rows
+    dataset: pharmacy_small
+    column: status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3012
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_045
+    name: status_allowed_values
+    description: status has 5 frequent categorical values
+    dataset: pharmacy_small
+    column: status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - FILLED
+      - PENDING
+      - REFUSED
+      - TRANSFERRED
+      - UNKNOWN_STATUS
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          FILLED: 1688
+          PENDING: 450
+          REFUSED: 432
+          TRANSFERRED: 422
+          UNKNOWN_STATUS: 20
+        excluded_rare_values: []
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_046
+    name: pharmacy_small_duplicate
+    description: exact duplicate records were found
+    dataset: pharmacy_small
+    column: null
+    rule_type: DUPLICATE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      keys: ALL_COLUMNS
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        duplicate_rows: 12
+        duplicate_groups: 12
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  - rule_id: GEN_PHARMACY_SMALL_047
+    name: pharmacy_small_schema_validation
+    description: schema observed at profiling time
+    dataset: pharmacy_small
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      expected_columns:
+      - name: rx_id
+        type: string
+      - name: patient_id
+        type: string
+      - name: patient_name
+        type: string
+      - name: patient_dob
+        type: string
+      - name: patient_phone
+        type: string
+      - name: patient_email
+        type: string
+      - name: drug_name
+        type: string
+      - name: drug_code
+        type: string
+      - name: quantity
+        type: string
+      - name: dosage_mg
+        type: string
+      - name: prescriber_id
+        type: string
+      - name: prescriber_name
+        type: string
+      - name: pharmacy_id
+        type: string
+      - name: fill_date
+        type: string
+      - name: refill_count
+        type: string
+      - name: copay_amount
+        type: string
+      - name: insurance_id
+        type: string
+      - name: status
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 18
+      profiled_at: '2026-11-15T19:01:54Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-15T19:03:18Z'
+  change_log:
+  - approved 47 of 47 candidate rules
