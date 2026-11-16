@@ -106,11 +106,7 @@ rem Install deps only when requirements.txt changed (skip if hash matches)
 set "REQ_HASH=%ROOT%\.tmp\.req_hash"
 set "NEED_INSTALL=1"
 if exist "%REQ_HASH%" (
-    for /f "skip=1 tokens=*" %%h in ('certutil -hashfile "%ROOT%\requirements.txt" MD5 2^>nul') do (
-        set "CUR_HASH=%%h"
-        goto :hash_done
-    )
-    :hash_done
+    for /f "skip=1 tokens=*" %%h in ('certutil -hashfile "%ROOT%\requirements.txt" MD5 2^>nul') do set "CUR_HASH=%%h"
     set "CUR_HASH=%CUR_HASH: =%"
     set /p OLD_HASH=<"%REQ_HASH%"
     if /i "%CUR_HASH%"=="%OLD_HASH%" set "NEED_INSTALL=0"
@@ -135,14 +131,10 @@ if defined DATABRICKS_TOKEN (
     set "LLM_HASH=%ROOT%\.tmp\.llm_hash"
     set "LLM_INSTALL=1"
     if exist "%LLM_HASH%" (
-        for /f "skip=1 tokens=*" %%h in ('certutil -hashfile "%ROOT%\requirements-llm.txt" MD5 2^>nul') do (
-            set "LLM_CUR=%%h"
-            goto :llm_hash_done
-        )
-        :llm_hash_done
+        for /f "skip=1 tokens=*" %%h in ('certutil -hashfile "%ROOT%\requirements-llm.txt" MD5 2^>nul') do set "LLM_CUR=%%h"
         set "LLM_CUR=%LLM_CUR: =%"
         set /p LLM_OLD=<"%LLM_HASH%"
-        if /i "!LLM_CUR!"=="!LLM_OLD!" set "LLM_INSTALL=0"
+        if /i "%LLM_CUR%"=="%LLM_OLD%" set "LLM_INSTALL=0"
     )
     if "!LLM_INSTALL!"=="1" (
         echo      DATABRICKS_TOKEN detected - installing LLM deps...
