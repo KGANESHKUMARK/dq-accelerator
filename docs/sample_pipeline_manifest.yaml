@@ -1,0 +1,30 @@
+# Sample pipeline manifest — copy to config/pipelines/<PIPELINE_ID>.yaml to onboard manually.
+# Paths are relative to config/pipelines/ (the manifest's own directory).
+pipeline:
+  pipeline_id: DEMO_SAMPLE_PIPELINE
+  pipeline_name: Demo Sample Pipeline
+  platform: STANDALONE_SPARK          # DATABRICKS | STANDALONE_SPARK | DATAPROC | FABRIC | AIRFLOW | ADF | PYTHON | OTHER
+  runtime: SPARK                      # SPARK | DATABRICKS | POCKETFLOW | AZURE_DATA_FACTORY
+  integration_mode: INLINE            # INLINE | SIDECAR
+  dq_mode: REMEDIATE                  # OBSERVE_ONLY | ENFORCE | REMEDIATE
+  owner: data-steward@example.com
+  description: Sample manifest for manual onboarding — Bronze→Silver→Gold medallion.
+  policy: ../policies/default.yaml    # relative to config/policies/
+
+  datasets:
+    - dataset_id: demo_insurance_claims
+      format: CSV                     # CSV | PARQUET | JSON | TABLE | DELTA
+      stages: [BRONZE, SILVER, GOLD]  # stages this dataset flows through
+      rulesets:
+        SILVER: ../rulesets/demo_insurance_claims_v1.yaml        # required for SILVER stage
+        GOLD: ../rulesets/demo_insurance_claims_gold_v1.yaml      # optional — omit for Silver-only
+      test_data: ../../data/uploads/demo_insurance_claims.csv     # source file for test runs
+      test_data_format: CSV            # format of test_data (TABLE → catalog.schema.table)
+
+# Notes:
+# - rulesets must be PUBLISHED (immutable, checksum-verified) for ENFORCE/REMEDIATE modes.
+# - policy file lives in config/policies/*.yaml — defines confidence threshold (0.90),
+#   sensitive columns, quality gates, approval stores.
+# - platform is a label for portability reporting; engine runs identically on local Spark.
+# - For TABLE sources: test_data: catalog.schema.table + test_data_format: TABLE
+#   (table must exist in Spark catalog — register via /api/tables/register locally).

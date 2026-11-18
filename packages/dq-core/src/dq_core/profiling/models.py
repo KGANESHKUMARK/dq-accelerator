@@ -29,6 +29,7 @@ class ColumnProfile:
     percentiles: dict[str, float] = field(default_factory=dict)
     negative_count: int | None = None
     outlier_count: int | None = None
+    robust_outlier_count: int | None = None   # |x - median| > 3.5 * (IQR/1.349) — MAD-style, resistant to masking
     min_length: int | None = None
     max_length: int | None = None
     avg_length: float | None = None

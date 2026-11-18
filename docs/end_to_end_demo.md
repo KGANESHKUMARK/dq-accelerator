@@ -27,13 +27,15 @@ Core promises the demo proves:
 
 | Promise | How the demo shows it |
 |---|---|
-| Profile + auto-generate rules, no code | Onboard wizard → "Profile & generate rules" |
-| Rules are versioned, immutable, steward-approved | Rule Sets page + `ruleset diff/activate/rollback` |
+| One-click onboarding → full medallion | Onboard → **Auto E2E** card (profile→rules→publish→B→S→G in one job) |
+| Profile + auto-generate rules, no code | Auto E2E or wizard → "Profile & generate rules" |
+| Live step-by-step progress | JobStatus phase chips + progress line + bottom **Live activity** feed |
+| Rules are versioned, immutable, steward-approved | Rule Sets page → **Rules (N)** panel + diff/activate/rollback |
 | Deterministic fixes first, AI second | Outcome badges: `DETERMINISTIC_FIX`, `AI_APPLIED` |
 | AI proposes, policy decides (90% threshold) | `BELOW_CONFIDENCE_THRESHOLD` quarantined |
 | Sensitive data never leaves for external AI | `BLOCKED_SENSITIVE_DATA` outcome |
 | Below-threshold → quarantine → human approves | Approvals page → `HUMAN_APPROVED_AI` |
-| Physical medallion outputs + audit | "Written outputs" paths under `data/` |
+| Physical medallion outputs + audit | Stage preview BRONZE/SILVER/GOLD/QUARANTINE rows |
 | Seven-pillar quality score + domain advice | Report JSON `quality_pillars` |
 | Portable Spark core | Same engine under all platform labels |
 
@@ -102,11 +104,26 @@ Stop everything: close the `DQ-Backend` and `DQ-Frontend` windows.
 
 ## 3. Asset inventory — what must exist in the repo
 
-### 3.1 Sample datasets (`sample_data/bronze/` + `sample_data/minimal/`)
+### 3.1 Sample datasets (`sample_data/` + `data/uploads/`)
+
+**Auto-generated demo datasets (new — all verified end-to-end):**
+
+| File | Rows | Domain | Auto-E2E result |
+|---|---|---|---|
+| `demo_insurance_claims.csv` | 20,000 | Insurance | 18 rules → 19,220 acc / 780 quar — **primary demo** |
+| `demo_hospital_encounters.csv` | 50,000 | Healthcare | Full B→S→G — 48,405 acc / 1,595 quar |
+| `demo_bank_loans.csv` | 60,000 | Banking | 33 rules — fast medium demo |
+| `demo_airline_flights.csv` | 80,000 | Aviation | Bad statuses, negative delays, $1M fares |
+| `demo_retail_inventory.csv` | 120,000 | Retail | Negative stock, bad categories |
+| `demo_ecommerce_orders.csv` | 300,000 | E-commerce | 19 rules → 290,490 acc / 9,510 quar |
+| `demo_telco_events.csv` / `.parquet` | **1,000,000** | Telecom | 22 rules → 974,714 acc / 25,286 quar — scale story |
+| `demo_mongo_claims.json` | 20,000 | NoSQL documents | MongoDB-style docs (`_id`, nested objects) via JSON source |
+
+**Classic datasets (`sample_data/bronze/` + `sample_data/minimal/`):**
 
 | File | Rows | Domain | Best used for |
 |---|---|---|---|
-| `goat_herd_animals.csv` | 63 | Agriculture/livestock | **Hero demo** — fast (~1 min), exercises every AI outcome |
+| `goat_herd_animals.csv` | 63 | Agriculture/livestock | **AI-outcome hero** — real LLM decisions, approvals |
 | `hotel_reservations.parquet` | **1,000,000** | Hospitality | Large-file demo, auto-sampling path |
 | `patients.csv` | ~38 | Healthcare | PHI/sensitive-column story |
 | `sample_data/minimal/patients_minimal.csv` | 3 | Healthcare | Phase-verification fixture |
@@ -116,7 +133,7 @@ Stop everything: close the `DQ-Backend` and `DQ-Frontend` windows.
 
 All datasets contain **seeded, realistic defects** (nulls, duplicates, bad
 formats, case variants, outliers) — that is intentional; clean data demos
-nothing.
+nothing. Generators: `scripts/gen_demo_datasets.py`, `scripts/gen_demo_datasets2.py`, `scripts/gen_hospital.py`.
 
 ### 3.2 YAML configuration (`config/`)
 
@@ -161,10 +178,49 @@ nothing.
    **Say:** "Every client pipeline is governed by a manifest — platform label,
    datasets, per-stage rulesets, DQ mode. This is onboarding, not a rewrite."
 
-### Act 2 — The onboarding wizard (5 min): Onboard page
+### Act 2 — One-click onboarding (2–5 min): Auto E2E — THE hero moment
 
-Use **`hotel_reservations.parquet`** for the "wow, 1M rows" moment, or
-**`goat_herd_animals.csv`** for speed.
+**Onboard** page → top card **Auto E2E — one click: profile → rules → publish → run**.
+
+1. **Source file** dropdown → pick `demo_insurance_claims` (or **Browse / upload…**
+   for any CSV/Parquet/JSON file — auto-fills pipeline ID from filename)
+2. **Preview data** → first 20 rows table — *"raw input, defects visible"*
+3. Pipeline ID auto-fills → Mode `REMEDIATE` → **▶ Run auto E2E**
+
+Watch the live narrative — JobStatus chips + progress line + **bottom Live
+activity feed** (step history, updates every 3s):
+
+```
+phase=profile   | profiled 20,000 rows · 14 anomalies · 18 candidate rules · 18 auto-approved
+phase=validate  | ruleset demo_insurance_claims_silver@1.0 + manifest written · pipeline registered · gold ruleset ...
+phase=read      | [BRONZE] persisting raw bronze layer + ingest manifest
+phase=validate  | [SILVER] loading silver ruleset + profiling
+phase=validate  | [SILVER] validating all rules against the data
+phase=remediate | [SILVER] applying deterministic fixes
+phase=ai        | [SILVER] AI corrections via LLM provider
+phase=revalidate| [SILVER] re-validating corrected rows
+phase=quarantine| [SILVER] building quarantine + quality gate
+phase=report    | [SILVER] writing silver accepted + quarantine outputs
+phase=validate  | [GOLD] loading gold ruleset (strict re-check) → validating → writing
+phase=report    | writing run reports
+```
+
+*Say:* "One click onboards ANY file — the engine profiles it, generates rules
+with confidence scores, publishes them immutably, generates the stricter Gold
+ruleset, and runs the full Bronze→Silver→Gold medallion. Every step is live."*
+
+On completion the result card shows accepted/quarantined per stage + two
+buttons: **View auto-created profile →** (Profiles tab) and
+**View ruleset + versions →** (Rule Sets tab).
+
+> **Idempotent:** re-running the same dataset purges prior artifacts first —
+> safe to demo repeatedly.
+
+### Act 2b — Manual wizard (optional, 5 min): step-by-step governance
+
+Same Onboard page, below the auto card (can be hidden via **Settings →
+Onboard page sections → Manual run pipeline**). Use `goat_herd_animals.csv`
+for the AI-outcome story or any client CSV/Parquet.
 
 | # | Click | What happens | Say |
 |---|---|---|---|
@@ -196,10 +252,15 @@ Result card shows:
 | Page | Show | Say |
 |---|---|---|
 | **Reports** | Open latest stage report JSON | "Full audit: per-rule results, `quality_pillars`, `outcome_audit`, AI decisions with `simulated` flag." |
+| **Reports → AI activity** | Per-record AI fixes card | "Every AI fix auditable — original→proposed, confidence, LIVE/SIM badge." |
+| **Reports → Stage data preview** | BRONZE/SILVER/GOLD/QUARANTINE rows | "Real parquet rows per layer — quarantine shows the actual rejected data." |
+| **Profiles** | Auto-created profile per dataset | "The engine profiled this automatically — nulls, outliers, PII suspects, drift." |
+| **Rule Sets → Rules (N)** | Click Rules on any ruleset card | "Here are the actual generated rules — type, column, confidence, evidence." |
+| **Rule Sets** | Published versions, checksums, diff, activate/rollback | "Rules are data — versioned, checksummed, diffable, rollback-able." |
 | **Anomalies** | Detected anomalies per dataset | "Statistical + format anomalies feed rule candidates." |
 | **Approvals** | Pending/approved corrections | "Below-90% AI proposals wait here. Approve → next run applies as `HUMAN_APPROVED_AI`." |
-| **Rule Sets** | Published versions, checksums, diff | "Rules are data — versioned, checksummed, diffable, rollback-able." |
-| **Settings** | AI provider, thresholds, Spark config, system checks | "Hot-reload config — no code change, no restart." |
+| **Pipelines** | Lifecycle states + pause/activate/offboard | "Pipelines are governed assets — pause enforcement without code changes." |
+| **Settings** | AI provider, thresholds, Spark config, **Sidebar tabs** + **Onboard page sections** toggles | "Hot-reload config; show/hide nav tabs and auto-vs-manual run for the audience." |
 
 ### Act 5 — (Optional, engineer audience) CLI path
 
@@ -213,6 +274,18 @@ Full 21-step CLI demo script: `docs/poc_demo_script.md`.
 ---
 
 ## 5. Verified numbers to quote (do not improvise)
+
+### Auto-generated demo datasets — all verified via Auto E2E
+
+| Dataset | Rows | Rules | Accepted | Quarantined | Notes |
+|---|---|---|---|---|---|
+| `demo_insurance_claims` | 20,000 | 18 | 19,220 | 780 (~3.9%) | **Primary demo** — nulls, dup IDs, bad dates, $1M outliers |
+| `demo_hospital_encounters` | 50,000 | ~22 | 48,405 | 1,595 (~3.2%) | Full B→S→G verified |
+| `demo_ecommerce_orders` | 300,000 | 19 | 290,490 | 9,510 (~3.2%) | Bad emails, mixed dates, negatives |
+| `demo_telco_events` | **1,000,000** | 22 | 974,714 | 25,286 (~2.5%) | SAMPLE profiling auto-engaged; `.parquet` = 32 MB vs 74 MB CSV |
+| `demo_bank_loans` | 60,000 | 33 | — | — | Dup loan IDs, bad dates, negative income |
+
+All gates PASS (quarantine rates far under the 40% policy threshold).
 
 ### Goat herd — hero dataset, ruleset `goat_herd_animals_silver@1.2`, REMEDIATE
 
@@ -275,11 +348,15 @@ Ingest manifest: source SHA-256 0a819f28… + schema + row count + timestamp
 
 | Claim | Truth |
 |---|---|
-| "Runs on real Databricks Spark?" | Engine + real Databricks **LLM** verified. A run *on a Databricks cluster* is the one open P4 item — contract-tested locally, not yet executed on cloud Spark. |
-| "Real AI?" | Yes — `DQXProvider` calls Databricks Model Serving when `.env` creds exist; decisions show `simulated=false`. Without creds → MockAI, labelled `simulated=true`. |
+| "Runs on real Databricks Spark?" | Engine + real Databricks **LLM** verified earlier. A run *on a Databricks cluster* is the one open P4 item — contract-tested locally, not yet executed on cloud Spark. |
+| "Real AI?" | Yes — `DQXProvider` calls Databricks Model Serving when `.env` creds + `requirements-llm.txt` are installed; decisions show `simulated=false`. Without them → MockAI, labelled `simulated=true` with SIM badge in UI. |
+| "Why so slow locally?" | Local single-node Spark: 20K rows ≈ 1–2 min, 1M rows ≈ 4–5 min (JVM + CSV parse + per-rule Spark jobs). Same engine on a Databricks cluster + Photon runs in seconds — speed is a runtime property, not a code property. Parquet sources are ~5–10× faster than CSV reads. |
+| "Does Auto E2E skip human review?" | Yes — by design for the accelerator demo (auto-approves all candidates, `approve_confidence=0`). The manual wizard is the governed path where stewards review/approve/reject each rule. Both flows coexist; Settings can show/hide either. |
+| "Do auto re-runs keep version history?" | Auto-E2E purges prior same-pipeline artifacts so reruns are idempotent — version history accumulates through the manual wizard/publish path instead. |
+| "NoSQL as a data source?" | `demo_mongo_claims.json` proves document-shaped data (MongoDB-style `_id` + nested objects) flows through the same pipeline via the JSON source. Native MongoDB ingestion via spark-mongo connector is a roadmap item (needs cluster JVM deps). |
 | "Pipelines are real?" | Manifests labelled `platform: DATABRICKS/FABRIC/...` are **synthetic stand-ins** for client pipelines (no client assets were supplied). Integration pattern is real and tested. |
-| "1M rows = auto-sampling?" | The 42.8 MB parquet may sit under the 50 MB sampling threshold — profiling runs FULL. Don't claim sampling unless the report shows `mode=SAMPLE`. |
-| "Production-ready?" | POC scope: no auth/RBAC, scheduling, multi-tenancy, or external alerting — those are P5+ roadmap. |
+| "1M rows = auto-sampling?" | Telco 1M profiling auto-engages SAMPLE mode (check report `mode=SAMPLE`); validation still covers all rows. Hotel parquet may run FULL under the 50 MB threshold. |
+| "Production-ready?" | POC scope: no auth/RBAC, scheduling, multi-tenancy, or external alerting — those are P5+ roadmap. Formal schema-contract enforcement (expected-schema YAML → hard drift reject) is a noted gap; ODCS import + profile-driven type rules cover most of it. |
 
 ---
 

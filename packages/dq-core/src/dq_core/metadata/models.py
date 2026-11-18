@@ -33,6 +33,10 @@ class RuleType(str, Enum):
     SCHEMA_VALIDATION = "SCHEMA_VALIDATION"
     ROW_COUNT = "ROW_COUNT"
     RECONCILIATION = "RECONCILIATION"
+    NULL_RATE = "NULL_RATE"
+    DISTINCT_RATIO = "DISTINCT_RATIO"
+    FRESHNESS = "FRESHNESS"
+    COLUMN_AGGREGATE = "COLUMN_AGGREGATE"
 
 
 class RuleScope(str, Enum):
@@ -85,15 +89,23 @@ ROW_RULE_TYPES = {
     RuleType.ALLOWED_VALUES, RuleType.DATA_TYPE, RuleType.DATE_FORMAT, RuleType.STRING_LENGTH,
     RuleType.REFERENTIAL_INTEGRITY,
 }
-DATASET_RULE_TYPES = {RuleType.SCHEMA_VALIDATION, RuleType.ROW_COUNT, RuleType.RECONCILIATION}
+DATASET_RULE_TYPES = {RuleType.SCHEMA_VALIDATION, RuleType.ROW_COUNT, RuleType.RECONCILIATION,
+                      RuleType.NULL_RATE, RuleType.DISTINCT_RATIO, RuleType.FRESHNESS,
+                      RuleType.COLUMN_AGGREGATE}
 DEFAULT_SCOPE = {t: RuleScope.ROW_LEVEL for t in ROW_RULE_TYPES}
 DEFAULT_SCOPE.update({
     RuleType.REFERENTIAL_INTEGRITY: RuleScope.CROSS_DATASET,
     RuleType.SCHEMA_VALIDATION: RuleScope.DATASET_LEVEL,
     RuleType.ROW_COUNT: RuleScope.DATASET_LEVEL,
     RuleType.RECONCILIATION: RuleScope.CROSS_DATASET,
+    RuleType.NULL_RATE: RuleScope.DATASET_LEVEL,
+    RuleType.DISTINCT_RATIO: RuleScope.DATASET_LEVEL,
+    RuleType.FRESHNESS: RuleScope.DATASET_LEVEL,
+    RuleType.COLUMN_AGGREGATE: RuleScope.DATASET_LEVEL,
 })
-COLUMN_REQUIRED = ROW_RULE_TYPES - {RuleType.DUPLICATE} | {RuleType.RECONCILIATION}
+COLUMN_REQUIRED = ROW_RULE_TYPES - {RuleType.DUPLICATE} | {RuleType.RECONCILIATION,
+                                                        RuleType.NULL_RATE, RuleType.DISTINCT_RATIO,
+                                                        RuleType.FRESHNESS, RuleType.COLUMN_AGGREGATE}
 ALL_COLUMNS = "ALL_COLUMNS"
 _RULE_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{1,99}$")
 _VERSION_RE = re.compile(r"^\d+(\.\d+){1,2}$")

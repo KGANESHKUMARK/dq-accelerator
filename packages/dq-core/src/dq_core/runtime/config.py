@@ -46,9 +46,22 @@ class ValidationSettings:
 
 
 @dataclass
+class MetadataSettings:
+    engine: str = "tinydb"                   # tinydb (embedded, default) | mongodb | dynamodb
+    db_path: str | None = None               # tinydb JSON file when engine=tinydb
+    uri: str | None = None                   # mongodb://... when engine=mongodb
+    db_name: str = "dq_metadata"
+    region: str = "us-east-1"                # dynamodb
+    table_prefix: str = "dq_meta"            # dynamodb
+    endpoint_url: str | None = None          # dynamodb local endpoint
+    aws_profile: str | None = None           # dynamodb
+
+
+@dataclass
 class RegistrySettings:
-    backend: str = "file"                      # "file" (default) or "sqlite"
+    backend: str = "file"                      # "file" (default), "sqlite" or "nosql"
     db_path: str | None = None                 # sqlite file when backend="sqlite"
+    metadata: MetadataSettings = field(default_factory=MetadataSettings)
     rulesets_path: str | None = None
     pipelines_path: str | None = None
     enforce_published_immutability: bool = True
@@ -70,8 +83,10 @@ class AISettings:
 class OutputSettings:
     base_path: str | None = None
     reports_path: str | None = None
-    format: str = "parquet"
+    format: str = "parquet"          # parquet | delta
     write_mode: str = "overwrite"
+    catalog: str = ""                # optional namespace level: <base>/<catalog>/<layer>/<dataset>
+                                      # mirrors catalog.schema.table (catalog.dq, schema=layer, table=dataset)
 
 
 @dataclass
@@ -84,6 +99,17 @@ class RuntimeSettings:
 
 
 @dataclass
+class AlertSettings:
+    enabled: bool = False
+    webhook_url: str | None = None            # Slack/Teams/any HTTP POST endpoint
+    events: list[str] = field(default_factory=lambda: ["gate_fail"])
+    fail_pipeline: bool = False               # raise QualityGateFailedError on gate fail
+    timeout_seconds: int = 10
+    min_quarantine_rate: float = 1.0          # quarantine_threshold event fires at/above this
+    webhook_format: str = "generic"           # generic | slack | teams — payload shape for the endpoint
+
+
+@dataclass
 class EngineConfig:
     name: str = "dq-accelerator"
     default_mode: IntegrationMode = IntegrationMode.OBSERVE_ONLY
@@ -92,6 +118,7 @@ class EngineConfig:
     profiling: ProfilingSettings = field(default_factory=ProfilingSettings)
     validation: ValidationSettings = field(default_factory=ValidationSettings)
     ai: AISettings = field(default_factory=AISettings)
+    alerts: AlertSettings = field(default_factory=AlertSettings)
     outputs: OutputSettings = field(default_factory=OutputSettings)
     runtime: RuntimeSettings = field(default_factory=RuntimeSettings)
     logging_level: str = "INFO"
@@ -118,6 +145,9 @@ class EngineConfig:
             registry = dict(data.get("registry") or {})
             for key in ("rulesets_path", "pipelines_path", "db_path"):
                 registry[key] = resolve_path(registry.get(key), base_dir)
+            meta = dict(registry.get("metadata") or {})
+            meta["db_path"] = resolve_path(meta.get("db_path"), base_dir)
+            registry["metadata"] = MetadataSettings(**meta)
             ai = dict(data.get("ai") or {})
             ai["mock_responses_path"] = resolve_path(ai.get("mock_responses_path"), base_dir)
             outputs = dict(data.get("outputs") or {})
@@ -141,6 +171,7 @@ class EngineConfig:
                 profiling=ProfilingSettings(**(data.get("profiling") or {})),
                 validation=ValidationSettings(**(data.get("validation") or {})),
                 ai=AISettings(**ai),
+                alerts=AlertSettings(**(data.get("alerts") or {})),
                 outputs=OutputSettings(**outputs),
                 runtime=RuntimeSettings(**runtime),
                 logging_level=str(logging_cfg.get("level", "INFO")),

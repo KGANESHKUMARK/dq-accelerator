@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: PHARMACY_SMALL_PIPELINE
+  pipeline_name: Pharmacy Small Pipeline
+  platform: DATABRICKS
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: ''
+  description: Onboarded via UI wizard from pharmacy_small.csv (3012 rows profiled)
+  policy: ../policies/default.yaml
+  datasets:
+  - dataset_id: pharmacy_small
+    format: CSV
+    stages:
+    - BRONZE
+    - GOLD
+    rulesets:
+      GOLD: ../rulesets/pharmacy_small_v1.yaml
+    test_data: ../../data/uploads/pharmacy_small.csv
+    test_data_format: CSV

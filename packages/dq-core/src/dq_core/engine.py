@@ -71,12 +71,31 @@ class DataQualityEngine:
             return RemediationPolicyConfig()
         if isinstance(policy, RemediationPolicyConfig):
             return policy
+        # Store-first: NoSQL `policies` collection canonical, YAML fallback + write-through
+        try:
+            from dq_core.metadata import resolver as _res
+            from dq_core.metadata.serialization import load_document
+            store = _res.store_from_engine(self)
+            path = Path(policy)
+            if store is not None:
+                key = path.stem
+                raw = _res.policy_from_store(store, key)
+                if raw is not None:
+                    return RemediationPolicyConfig.from_dict(raw, source_path=str(path))
+                if path.exists():
+                    doc = load_document(path)
+                    _res.save_policy(store, key, doc)
+                    return RemediationPolicyConfig.from_dict(doc, source_path=str(path.resolve()))
+        except Exception:
+            pass
         return RemediationPolicyConfig.load(policy)
 
     # ------------------------------------------------------------------ profiling & generation
     def profile(self, dataframe: DataFrame, dataset: str, *, mode: str | None = None,
-                sample_fraction: float | None = None) -> ProfileReport:
-        return self.profiler.profile(dataframe, dataset, mode=mode, sample_fraction=sample_fraction)
+                sample_fraction: float | None = None,
+                on_phase: Callable[[str], None] | None = None) -> ProfileReport:
+        return self.profiler.profile(dataframe, dataset, mode=mode, sample_fraction=sample_fraction,
+                                     on_phase=on_phase)
 
     def generate_candidate_rules(self, profile: ProfileReport, *, related_profiles: Mapping[str, ProfileReport] | None = None,
                                  stage: Stage | str = Stage.SILVER, version: str = "0.1") -> RuleSet:
@@ -111,7 +130,10 @@ class DataQualityEngine:
                 and self.ruleset_registry is not None and not published):
             raise ConfigurationError(f"{rules.ref} is not published. Publish the reviewed rule set "
                                      f"(dqctl ruleset publish) before running in {resolved_mode.value} mode.")
-        runner = DQRunner(self.validator, self.profiler, self.ai_provider, self.config.include_dq_columns_in_accepted)
+        store = getattr(self.ruleset_registry, "store", None)
+        runner = DQRunner(self.validator, self.profiler, self.ai_provider, self.config.include_dq_columns_in_accepted,
+                          alerts=self.config.alerts, metadata_store=store,
+                          reports_path=self.config.outputs.reports_path)
         if self.pipeline_registry is not None and self.config.registry.enforce_pipeline_lifecycle:
             state = self.pipeline_registry.state(context.pipeline_id)
             if state in PASS_THROUGH_STATES:

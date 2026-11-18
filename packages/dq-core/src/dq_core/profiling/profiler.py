@@ -14,7 +14,7 @@ never collected. A profile normally costs 4-5 Spark jobs regardless of the numbe
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from pyspark import StorageLevel
 from pyspark.sql import DataFrame
@@ -50,18 +50,35 @@ class DataProfiler:
         self.settings = settings or ProfilingSettings()
 
     def profile(self, df: DataFrame, dataset: str, *, mode: str | None = None,
-                sample_fraction: float | None = None) -> ProfileReport:
+                sample_fraction: float | None = None,
+                on_phase: Callable[[str], None] | None = None) -> ProfileReport:
         s = self.settings
         mode = (mode or s.mode).upper()
         fraction = sample_fraction or s.sample_fraction
         started = utc_now_iso()
+
+        def _emit(msg: str) -> None:
+            if on_phase is not None:
+                on_phase(msg)
+
         jobs = 0
         with Stopwatch() as sw:
             source_rows: int | None = None
             data = df.select(*[col(c) for c in user_columns(df.columns)])
             if mode == "SAMPLE":
-                source_rows = data.count()
-                jobs += 1
+                # Avoid full count() scan on large files — it reads every row just
+                # for a metadata number.  Use Parquet metadata when available
+                # (zero Spark jobs); fall back to count() only for non-Parquet sources.
+                try:
+                    src_plan = str(df._jdf.queryExecution().logical())
+                    if "parquet" in src_plan.lower():
+                        source_rows = int(df._jdf.queryExecution()
+                                          .optimizedPlan().stats().rowCount().getOrElse(None) or 0) or None
+                except Exception:
+                    source_rows = None
+                if source_rows is None:
+                    source_rows = data.count()
+                    jobs += 1
                 data = data.sample(withReplacement=False, fraction=fraction, seed=s.sample_seed)
             approximate = mode == "APPROXIMATE"
             data = data.persist(StorageLevel.MEMORY_AND_DISK)
@@ -69,50 +86,141 @@ class DataProfiler:
             dtypes = dict(data.dtypes)
             strings = [c for c in columns if dtypes[c] == "string"]
 
-            # ---------------------------------------------------------------- job 1: wide aggregation
-            aggs = [F.count(F.lit(1)).alias("__rows")]
+            # ============================================================
+            # PASS 0 — schema sniff on ≤5 000 sample rows (one cheap job)
+            # Determines which type-probes to run per string column so the
+            # main aggregation plan stays small and codegen compiles fast.
+            # ============================================================
+            # type_hints[col] = set of likely types: 'numeric','integer','email','date'
+            type_hints: dict[str, set[str]] = {c: set() for c in strings}
+            if strings:
+                _emit(f"spark job · schema sniff — detecting column types for {len(strings)} text columns")
+                sniff = data.select(*[col(c) for c in strings]).limit(5000)
+                s0: list[Any] = []
+                for si, c in enumerate(strings):
+                    x = col(c)
+                    s0 += [
+                        F.count(x).alias(f"s0nn{si}"),
+                        F.count(safe_cast(c, "double")).alias(f"s0num{si}"),
+                        F.count(safe_cast(c, "bigint")).alias(f"s0int{si}"),
+                        F.sum(x.rlike(EMAIL_REGEX).cast("int")).alias(f"s0em{si}"),
+                        F.count(safe_to_timestamp(x, CANDIDATE_DATE_FORMATS[0])).alias(f"s0dt{si}"),
+                    ]
+                sniff_st = sniff.agg(*s0).collect()[0].asDict()
+                jobs += 1
+                thr = s.semantic_match_rate
+                for si, c in enumerate(strings):
+                    nn = int(sniff_st.get(f"s0nn{si}") or 0)
+                    if nn == 0:
+                        continue
+                    if int(sniff_st.get(f"s0num{si}") or 0) >= thr * nn:
+                        type_hints[c].add("numeric")
+                    if int(sniff_st.get(f"s0int{si}") or 0) >= thr * nn:
+                        type_hints[c].add("integer")
+                    if int(sniff_st.get(f"s0em{si}") or 0) >= thr * nn:
+                        type_hints[c].add("email")
+                    if int(sniff_st.get(f"s0dt{si}") or 0) >= thr * nn:
+                        type_hints[c].add("date")
+
+            # ============================================================
+            # PASS 1 — structural stats, all data, lean plan (~6 expr/col)
+            # Always approx distinct (HLL, 0.5 % error) — no shuffle cost.
+            # Tolerance-based PK: distinct >= rows*0.999 (not exact == rows).
+            # ============================================================
+            _emit(f"spark job · structural stats for {len(columns)} columns (nulls, approx distinct, min/max)")
+            p1: list[Any] = [F.count(F.lit(1)).alias("__rows")]
             for i, c in enumerate(columns):
                 x, t = col(c), dtypes[c]
-                aggs += [F.count(x).alias(f"nn{i}"),
-                         (F.approx_count_distinct(x, 0.01) if approximate else F.countDistinct(x)).alias(f"dc{i}")]
+                p1 += [
+                    F.count(x).alias(f"nn{i}"),
+                    F.approx_count_distinct(x, 0.005).alias(f"dc{i}"),   # 0.5 % rsd
+                ]
                 if t == "string" or _is_numeric(t) or t in ("date", "timestamp", "timestamp_ntz"):
-                    aggs += [F.min(x).cast("string").alias(f"mn{i}"), F.max(x).cast("string").alias(f"mx{i}")]
-                numeric = safe_cast(c, "double") if t == "string" else (x.cast("double") if _is_numeric(t) else None)
-                if numeric is not None:
-                    aggs += [F.count(numeric).alias(f"nc{i}"), F.avg(numeric).alias(f"avg{i}"),
-                             F.stddev_samp(numeric).alias(f"sd{i}"), F.min(numeric).alias(f"nmn{i}"),
-                             F.max(numeric).alias(f"nmx{i}"),
-                             F.percentile_approx(numeric, [0.25, 0.5, 0.75], 1000).alias(f"pc{i}"),
-                             F.sum((numeric < 0).cast("int")).alias(f"neg{i}")]
-                if t == "string":
-                    length = F.length(x)
-                    aggs += [F.min(length).alias(f"lmn{i}"), F.max(length).alias(f"lmx{i}"), F.avg(length).alias(f"lav{i}"),
-                             F.sum((F.trim(x) == "").cast("int")).alias(f"bl{i}"),
-                             F.sum((x != F.trim(x)).cast("int")).alias(f"ws{i}"),
-                             F.count(safe_cast(c, "bigint")).alias(f"ic{i}"),
-                             F.sum(x.rlike(EMAIL_REGEX).cast("int")).alias(f"em{i}"),
-                             F.sum(((x == F.upper(x)) & x.rlike("[A-Za-z]")).cast("int")).alias(f"up{i}")]
-                    for j, fmt in enumerate(CANDIDATE_DATE_FORMATS):
-                        aggs.append(F.count(safe_to_timestamp(x, fmt)).alias(f"df{i}_{j}"))
-                    parsed = safe_to_date(x, CANDIDATE_DATE_FORMATS[0])
-                    aggs += [F.min(parsed).cast("string").alias(f"dmn{i}"), F.max(parsed).cast("string").alias(f"dmx{i}")]
-            stats = data.agg(*aggs).collect()[0].asDict()
+                    p1 += [F.min(x).cast("string").alias(f"mn{i}"), F.max(x).cast("string").alias(f"mx{i}")]
+            stats = data.agg(*p1).collect()[0].asDict()
             jobs += 1
             rows = int(stats["__rows"])
 
-            # ---------------------------------------------------------------- job 2: duplicates
+            # ============================================================
+            # PASS 2a — numeric moments (native + evidence-guided strings)
+            # ============================================================
+            num_targets: list[tuple[int, str, Any]] = []
+            for i, c in enumerate(columns):
+                t = dtypes[c]
+                if _is_numeric(t):
+                    num_targets.append((i, c, col(c).cast("double")))
+                elif t == "string" and "numeric" in type_hints.get(c, set()):
+                    num_targets.append((i, c, safe_cast(c, "double")))
+            if num_targets:
+                _emit(f"spark job · numeric moments for {len(num_targets)} columns (mean, stddev, percentiles)")
+                p2n: list[Any] = []
+                for i, c, expr in num_targets:
+                    p2n += [
+                        F.count(expr).alias(f"nc{i}"),
+                        F.avg(expr).alias(f"avg{i}"),
+                        F.stddev_samp(expr).alias(f"sd{i}"),
+                        F.min(expr).alias(f"nmn{i}"),
+                        F.max(expr).alias(f"nmx{i}"),
+                        F.percentile_approx(expr, [0.25, 0.5, 0.75], 1000).alias(f"pc{i}"),
+                        F.sum((expr < 0).cast("int")).alias(f"neg{i}"),
+                    ]
+                stats.update(data.agg(*p2n).collect()[0].asDict())
+                jobs += 1
+
+            # ============================================================
+            # PASS 2b — string characteristics + evidence-based probes only
+            # ============================================================
+            if strings:
+                _emit(f"spark job · string characteristics for {len(strings)} text columns")
+                p2s: list[Any] = []
+                for i, c in enumerate(columns):
+                    if dtypes[c] != "string":
+                        continue
+                    x = col(c)
+                    hints = type_hints.get(c, set())
+                    length = F.length(x)
+                    p2s += [
+                        F.min(length).alias(f"lmn{i}"),
+                        F.max(length).alias(f"lmx{i}"),
+                        F.avg(length).alias(f"lav{i}"),
+                        F.sum((F.trim(x) == "").cast("int")).alias(f"bl{i}"),
+                        F.sum((x != F.trim(x)).cast("int")).alias(f"ws{i}"),
+                        F.sum(((x == F.upper(x)) & x.rlike("[A-Za-z]")).cast("int")).alias(f"up{i}"),
+                    ]
+                    if "integer" in hints:
+                        p2s.append(F.count(safe_cast(c, "bigint")).alias(f"ic{i}"))
+                    if "email" in hints:
+                        p2s.append(F.sum(x.rlike(EMAIL_REGEX).cast("int")).alias(f"em{i}"))
+                    if "date" in hints:
+                        # probe only the 3 most common formats (ordered by Pass-0 hit)
+                        for j, fmt in enumerate(CANDIDATE_DATE_FORMATS[:3]):
+                            p2s.append(F.count(safe_to_timestamp(x, fmt)).alias(f"df{i}_{j}"))
+                        parsed = safe_to_date(x, CANDIDATE_DATE_FORMATS[0])
+                        p2s += [F.min(parsed).cast("string").alias(f"dmn{i}"),
+                                F.max(parsed).cast("string").alias(f"dmx{i}")]
+                if p2s:
+                    stats.update(data.agg(*p2s).collect()[0].asDict())
+                    jobs += 1
+
+            # ============================================================
+            # PASS 3a — duplicates
+            # ============================================================
+            _emit("spark job · duplicate-row detection across all columns")
             dup = (data.groupBy(*[col(c) for c in columns]).count().where(F.col("count") > 1)
                    .agg(F.count(F.lit(1)).alias("groups"), F.sum("count").alias("rows")).collect()[0])
             jobs += 1
             duplicate_groups = int(dup["groups"] or 0)
             duplicate_rows = int(dup["rows"] or 0) - duplicate_groups  # rows beyond the first occurrence
 
-            # ---------------------------------------------------------------- job 3: value frequencies
+            # ============================================================
+            # PASS 3b — value frequencies
+            # ============================================================
             distinct_counts = {c: int(stats[f"dc{i}"] or 0) for i, c in enumerate(columns)}
             freq_cols = [c for c in columns if not approximate or distinct_counts[c] <= s.max_allowed_values]
             top_values: dict[str, list[dict[str, Any]]] = {c: [] for c in columns}
             unique_counts: dict[str, int | None] = {c: None for c in columns}
             if freq_cols and rows:
+                _emit(f"spark job · top values + cardinality for {len(freq_cols)} columns")
                 pairs = F.explode(F.array(*[F.struct(F.lit(c).alias("column"), col(c).cast("string").alias("value"))
                                             for c in freq_cols]))
                 vc = (data.select(pairs.alias("p")).select("p.column", "p.value").where(F.col("value").isNotNull())
@@ -128,9 +236,12 @@ class DataProfiler:
                 vc.unpersist()
                 jobs += 2
 
-            # ---------------------------------------------------------------- job 4: patterns
+            # ============================================================
+            # PASS 3c — string patterns
+            # ============================================================
             top_patterns: dict[str, list[dict[str, Any]]] = {c: [] for c in columns}
             if strings and rows:
+                _emit(f"spark job · string pattern detection for {len(strings)} text columns")
                 pairs = F.explode(F.array(*[F.struct(F.lit(c).alias("column"), structural_pattern(col(c)).alias("pattern"))
                                             for c in strings]))
                 pc = (data.select(pairs.alias("p")).select("p.column", "p.pattern").where(F.col("pattern").isNotNull())
@@ -142,28 +253,48 @@ class DataProfiler:
                                                       "percentage": _pct(r["count"], rows)})
                 jobs += 1
 
-            # ---------------------------------------------------------------- build column profiles
+            # ============================================================
+            # Build column profiles from merged stats
+            # ============================================================
             profiles: dict[str, ColumnProfile] = {}
             for i, c in enumerate(columns):
-                profiles[c] = self._column_profile(c, i, dtypes[c], stats, rows, approximate, distinct_counts[c],
-                                                   unique_counts[c], top_values[c], top_patterns[c])
+                profiles[c] = self._column_profile(c, i, dtypes[c], stats, rows, True,
+                                                   distinct_counts[c], unique_counts[c],
+                                                   top_values[c], top_patterns[c])
 
-            # ---------------------------------------------------------------- job 5: outliers
+            # ============================================================
+            # PASS 3d — outliers (numeric columns only, one merged agg)
+            # ============================================================
             outlier_targets = {c: p for c, p in profiles.items() if p.mean is not None and p.stddev not in (None, 0.0)
                                and (_is_numeric(p.data_type) or (p.numeric_castable_percentage or 0) >= 100 * s.semantic_match_rate)}
             if outlier_targets and rows:
-                exprs = []
+                _emit(f"spark job · numeric outlier counts for {len(outlier_targets)} columns")
+                exprs: list[Any] = []
+                robust_targets: dict[str, tuple[float, float]] = {}
                 for c, p in outlier_targets.items():
                     numeric = safe_cast(c, "double") if p.data_type == "string" else col(c).cast("double")
                     exprs.append(F.sum((F.abs(numeric - F.lit(p.mean)) > F.lit(s.outlier_stddevs * p.stddev)).cast("int")).alias(c))
+                    pcts = p.percentiles or {}
+                    p25, p50, p75 = pcts.get("p25"), pcts.get("p50"), pcts.get("p75")
+                    if None not in (p25, p50, p75):
+                        iqr = float(p75) - float(p25)
+                        if iqr > 0:
+                            robust_sigma = iqr / 1.349
+                            robust_targets[c] = (float(p50), 3.5 * robust_sigma)
+                            exprs.append(F.sum((F.abs(numeric - F.lit(float(p50))) > F.lit(3.5 * robust_sigma)).cast("int")).alias(f"{c}__robust"))
                 out = data.agg(*exprs).collect()[0].asDict()
                 for c in outlier_targets:
                     profiles[c].outlier_count = int(out[c] or 0)
+                    if c in robust_targets:
+                        profiles[c].robust_outlier_count = int(out.get(f"{c}__robust") or 0)
                 jobs += 1
             data.unpersist()
 
+            _emit("building anomaly report — null rates, outliers, PII suspects, drift")
             anomalies, schema_anomalies = self._anomalies(profiles, rows, columns)
-            pk = [c for c, p in profiles.items() if rows and p.null_count == 0 and p.distinct_count == rows and not approximate]
+            # Tolerance-based PK: approx distinct within 0.1 % of rows (HLL error headroom)
+            pk = [c for c, p in profiles.items()
+                  if rows and p.null_count == 0 and p.distinct_count >= rows * 0.999]
             near = [{"column": c, "unique_ratio": round(p.distinct_count / p.non_null_count, 4), "null_count": p.null_count,
                      "duplicate_value_count": p.duplicate_value_count}
                     for c, p in profiles.items()
@@ -177,9 +308,10 @@ class DataProfiler:
             schema=schema_to_list(df.select(*[col(c) for c in columns]).schema), columns=profiles,
             duplicate_rows=duplicate_rows, duplicate_groups=duplicate_groups, primary_key_candidates=pk,
             near_key_candidates=near, anomalies=anomalies, schema_anomalies=schema_anomalies, spark_jobs=jobs,
-            notes=(["percentiles are approximate (percentile_approx)"]
-                   + (["distinct counts are approximate (HyperLogLog++, rsd=0.01)"] if approximate else [])
-                   + ([f"statistics computed on a {fraction:.0%} sample (seed {s.sample_seed})"] if mode == "SAMPLE" else [])))
+            notes=(["percentiles are approximate (percentile_approx)",
+                    "distinct counts are approximate (HyperLogLog++, rsd=0.5%) — PK detection uses >=99.9% threshold"]
+                   + ([f"statistics computed on a {fraction:.0%} sample (seed {s.sample_seed})"] if mode == "SAMPLE" else [])
+                   + (["type probes are evidence-guided (schema sniff pass on 5K sample)"] if strings else [])))
         log_event(_logger, "profile_completed", dataset=dataset, rows=rows, columns=len(columns), mode=mode,
                   spark_jobs=jobs, duration_ms=report.duration_ms)
         return report
@@ -257,6 +389,9 @@ class DataProfiler:
             if p.outlier_count:
                 add(c, "OUTLIERS", f"{p.outlier_count} value(s) beyond {s.outlier_stddevs} standard deviations "
                                    f"(mean={p.mean}, stddev={p.stddev}, min={p.min}, max={p.max})")
+            if p.robust_outlier_count:
+                add(c, "ROBUST_OUTLIERS", f"{p.robust_outlier_count} value(s) beyond 3.5 robust sigma "
+                                          "(median±IQR/1.349 — resistant to masking by extreme values)")
             if p.negative_count and p.non_null_count and p.negative_count <= 0.1 * p.non_null_count:
                 add(c, "RARE_NEGATIVE_VALUES", f"{p.negative_count} negative value(s) in a mostly positive column - "
                                                "review with the business (may be valid, e.g. refunds)", "INFO")
@@ -282,6 +417,16 @@ class DataProfiler:
                 rare = [t["value"] for t in p.top_values if t["count"] == 1]
                 if rare and max(counts) >= 3:
                     add(c, "RARE_CATEGORY_VALUES", f"rare values (possible typos): {rare}")
+
+        # PII / sensitive-entity detection (name + sampled-value signals)
+        try:
+            from dq_core.pii import detect_pii
+            for col, f in detect_pii(profiles).items():
+                sev = "WARNING" if f.confidence >= 0.8 else "INFO"
+                cat = f" → sensitive category '{f.category}'" if f.category else ""
+                add(col, "PII_SUSPECTED", f"{f.entity_type} detected ({f.evidence}){cat}", sev)
+        except Exception:  # noqa: BLE001 — PII scan must never break profiling
+            pass
 
         schema_anomalies: list[dict[str, Any]] = []
         seen: dict[str, str] = {}

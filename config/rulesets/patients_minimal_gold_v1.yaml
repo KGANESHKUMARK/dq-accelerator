@@ -1,0 +1,850 @@
+ruleset:
+  ruleset_id: patients_minimal_gold
+  dataset: patients_minimal
+  version: '1.0'
+  stage: GOLD
+  description: ''
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_PATIENTS_MINIMAL_001
+    name: patient_id_not_null
+    description: patient_id is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: patient_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_002
+    name: patient_id_unique
+    description: patient_id is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: patient_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_003
+    name: patient_id_regex
+    description: patient_id follows the structural pattern A9999
+    dataset: patients_minimal
+    column: patient_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      pattern: ^[A-Z][0-9]{4}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: A9999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_004
+    name: patient_id_string_length
+    description: patient_id length observed between 5 and 5
+    dataset: patients_minimal
+    column: patient_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 5
+      max: 5
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 5
+        max_length: 5
+        avg_length: 5.0
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_005
+    name: patient_name_not_null
+    description: patient_name is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: patient_name
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_006
+    name: patient_name_unique
+    description: patient_name is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: patient_name
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_007
+    name: patient_name_string_length
+    description: patient_name length observed between 11 and 13
+    dataset: patients_minimal
+    column: patient_name
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 11
+      max: 13
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 11
+        max_length: 13
+        avg_length: 11.666667
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_008
+    name: mrn_not_null
+    description: mrn is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: mrn
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_009
+    name: mrn_unique
+    description: mrn is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: mrn
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_010
+    name: mrn_regex
+    description: mrn follows the structural pattern AAA999999
+    dataset: patients_minimal
+    column: mrn
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      pattern: ^[A-Z]{3}[0-9]{6}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_011
+    name: mrn_string_length
+    description: mrn length observed between 9 and 9
+    dataset: patients_minimal
+    column: mrn
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 9
+      max: 9
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 9
+        max_length: 9
+        avg_length: 9.0
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_012
+    name: dob_not_null
+    description: dob is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: dob
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_013
+    name: dob_unique
+    description: dob is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: dob
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_014
+    name: dob_date_format
+    description: dob is a date in yyyy-MM-dd
+    dataset: patients_minimal
+    column: dob
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 100.0
+        date_min: '1978-11-30'
+        date_max: '1992-07-22'
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_015
+    name: gender_not_null
+    description: gender is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: gender
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_016
+    name: gender_string_length
+    description: gender length observed between 1 and 1
+    dataset: patients_minimal
+    column: gender
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 1
+      max: 1
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 1
+        max_length: 1
+        avg_length: 1.0
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_017
+    name: blood_type_not_null
+    description: blood_type is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: blood_type
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_018
+    name: blood_type_unique
+    description: blood_type is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: blood_type
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_019
+    name: blood_type_string_length
+    description: blood_type length observed between 2 and 2
+    dataset: patients_minimal
+    column: blood_type
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 2
+      max: 2
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 2
+        max_length: 2
+        avg_length: 2.0
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_020
+    name: admission_date_not_null
+    description: admission_date is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: admission_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_021
+    name: admission_date_unique
+    description: admission_date is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: admission_date
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_022
+    name: admission_date_date_format
+    description: admission_date is a date in yyyy-MM-dd
+    dataset: patients_minimal
+    column: admission_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 100.0
+        date_min: '2024-01-05'
+        date_max: '2024-01-08'
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_023
+    name: ward_not_null
+    description: ward is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: ward
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_024
+    name: ward_unique
+    description: ward is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: ward
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_025
+    name: ward_string_length
+    description: ward length observed between 7 and 9
+    dataset: patients_minimal
+    column: ward
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 7
+      max: 9
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 7
+        max_length: 9
+        avg_length: 8.333333
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_026
+    name: diagnosis_code_not_null
+    description: diagnosis_code is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: diagnosis_code
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_027
+    name: diagnosis_code_unique
+    description: diagnosis_code is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: diagnosis_code
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_028
+    name: diagnosis_code_string_length
+    description: diagnosis_code length observed between 3 and 5
+    dataset: patients_minimal
+    column: diagnosis_code
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 3
+      max: 5
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 3
+        max_length: 5
+        avg_length: 3.666667
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_029
+    name: insurance_status_not_null
+    description: insurance_status is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: insurance_status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_030
+    name: insurance_status_allowed_values
+    description: insurance_status has 1 frequent categorical values
+    dataset: patients_minimal
+    column: insurance_status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      values:
+      - COVERED
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          COVERED: 3
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_031
+    name: contact_email_not_null
+    description: contact_email is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: contact_email
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_032
+    name: contact_email_unique
+    description: contact_email is unique in the profiled data (primary key candidate)
+    dataset: patients_minimal
+    column: contact_email
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 3
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_033
+    name: contact_email_string_length
+    description: contact_email length observed between 9 and 24
+    dataset: patients_minimal
+    column: contact_email
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 9
+      max: 24
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 9
+        max_length: 24
+        avg_length: 19.0
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_034
+    name: admission_status_not_null
+    description: admission_status is populated in 100.0% of rows
+    dataset: patients_minimal
+    column: admission_status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 3
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_035
+    name: admission_status_string_length
+    description: admission_status length observed between 8 and 10
+    dataset: patients_minimal
+    column: admission_status
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: GOLD
+    config:
+      min: 8
+      max: 10
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 8
+        max_length: 10
+        avg_length: 9.333333
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  - rule_id: GEN_PATIENTS_MINIMAL_036
+    name: patients_minimal_schema_validation
+    description: schema observed at profiling time
+    dataset: patients_minimal
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: GOLD
+    config:
+      expected_columns:
+      - name: patient_id
+        type: string
+      - name: patient_name
+        type: string
+      - name: mrn
+        type: string
+      - name: dob
+        type: string
+      - name: gender
+        type: string
+      - name: blood_type
+        type: string
+      - name: admission_date
+        type: string
+      - name: ward
+        type: string
+      - name: diagnosis_code
+        type: string
+      - name: insurance_status
+        type: string
+      - name: contact_email
+        type: string
+      - name: admission_status
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 12
+      profiled_at: '2026-11-13T13:38:26Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ''
+  approved_at: ''
+  change_log: []

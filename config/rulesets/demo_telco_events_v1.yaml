@@ -1,0 +1,570 @@
+ruleset:
+  ruleset_id: demo_telco_events_silver
+  dataset: demo_telco_events
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates demo_telco_events_silver@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_DEMO_TELCO_EVENTS_001
+    name: event_id_not_null
+    description: event_id is populated in 100.0% of rows
+    dataset: demo_telco_events
+    column: event_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 100297
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_002
+    name: event_id_unique
+    description: event_id is unique in the profiled data (primary key candidate)
+    dataset: demo_telco_events
+    column: event_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 100297
+        rows: 100297
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_003
+    name: event_id_regex
+    description: event_id follows the structural pattern AA-99999999
+    dataset: demo_telco_events
+    column: event_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{2}\-[0-9]{8}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AA-99999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_004
+    name: event_id_string_length
+    description: event_id length observed between 11 and 11
+    dataset: demo_telco_events
+    column: event_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 11
+      max: 11
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 11
+        max_length: 11
+        avg_length: 11.0
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_005
+    name: msisdn_not_null
+    description: msisdn is populated in 98.5% of rows
+    dataset: demo_telco_events
+    column: msisdn
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 1513
+        null_percentage: 1.51
+        rows: 100297
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_006
+    name: msisdn_data_type
+    description: msisdn holds whole numbers stored as text
+    dataset: demo_telco_events
+    column: msisdn
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9897
+      evidence:
+        integer_castable_percentage: 98.97
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_007
+    name: msisdn_range
+    description: msisdn typically between 2000002812 and 9999954850
+    dataset: demo_telco_events
+    column: msisdn
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 2000002812
+      max: 9999954850
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 2000002812.0
+        observed_max: 9999954850.0
+        p25: 3997929974.0
+        p75: 7983134740.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_008
+    name: event_ts_not_null
+    description: event_ts is populated in 100.0% of rows
+    dataset: demo_telco_events
+    column: event_ts
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 100297
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_009
+    name: event_ts_regex
+    description: event_ts follows the structural pattern 9999-99-99A99:99:99A
+    dataset: demo_telco_events
+    column: event_ts
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[0-9]{4}\-[0-9]{2}\-[0-9]{2}[A-Z][0-9]{2}:[0-9]{2}:[0-9]{2}[A-Z]$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9799
+      evidence:
+        dominant_pattern: 9999-99-99A99:99:99A
+        share: 0.9799
+        other_patterns:
+        - pattern: aaaaaaaaa-a
+          count: 502
+          percentage: 0.5
+        - pattern: 9/99/9999 99a
+          count: 469
+          percentage: 0.47
+        - pattern: 9/99/9999 9a
+          count: 327
+          percentage: 0.33
+        - pattern: 9/9/9999 99a
+          count: 193
+          percentage: 0.19
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_010
+    name: event_ts_string_length
+    description: event_ts length observed between 11 and 20
+    dataset: demo_telco_events
+    column: event_ts
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 11
+      max: 20
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 11
+        max_length: 20
+        avg_length: 19.842458
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_011
+    name: duration_sec_not_null
+    description: duration_sec is populated in 100.0% of rows
+    dataset: demo_telco_events
+    column: duration_sec
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 100297
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_012
+    name: duration_sec_data_type
+    description: duration_sec holds whole numbers stored as text
+    dataset: demo_telco_events
+    column: duration_sec
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_013
+    name: duration_sec_range
+    description: duration_sec typically between -100 and 3600
+    dataset: demo_telco_events
+    column: duration_sec
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: -100
+      max: 3600
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -100.0
+        observed_max: 3600.0
+        p25: 866.0
+        p75: 2692.0
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_014
+    name: bytes_not_null
+    description: bytes is populated in 100.0% of rows
+    dataset: demo_telco_events
+    column: bytes
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 100297
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_015
+    name: bytes_data_type
+    description: bytes holds whole numbers stored as text
+    dataset: demo_telco_events
+    column: bytes
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: bigint
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_016
+    name: bytes_range
+    description: bytes typically between 45 and 7577297
+    dataset: demo_telco_events
+    column: bytes
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: 45
+      max: 7577297
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: 45.0
+        observed_max: 9999312448.0
+        p25: 1266772.0
+        p75: 3790982.0
+        outliers: 932
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_017
+    name: cell_id_not_null
+    description: cell_id is populated in 100.0% of rows
+    dataset: demo_telco_events
+    column: cell_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 100297
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_018
+    name: cell_id_regex
+    description: cell_id follows the structural pattern AAAA-9999
+    dataset: demo_telco_events
+    column: cell_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{4}\-[0-9]{4}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9899
+      evidence:
+        dominant_pattern: AAAA-9999
+        share: 0.9899
+        other_patterns:
+        - pattern: aaaa999999
+          count: 922
+          percentage: 0.92
+        - pattern: aaaa99999
+          count: 88
+          percentage: 0.09
+        - pattern: aaaa9999
+          count: 8
+          percentage: 0.01
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_019
+    name: cell_id_string_length
+    description: cell_id length observed between 8 and 10
+    dataset: demo_telco_events
+    column: cell_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 8
+      max: 10
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 8
+        max_length: 10
+        avg_length: 9.009113
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_020
+    name: event_type_not_null
+    description: event_type is populated in 100.0% of rows
+    dataset: demo_telco_events
+    column: event_type
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 100297
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_021
+    name: event_type_allowed_values
+    description: event_type has 5 frequent categorical values
+    dataset: demo_telco_events
+    column: event_type
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - VOICE
+      - DATA
+      - MMS
+      - SMS
+      - ROAMING
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          VOICE: 24798
+          DATA: 24735
+          MMS: 24683
+          SMS: 24568
+          ROAMING: 1513
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  - rule_id: GEN_DEMO_TELCO_EVENTS_022
+    name: demo_telco_events_schema_validation
+    description: schema observed at profiling time
+    dataset: demo_telco_events
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: event_id
+        type: string
+      - name: msisdn
+        type: string
+      - name: event_ts
+        type: string
+      - name: duration_sec
+        type: string
+      - name: bytes
+        type: string
+      - name: cell_id
+        type: string
+      - name: event_type
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 7
+      profiled_at: '2026-11-13T13:05:57Z'
+      profile_mode: SAMPLE
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-13T13:07:47Z'
+  change_log:
+  - approved 22 of 22 candidate rules

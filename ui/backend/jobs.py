@@ -50,6 +50,21 @@ class JobConflict(Exception):
     """Raised when a job is submitted while another job is still active."""
 
 
+class JobCancelled(Exception):
+    """Raised inside a running job when a cancel was requested."""
+
+
+_cancel: set[str] = set()
+_prog_hist: dict[str, list[str]] = {}
+
+
+def request_cancel(job_id: str) -> None:
+    """Flag a job for cancellation — takes effect at the next progress checkpoint."""
+    with _lock:
+        _cancel.add(job_id)
+    _emit(job_id, "status", {"status": "CANCELLED", "progress": "cancel requested"})
+
+
 def _emit(job_id: str, event: str, data: dict[str, Any]) -> None:
     with _econd:
         _events.setdefault(job_id, []).append({"event": event, "data": data})
@@ -89,10 +104,17 @@ def submit(kind: str, fn: Callable[[], dict[str, Any]]) -> str:
             result = fn()
             _update(job_id, status="COMPLETED", finished_at=_now(), progress="done", result=result)
             _emit(job_id, "status", {"status": "COMPLETED", "progress": "done", "result": result})
+        except JobCancelled:
+            _update(job_id, status="CANCELLED", finished_at=_now(), progress="cancelled",
+                    error="cancelled by user")
+            _emit(job_id, "status", {"status": "CANCELLED", "progress": "cancelled",
+                                     "error": "cancelled by user"})
         except Exception as exc:  # noqa: BLE001
             err = f"{type(exc).__name__}: {exc}\n{traceback.format_exc(limit=5)}"
             _update(job_id, status="FAILED", finished_at=_now(), progress="failed", error=err)
             _emit(job_id, "status", {"status": "FAILED", "progress": "failed", "error": err})
+        finally:
+            _cancel.discard(job_id)
 
     threading.Thread(target=_run, daemon=True, name=f"dq-job-{job_id}").start()
     return job_id
@@ -109,6 +131,15 @@ def get(job_id: str) -> dict[str, Any] | None:
     for k in ("result",):
         if j.get(k):
             j[k] = json.loads(j[k])
+    r = j.get("result")
+    if isinstance(r, dict) and "run" in r and "accepted" not in r:
+        run = r.get("run") or {}
+        stages = run.get("stages") or []
+        silver = next((s for s in stages if s.get("stage") == "SILVER"), {})
+        r.update({"pipeline_id": r.get("pipeline_id") or run.get("pipeline_id"),
+                  "input": silver.get("input") or silver.get("input_rows"),
+                  "accepted": silver.get("accepted"), "quarantined": silver.get("quarantined"),
+                  "gate_passed": run.get("gate_passed")})
     return j
 
 
@@ -117,8 +148,11 @@ def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
         rows = _conn.execute(
             "SELECT job_id,kind,status,submitted_at,finished_at,progress FROM jobs "
             "ORDER BY submitted_at DESC LIMIT ?", (limit,)).fetchall()
-    return [dict(zip(("job_id", "kind", "status", "submitted_at",
-                      "finished_at", "progress"), r)) for r in rows]
+    out = [dict(zip(("job_id", "kind", "status", "submitted_at",
+                     "finished_at", "progress"), r)) for r in rows]
+    for j in out:
+        j["progress_log"] = _prog_hist.get(j["job_id"], [])[-10:]
+    return out
 
 
 def stream(job_id: str, timeout: float = 0.5) -> Iterator[str]:
@@ -149,7 +183,12 @@ def stream(job_id: str, timeout: float = 0.5) -> Iterator[str]:
 
 
 def progress_cb(job_id: str, msg: str) -> None:
+    if job_id in _cancel:
+        raise JobCancelled(f"job {job_id} cancelled by user")
     _update(job_id, progress=msg)
+    h = _prog_hist.setdefault(job_id, [])
+    h.append(msg)
+    del h[:-60]
     _emit(job_id, "progress", {"progress": msg})
 
 

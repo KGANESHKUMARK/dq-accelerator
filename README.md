@@ -48,7 +48,7 @@ Spark scratch and temp files. Nothing is written to C:.
 
 ### One file: `DQ_start.bat`
 
-Double-click **`DQ_start.bat`** — it checks Python 3.12 / JDK 21 / Node 18+
+Double-click **`DQ_start.bat`** — it checks Python 3.12 / JDK 17+ / Node 18+
 (prints download links if missing), creates `.venv`, installs
 `requirements.txt` (+ `requirements-llm.txt` when `DATABRICKS_TOKEN` is set),
 runs `npm install` + build, then launches backend (`:8000`) + frontend (`:5173`)

@@ -80,11 +80,15 @@ def _remediation_log(final: DataFrame, removed: DataFrame | None, run_id: str, d
 
 class DQRunner:
     def __init__(self, validation: ValidationEngine, profiler: DataProfiler, provider: AIRemediationProvider,
-                 include_dq_columns: bool = False) -> None:
+                 include_dq_columns: bool = False, alerts: Any = None,
+                 metadata_store: Any = None, reports_path: str | None = None) -> None:
         self.validation = validation
         self.profiler = profiler
         self.provider = provider
         self.include_dq_columns = include_dq_columns
+        self.alerts = alerts
+        self.metadata_store = metadata_store
+        self.reports_path = reports_path
 
     def run(self, df: DataFrame, ruleset: RuleSet, policy: RemediationPolicyConfig, context: PipelineContext,
             mode: IntegrationMode, *, reference_data: Mapping[str, DataFrame] | None = None, profile: bool = False,
@@ -148,8 +152,15 @@ class DQRunner:
                 deterministic = DeterministicRemediator(policy).apply(candidates, ruleset)
                 intermediate = self.validation.validate(deterministic.dataframe, ruleset, reference_data=reference_data)
                 persisted.append(intermediate)
-                policy_engine = ConfidencePolicyEngine(policy, ApprovalStore.load(policy.approvals_path),
-                                                        RejectionStore.load(policy.rejections_path))
+                store = self.metadata_store if hasattr(self.metadata_store, "collection") else None
+                if store is not None:
+                    from dq_core.metadata import resolver as _res
+                    approvals = ApprovalStore.from_documents(_res.approval_docs(store))
+                    rejections = RejectionStore.from_documents(_res.rejection_docs(store))
+                else:
+                    approvals = ApprovalStore.load(policy.approvals_path)
+                    rejections = RejectionStore.load(policy.rejections_path)
+                policy_engine = ConfidencePolicyEngine(policy, approvals, rejections)
                 _ph("remediation_ai")
                 ai = AIRemediator(self.provider, policy_engine, policy).apply(intermediate.annotated, ruleset, run_id)
             phases["remediation"] = sw.elapsed_ms
@@ -223,6 +234,25 @@ class DQRunner:
         log_event(_logger, "dq_run_completed", run_id=run_id, dataset=context.dataset, mode=mode.value,
                   input=metrics.input_records, accepted=accepted_count, quarantined=quarantined_count,
                   gate_passed=gate.passed, duration_ms=metrics.duration_ms)
+        try:
+            from dq_core.alerts.webhook import QualityGateFailedError, notify_gate
+            from dq_core.metrics.recorder import record_run_metrics
+            score = getattr(gate, "score", None) or getattr(gate, "quality_score", None)
+            notify_gate(self.alerts, pipeline_id=context.pipeline_id, dataset=context.dataset,
+                        stage=context.stage.value, gate_passed=gate.passed, quality_score=score,
+                        input_records=metrics.input_records, accepted=accepted_count,
+                        quarantined=quarantined_count, ruleset_ref=ruleset.ref)
+            record_run_metrics(self.metadata_store, self.reports_path, {
+                "dq_run_id": run_id, "pipeline_id": context.pipeline_id, "dataset": context.dataset,
+                "stage": context.stage.value, "mode": mode.value, "ruleset": ruleset.ref,
+                "input_records": metrics.input_records, "accepted_records": accepted_count,
+                "quarantined_records": quarantined_count,
+                "quality_score": score, "gate_passed": gate.passed,
+                "duration_ms": metrics.duration_ms, "finished_at": metrics.finished_at})
+        except QualityGateFailedError:
+            raise
+        except Exception as exc:  # alerting/metrics are best-effort — never break a run
+            _logger.warning("post-run notify/metrics failed", error=str(exc)[:200])
         return DQResult(run_id=run_id, mode=mode, execution_context=exec_ctx, accepted_dataframe=accepted,
                         quarantine_dataframe=quarantine, validation_results=report, remediation_results=remediation,
                         execution_metrics=metrics, quality_gate=gate, final_validation_results=final_report,

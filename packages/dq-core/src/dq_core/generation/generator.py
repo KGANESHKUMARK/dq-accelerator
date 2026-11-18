@@ -63,7 +63,7 @@ class CandidateRuleGenerator:
             # DATA_TYPE / DATE_FORMAT / REGEX(email) ---------------------------------------------
             if p.data_type == "string" and p.inferred_type == "integer (stored as string)":
                 propose(RuleType.DATA_TYPE, name, (p.integer_castable_percentage or 0) / 100,
-                        {"integer_castable_percentage": p.integer_castable_percentage}, {"data_type": "int"},
+                        {"integer_castable_percentage": p.integer_castable_percentage}, {"data_type": "bigint"},
                         description=f"{name} holds whole numbers stored as text")
             elif p.data_type == "string" and p.inferred_type == "decimal (stored as string)":
                 propose(RuleType.DATA_TYPE, name, (p.numeric_castable_percentage or 0) / 100,
@@ -94,10 +94,14 @@ class CandidateRuleGenerator:
                 upper = min(float(p.max), q3 + 1.5 * iqr)
                 integer = p.inferred_type.startswith("integer") or p.data_type in ("int", "bigint", "smallint", "tinyint")
                 lower, upper = (math.floor(lower), math.ceil(upper)) if integer else (round(lower, 2), round(upper, 2))
+                if integer:
+                    dtype = "int" if max(abs(lower), abs(upper)) <= 2_147_483_647 else "bigint"
+                else:
+                    dtype = "decimal(18,2)"
                 propose(RuleType.RANGE, name, 0.6,
                         {"observed_min": p.min, "observed_max": p.max, "p25": q1, "p75": q3, "outliers": p.outlier_count,
                          "method": "IQR fences clipped to observed range - business review required"},
-                        {"min": lower, "max": upper, "data_type": "int" if integer else "decimal(18,2)"},
+                        {"min": lower, "max": upper, "data_type": dtype},
                         description=f"{name} typically between {lower} and {upper}")
             # ALLOWED_VALUES ---------------------------------------------------------------------
             if p.candidate_allowed_values and p.inferred_type == "categorical":

@@ -1,0 +1,22 @@
+pipeline:
+  pipeline_id: DEMO_RETAIL_INVENTORY_PIPELINE
+  pipeline_name: Demo Retail Inventory Pipeline
+  platform: STANDALONE_SPARK
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: auto-e2e
+  description: Onboarded via UI wizard from demo_retail_inventory.csv (120000 rows profiled)
+  policy: config/policies/default.yaml
+  datasets:
+  - dataset_id: demo_retail_inventory
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    - GOLD
+    rulesets:
+      SILVER: ../rulesets/demo_retail_inventory_v1.yaml
+      GOLD: ../rulesets/demo_retail_inventory_gold_v1.yaml
+    test_data: ../../data/uploads/demo_retail_inventory.csv
+    test_data_format: CSV

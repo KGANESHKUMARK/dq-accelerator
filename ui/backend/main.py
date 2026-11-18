@@ -272,6 +272,20 @@ def rulesets() -> list[dict[str, Any]]:
     return out
 
 
+@app.get("/api/rulesets/files")
+def ruleset_files() -> list[str]:
+    """YAML filenames in config/rulesets — for ad-hoc run dropdown."""
+    d = ROOT / "config" / "rulesets"
+    return sorted(p.name for p in d.glob("*.yaml")) if d.exists() else []
+
+
+@app.get("/api/policies/files")
+def policy_files() -> list[str]:
+    """YAML filenames in config/policies — for policy dropdowns."""
+    d = ROOT / "config" / "policies"
+    return sorted(p.name for p in d.glob("*.yaml")) if d.exists() else []
+
+
 class RulesetIn(BaseModel):
     ruleset_yaml: str
     activate: bool = True
@@ -330,6 +344,58 @@ def ruleset_diff(rid: str, from_: str = "", to: str = "") -> dict[str, Any]:
         raise HTTPException(400, str(exc)) from exc
 
 
+@app.get("/api/rulesets/{rid}/rules")
+def ruleset_rules(rid: str) -> dict[str, Any]:
+    """Return the actual rule definitions for a ruleset via the registry (works for file + NoSQL backends)."""
+    reg = _registry("rulesets")
+    found: dict[str, dict[str, Any]] = {}
+
+    def _add(rules: list[dict[str, Any]]) -> None:
+        for r in rules or []:
+            rule_key = r.get("rule_id")
+            if rule_key and rule_key not in found:
+                g = r.get("generation") or {}
+                found[rule_key] = {
+                    "rule_id": rule_key, "name": r.get("name"),
+                    "rule_type": r.get("rule_type"), "column": r.get("column"),
+                    "severity": r.get("severity"), "scope": r.get("scope"),
+                    "status": r.get("status"), "confidence": g.get("confidence"),
+                    "description": r.get("description"),
+                    "config": r.get("config") or {},
+                }
+
+    # primary: registry versions (file + NoSQL backends)
+    try:
+        for e in reg.list_versions(rid):
+            try:
+                rs = reg.get(rid, e["version"])
+                d = rs.to_dict() if hasattr(rs, "to_dict") else {}
+                _add(d.get("rules"))
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    # fallback: scan YAML files directly (covers rulesets not yet in registry index)
+    if not found:
+        import yaml as _yaml
+        for base in (ROOT / "config" / "rulesets", ROOT / "registry" / "rulesets"):
+            if not base.exists():
+                continue
+            for p in base.rglob("*.yaml"):
+                try:
+                    doc = _yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+                except Exception:
+                    continue
+                rs = doc.get("ruleset") or {}
+                if rs.get("ruleset_id") == rid:
+                    _add(rs.get("rules"))
+
+    if not found:
+        raise HTTPException(404, f"no rules found for ruleset {rid}")
+    return {"ruleset_id": rid, "count": len(found), "rules": list(found.values())}
+
+
 # ------------------------------------------------------------------ datasets / runs
 def _prog(msg: str) -> None:
     """Emit a granular progress update for the job running on this thread.
@@ -365,6 +431,12 @@ def _read_source(spark: Any, src: Path):
 
 
 _RUN_PHASE_LABELS = {
+    "bronze": "phase=read | persisting raw bronze layer + ingest manifest",
+    "silver_setup": "phase=validate | loading silver ruleset + profiling",
+    "silver_write": "phase=report | writing silver accepted + quarantine outputs",
+    "gold_setup": "phase=validate | loading gold ruleset (strict re-check)",
+    "gold_write": "phase=report | writing gold accepted + quarantine outputs",
+    "reports": "phase=report | writing run reports (silver/gold/profile JSON)",
     "profiling": "phase=profile | profiling dataset statistics",
     "validation": "phase=validate | validating all rules against the data",
     "remediation_deterministic": "phase=remediate | applying deterministic fixes",
@@ -375,16 +447,28 @@ _RUN_PHASE_LABELS = {
 
 
 @app.get("/api/datasets")
-def datasets() -> list[dict[str, str]]:
-    d = ROOT / "sample_data" / "bronze"
-    files = sorted(d.glob("*.csv")) + sorted(d.glob("*.parquet"))
-    return [{"id": p.stem, "path": str(p.relative_to(ROOT)).replace("\\", "/")}
-            for p in files]
+def datasets() -> list[dict[str, Any]]:
+    out: list[dict[str, str]] = []
+    for d in (ROOT / "sample_data" / "bronze", ROOT / "sample_data" / "demo", ROOT / "data" / "uploads"):
+        if not d.exists():
+            continue
+        for p in sorted(d.glob("*.csv")) + sorted(d.glob("*.parquet")) + sorted(d.glob("*.json")):
+            rows = None
+            if p.suffix.lower() == ".parquet":
+                try:
+                    import pyarrow.parquet as _pq
+                    rows = _pq.read_metadata(str(p)).num_rows
+                except Exception:
+                    pass
+            out.append({"id": p.stem, "path": str(p.relative_to(ROOT)).replace("\\", "/"),
+                        "size_mb": round(p.stat().st_size / 1e6, 1), "rows": rows})
+    return out
 
 
 class RunIn(BaseModel):
     source: str
     ruleset: str
+    source_format: str = "AUTO"
     policy: str = "config/policies/default.yaml"
     mode: str = "OBSERVE_ONLY"
     dataset: str | None = None
@@ -398,7 +482,10 @@ def _do_run(body: RunIn) -> dict[str, Any]:
     spark, engine = _spark_engine()
     rs = engine.load_ruleset(str(ROOT / body.ruleset))
     src = ROOT / body.source
-    df = _read_source(spark, src)
+    if (body.source_format or "AUTO").upper() in ("TABLE", "DELTA", "JSON") or not src.exists():
+        df = _read_any_source(spark, body.source, body.source_format)
+    else:
+        df = _read_source(spark, src)
     # Auto-sample large files using config thresholds (engine.yaml -> validation.*)
     val_cfg = engine.config.validation
     threshold_mb = val_cfg.large_file_threshold_mb
@@ -459,11 +546,28 @@ _STAGE_ORDER = {"BRONZE": 0, "SILVER": 1, "GOLD": 2}
 
 
 def _load_pipeline_manifest(pid: str):
+    """Store-first manifest resolution: NoSQL `manifests` collection, YAML fallback + write-through."""
+    from dq_core.metadata import resolver as _res
     from dq_core.pipelines.manifest import PipelineManifest
+    try:
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            raw = _res.manifest_from_store(store, pid)
+            if raw:
+                return PipelineManifest.from_dict(raw)
+    except Exception:
+        pass
     mdir = ROOT / "config" / "pipelines"
     direct = mdir / f"{pid}.yaml"
     if direct.exists():
-        return PipelineManifest.load(direct)
+        mf = PipelineManifest.load(direct)
+        try:
+            store = _res.store_from_engine(J.get_engine())
+            if store is not None:
+                _res.save_manifest(store, mf)
+        except Exception:
+            pass
+        return mf
     for p in sorted(mdir.glob("*.yaml")):
         try:
             mf = PipelineManifest.load(p)
@@ -472,6 +576,22 @@ def _load_pipeline_manifest(pid: str):
         except Exception:
             continue
     raise HTTPException(404, f"pipeline manifest not found for {pid}")
+
+
+def _cfg(p: str | None) -> str:
+    """Resolve a manifest config path (policy/ruleset) — repairs paths that were
+    resolved relative to config/pipelines/ producing config/pipelines/config/..."""
+    if not p:
+        return ""
+    s = str(p).replace("\\", "/")
+    marker = "/config/pipelines/config/"
+    if marker in s:
+        s = "config/" + s.split(marker, 1)[1]
+        return str(ROOT / s)
+    if Path(p).exists():
+        return str(p)
+    alt = ROOT / s
+    return str(alt) if alt.exists() else str(p)
 
 
 def _stage_prog(stage: str, key: str) -> None:
@@ -504,24 +624,31 @@ def _do_pipeline_run(pid: str, body: PipelineRunIn) -> dict[str, Any]:
                if d.dataset_id == (body.dataset_id or mf.datasets[0].dataset_id)), None)
     if ds is None:
         raise HTTPException(400, f"dataset '{body.dataset_id}' not in manifest {pid}")
-    src = Path(ds.test_data)
-    df = _read_source(spark, src)
+    src = ds.test_data
+    sp = Path(src)
+    tfmt = (ds.test_data_format or "").upper()
+    if tfmt in ("TABLE", "DELTA", "JSON") or not sp.exists():
+        df = _read_any_source(spark, src, tfmt if tfmt in ("TABLE", "DELTA", "JSON") else "AUTO")
+    else:
+        df = _read_source(spark, sp)
     mode = body.mode or getattr(mf.dq_mode, "value", str(mf.dq_mode))
-    policy = str(mf.policy) if mf.policy else str(ROOT / "config" / "policies" / "default.yaml")
+    policy = _cfg(str(mf.policy)) if mf.policy else str(ROOT / "config" / "policies" / "default.yaml")
     pipe_run_id = f"{pid}-{int(t0)}"
     platform = getattr(mf.platform, "value", mf.platform) if mf.platform else "LOCAL"
 
-    paths = StoragePaths(str(_output_base()))
-    sink = StorageSink()
-    silver_ruleset = ds.rulesets.get("SILVER")
+    _out = engine.config.outputs
+    paths = StoragePaths(str(_output_base()), catalog=getattr(_out, "catalog", "") or "")
+    sink = StorageSink(fmt=getattr(_out, "format", "parquet") or "parquet")
+    silver_ruleset = _cfg(ds.rulesets.get("SILVER"))
     if not silver_ruleset:
         raise HTTPException(400, f"{pid}/{ds.dataset_id} has no SILVER ruleset")
-    gold_ruleset = ds.rulesets.get("GOLD")
+    gold_ruleset = _cfg(ds.rulesets.get("GOLD"))
     _prog(f"phase=read | landing raw data and running persisted medallion stages under {paths.base_path}")
     result = MedallionRunner(engine, paths, sink).run(
         df, ds.dataset_id, pipeline_id=pid, pipeline_run_id=pipe_run_id,
         silver_ruleset=silver_ruleset, policy=policy, silver_mode=mode,
-        gold_ruleset=gold_ruleset, source_path=src, profile=False, platform=str(platform))
+        gold_ruleset=gold_ruleset, source_path=src, profile=False, platform=str(platform),
+        on_phase=_stage_prog)
     stages_out = [
         {"stage": "BRONZE", "status": "PERSISTED", "rows": result.bronze_rows,
          "written_paths": {"raw": result.written_paths.get("bronze", paths.bronze(ds.dataset_id))}},
@@ -588,7 +715,7 @@ def _do_profile(body: ProfileIn) -> dict[str, Any]:
     mode = _profile_mode_for(src, body.mode, engine)
     ds = body.dataset or src.stem
     _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
-    rep = engine.profile(df, ds, mode=mode)
+    rep = engine.profile(df, ds, mode=mode, on_phase=lambda m: _prog(f"phase=profile | {m}"))
     out = ROOT / "reports"
     out.mkdir(exist_ok=True)
     p = out / f"ui_profile_{src.stem}.json"
@@ -624,12 +751,34 @@ def job_status(jid: str) -> dict[str, Any]:
     j = J.get(jid)
     if not j:
         raise HTTPException(404, "job not found")
+    r = j.get("result")
+    if isinstance(r, dict) and "run" in r and "accepted" not in r:
+        stages = (r.get("run") or {}).get("stages") or []
+        silver = next((s for s in stages if s.get("stage") == "SILVER"), {})
+        import glob as _g
+        ds = r.get("dataset") or ""
+        reps = sorted(_g.glob(str(ROOT / "reports" / f"{ds}*silver*.json")), key=os.path.getmtime)
+        r.update({"input": silver.get("input") or silver.get("input_rows"),
+                  "accepted": silver.get("accepted"), "quarantined": silver.get("quarantined"),
+                  "gate_passed": (r.get("run") or {}).get("gate_passed"),
+                  "report_path": reps[-1] if reps else ""})
     return j
 
 
 @app.get("/api/jobs")
 def jobs() -> list[dict[str, Any]]:
     return J.list_jobs()
+
+
+@app.post("/api/jobs/{jid}/cancel")
+def job_cancel(jid: str) -> dict[str, Any]:
+    j = J.get(jid)
+    if not j:
+        raise HTTPException(404, "job not found")
+    if j.get("status") not in ("QUEUED", "RUNNING"):
+        raise HTTPException(400, f"job is {j.get('status')} — cannot cancel")
+    J.request_cancel(jid)
+    return {"ok": True, "job_id": jid}
 
 
 @app.get("/api/jobs/{jid}/stream")
@@ -716,12 +865,110 @@ def ai_status() -> dict[str, Any]:
         return {"error": str(exc), "provider": "unknown"}
 
 
+# ------------------------------------------------------------------ metadata store
+_META_COLLECTIONS = ("ruleset_index", "ruleset_versions", "pipelines", "manifests",
+                     "policies", "approvals", "rejections", "profiles", "candidates", "jobs")
+
+
+def _meta_engine():
+    from dq_core import DataQualityEngine
+    return DataQualityEngine(EngineConfig.from_yaml(ROOT / "config" / "engine.yaml"))
+
+
+@app.get("/api/metadata/status")
+def metadata_status() -> dict[str, Any]:
+    """Metadata store backend + per-collection document counts."""
+    cfg = EngineConfig.from_yaml(ROOT / "config" / "engine.yaml")
+    reg = cfg.registry
+    out: dict[str, Any] = {"backend": (reg.backend or "file").lower(),
+                           "metadata_engine": getattr(reg.metadata, "engine", None),
+                           "db_path": getattr(reg.metadata, "db_path", None),
+                           "uri": getattr(reg.metadata, "uri", None)}
+    try:
+        engine = _meta_engine()
+        store = getattr(getattr(engine, "ruleset_registry", None), "store", None)
+        out["store_type"] = type(store).__name__ if store is not None else ("sqlite" if hasattr(getattr(engine, "ruleset_registry", None), "store") else "file")
+        if store is not None and hasattr(store, "collection"):
+            out["collections"] = {n: store.collection(n).count() for n in _META_COLLECTIONS}
+            out["store_path"] = getattr(store, "path", None)
+    except Exception as exc:
+        out["error"] = str(exc)[:300]
+    return out
+
+
+@app.get("/api/metadata/collection/{name}")
+def metadata_collection(name: str, limit: int = 50) -> dict[str, Any]:
+    """Browse documents in a metadata collection (NoSQL backends only)."""
+    if name not in _META_COLLECTIONS:
+        raise HTTPException(404, f"Unknown collection '{name}'")
+    engine = _meta_engine()
+    store = getattr(getattr(engine, "ruleset_registry", None), "store", None)
+    if store is None or not hasattr(store, "collection"):
+        raise HTTPException(400, "Current registry backend is not a document store")
+    coll = store.collection(name)
+    return {"collection": name, "count": coll.count(), "docs": coll.find()[:limit]}
+
+
+@app.get("/api/metrics/recent")
+def metrics_recent(limit: int = 30, dataset: str | None = None) -> dict[str, Any]:
+    """Recent DQ run metrics for trend views — NoSQL metrics collection, JSONL fallback."""
+    engine = _meta_engine()
+    store = getattr(getattr(engine, "ruleset_registry", None), "store", None)
+    docs: list[dict[str, Any]] = []
+    if store is not None and hasattr(store, "collection"):
+        try:
+            docs = store.collection("metrics").find()
+        except Exception:
+            docs = []
+    if not docs:  # JSONL fallback for file/sqlite backends
+        import json as _json
+        p = _output_base() / "metrics.jsonl"
+        if p.exists():
+            for line in p.read_text(encoding="utf-8").splitlines()[-limit * 3:]:
+                try:
+                    docs.append(_json.loads(line))
+                except Exception:
+                    continue
+    docs = [d for d in docs if not dataset or d.get("dataset") == dataset]
+    docs.sort(key=lambda d: str(d.get("recorded_at") or d.get("finished_at") or ""), reverse=True)
+    docs = docs[:limit]
+    scores = [float(d["quality_score"]) for d in reversed(docs) if d.get("quality_score") is not None]
+    return {"count": len(docs), "runs": docs,
+            "sparkline": scores[-30:], "avg_score": round(sum(scores) / len(scores), 2) if scores else None}
+
+
+class MetadataSwitchIn(BaseModel):
+    backend: str                     # file | sqlite | nosql
+    engine: str | None = None        # tinydb | mongodb | dynamodb (nosql only)
+
+
+@app.post("/api/metadata/switch")
+def metadata_switch(body: MetadataSwitchIn) -> dict[str, Any]:
+    """Switch registry.backend (+ metadata.engine) in engine.yaml, then hot-reload."""
+    import re
+    backend = body.backend.lower()
+    if backend not in ("file", "sqlite", "nosql"):
+        raise HTTPException(400, "backend must be file|sqlite|nosql")
+    engine = (body.engine or "tinydb").lower()
+    if engine not in ("tinydb", "mongodb", "dynamodb"):
+        raise HTTPException(400, "engine must be tinydb|mongodb|dynamodb")
+    path = ROOT / "config" / "engine.yaml"
+    text = path.read_text(encoding="utf-8")
+    # registry.backend line (first 'backend:' inside registry block)
+    text = re.sub(r"(registry:\s*\n(?:.*\n)*?\s*backend:\s*)\S+", rf"\g<1>{backend}", text, count=1)
+    if backend == "nosql":
+        text = re.sub(r"(metadata:\s*\n(?:.*\n)*?\s*engine:\s*)\S+", rf"\g<1>{engine}", text, count=1)
+    path.write_text(text, encoding="utf-8")
+    return {"ok": True, "backend": backend, "engine": engine if backend == "nosql" else None,
+            "note": "call /api/engine/reload (restart_spark=false) to apply"}
+
+
 # ------------------------------------------------------------------ health score
 @app.get("/api/health/score")
 def health_score() -> dict[str, Any]:
     """Overall DQ health 0-100 from recent completed dq_run jobs."""
     rows = J.list_jobs(limit=50)
-    runs = [r for r in rows if r.get("kind") == "dq_run" and r.get("status") == "COMPLETED"]
+    runs = [r for r in rows if r.get("kind") in ("dq_run", "auto_e2e") and r.get("status") == "COMPLETED"]
     if not runs:
         return {"score": None, "runs": 0, "message": "No completed DQ runs yet"}
     full = [J.get(r["job_id"]) for r in runs[:20]]
@@ -733,7 +980,7 @@ def health_score() -> dict[str, Any]:
     gate_pass_rate = round(sum(1 for g in gates if g) / len(gates) * 100, 1) if gates else None
     return {"score": score, "gate_pass_rate": gate_pass_rate, "runs": len(runs),
             "total_input": total_in, "total_accepted": total_acc, "total_quarantined": total_q,
-            "total_failed_runs": sum(1 for r in rows if r.get("kind") == "dq_run" and r.get("status") == "FAILED")}
+            "total_failed_runs": sum(1 for r in rows if r.get("kind") in ("dq_run", "auto_e2e") and r.get("status") == "FAILED")}
 
 
 # ------------------------------------------------------------------ dashboard summary (real data from reports)
@@ -959,7 +1206,7 @@ def pipeline_trend(pid: str) -> list[dict[str, Any]]:
             run2pid[rid] = m["pipeline_id"]
     out = []
     for r in rows:
-        if r.get("kind") != "dq_run" or r.get("status") != "COMPLETED":
+        if r.get("kind") not in ("dq_run", "auto_e2e") or r.get("status") != "COMPLETED":
             continue
         j = J.get(r["job_id"])
         if not j:
@@ -982,6 +1229,64 @@ def pipeline_trend(pid: str) -> list[dict[str, Any]]:
         if len(out) >= 30:
             break
     return list(reversed(out))
+
+
+@app.get("/api/pipelines/{pid}/journey")
+def pipeline_journey(pid: str) -> dict[str, Any]:
+    """Quality journey for one pipeline: latest-run medallion stage scores
+    (Bronze→Silver→Gold with ruleset versions) + score-over-runs history."""
+    rows = J.list_jobs(limit=200)
+    runs: list[dict[str, Any]] = []
+    for r in rows:
+        if r.get("kind") not in ("pipeline_run", "dq_run", "auto_e2e") or r.get("status") != "COMPLETED":
+            continue
+        j = J.get(r["job_id"])
+        res = (j or {}).get("result") or {}
+        res_pid = res.get("pipeline_id") or (res.get("run") or {}).get("pipeline_id")
+        if res_pid != pid:
+            continue
+        stages = res.get("stages") or (res.get("run") or {}).get("stages") or []
+        if not stages:  # dq_run single-stage results carry scores differently
+            score = ((res.get("quality_gate") or {}).get("quality_score")
+                     or (res.get("summary") or {}).get("quality_score"))
+            if score is None:
+                continue
+            stages = [{"stage": res.get("stage") or "SILVER", "quality_score": score,
+                       "ruleset": res.get("ruleset"), "accepted": res.get("accepted"),
+                       "quarantined": res.get("quarantined"), "gate_passed": res.get("gate_passed")}]
+        runs.append({
+            "job_id": r["job_id"],
+            "ran_at": r.get("finished_at") or r.get("submitted_at"),
+            "gate_passed": res.get("gate_passed"),
+            "stages": stages,
+        })
+    if not runs:
+        return {"pipeline_id": pid, "stages": [], "history": []}
+    latest = runs[0]
+
+    def _norm_stage(s: dict[str, Any]) -> dict[str, Any]:
+        score = s.get("quality_score")
+        if score is None and s.get("pass_rate") is not None:
+            score = s["pass_rate"]
+        return {"stage": s.get("stage"), "score": score,
+                "ruleset": s.get("ruleset"), "status": s.get("status"),
+                "accepted": s.get("accepted"), "quarantined": s.get("quarantined"),
+                "rows": s.get("rows") or s.get("input"),
+                "gate": s.get("gate_passed", s.get("gate"))}
+
+    stages = [_norm_stage(s) for s in latest["stages"]]
+    history = []
+    for run in runs[:20]:
+        scores = [float(s["quality_score"]) for s in run["stages"]
+                  if isinstance(s.get("quality_score"), (int, float))]
+        if not scores:  # fall back to pass_rate style fields
+            scores = [float(s["pass_rate"]) for s in run["stages"]
+                      if isinstance(s.get("pass_rate"), (int, float))]
+        versions = sorted({str(s.get("ruleset")) for s in run["stages"] if s.get("ruleset")})
+        history.append({"ran_at": run["ran_at"], "score": round(sum(scores) / len(scores), 1) if scores else None,
+                        "versions": versions, "gate_passed": run["gate_passed"]})
+    return {"pipeline_id": pid, "latest_run_at": latest["ran_at"],
+            "latest_job_id": latest["job_id"], "stages": stages, "history": list(reversed(history))}
 
 
 # ------------------------------------------------------------------ anomaly lifecycle
@@ -1157,7 +1462,7 @@ def _load_quarantine_pending() -> list[dict[str, Any]]:
     """Scan last 10 completed REMEDIATE jobs — read ai_decisions from report JSON
     and return rows with decision == REQUIRES_APPROVAL (PENDING_HUMAN_APPROVAL)."""
     rows = J.list_jobs(limit=100)
-    runs = [r for r in rows if r.get("kind") == "dq_run" and r.get("status") == "COMPLETED"][:10]
+    runs = [r for r in rows if r.get("kind") in ("dq_run", "auto_e2e") and r.get("status") == "COMPLETED"][:10]
     pending: list[dict[str, Any]] = []
     seen: set[str] = set()
     strict_keys, loose_keys = _actioned_keys()
@@ -1260,6 +1565,13 @@ def approve_correction(body: ApprovalAction) -> dict[str, Any]:
     })
     with open(_APPROVALS_FILE, "w", encoding="utf-8") as f:
         _yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
+    try:  # dual-write into NoSQL approvals collection when doc store active
+        from dq_core.metadata import resolver as _res
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            _res.record_approval(store, approvals[-1])
+    except Exception:
+        pass
     return {"ok": True, "total_approved": len(approvals)}
 
 
@@ -1282,8 +1594,272 @@ def reject_correction(body: ApprovalAction) -> dict[str, Any]:
     })
     with open(_REJECTIONS_FILE, "w", encoding="utf-8") as f:
         _yaml.safe_dump(doc, f, sort_keys=False, allow_unicode=True)
+    try:  # dual-write into NoSQL rejections collection when doc store active
+        from dq_core.metadata import resolver as _res
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            _res.record_rejection(store, rejections[-1])
+    except Exception:
+        pass
     return {"ok": True, "status": "REJECTED", "column": body.column,
             "original_value": body.original_value}
+
+
+# ------------------------------------------------------------------ stage data preview
+_STAGE_DIRS = {"bronze": "bronze", "silver": "silver", "gold": "gold"}
+
+
+@app.get("/api/data/available")
+def data_available() -> dict[str, Any]:
+    """List datasets available per medallion stage (dirs under data/)."""
+    out: dict[str, list[str]] = {}
+    for stage in _STAGE_DIRS:
+        d = ROOT / "data" / stage
+        out[stage] = sorted(p.name for p in d.iterdir() if p.is_dir()) if d.exists() else []
+    q = ROOT / "data" / "quarantine"
+    out["quarantine"] = sorted(p.name for p in q.iterdir() if p.is_dir()) if q.exists() else []
+    return out
+
+
+@app.get("/api/data/preview")
+def data_preview(dataset: str, stage: str = "silver", limit: int = 50) -> dict[str, Any]:
+    """Preview actual output rows — reads the stage parquet dir via Spark."""
+    stage = stage.lower()
+    if stage == "quarantine":
+        # quarantine layout: data/quarantine/<substage>/<dataset>
+        base = ROOT / "data" / "quarantine"
+        hits = [p for p in base.glob(f"*/{dataset}") if p.is_dir()]
+        if not hits:
+            raise HTTPException(404, f"no quarantine data for {dataset}")
+        path = hits[0]
+    else:
+        if stage not in _STAGE_DIRS:
+            raise HTTPException(400, f"stage must be one of {list(_STAGE_DIRS)}|quarantine")
+        path = (ROOT / "data" / _STAGE_DIRS[stage] / dataset).resolve()
+        if not str(path).startswith(str(ROOT.resolve())) or not path.exists():
+            raise HTTPException(404, f"no {stage} data for {dataset}")
+    spark = J.get_spark()
+    df = spark.read.parquet(str(path))
+    rows = [r.asDict(recursive=True) for r in df.limit(min(limit, 200)).collect()]
+    cols = df.columns
+    return {"dataset": dataset, "stage": stage, "columns": cols,
+            "rows": rows, "shown": len(rows)}
+
+
+@app.get("/api/data/source-preview")
+def source_preview(source: str, limit: int = 20) -> dict[str, Any]:
+    """Quick peek at any source — columns + first N rows (no full scan)."""
+    spark = J.get_spark()
+    df = _read_any_source(spark, source, "AUTO")
+    rows = [r.asDict(recursive=True) for r in df.limit(min(limit, 100)).collect()]
+    return {"source": source, "columns": df.columns, "rows": rows, "shown": len(rows)}
+
+
+@app.get("/api/profiles")
+def profiles_list() -> list[dict[str, Any]]:
+    """Stored profile baselines (written during onboard preview) — newest first."""
+    from dq_core.metadata import resolver as _res
+    store = _res.store_from_engine(J.get_engine())
+    if store is None:
+        return []
+    docs = store.collection("profiles").find({})
+    docs.sort(key=lambda d: str(d.get("profiled_at") or ""), reverse=True)
+    return [{"dataset": d.get("dataset"), "ruleset_id": d.get("ruleset_id"),
+             "stage": d.get("stage"), "profiled_at": d.get("profiled_at"),
+             "row_count": d.get("row_count"), "profile_mode": d.get("profile_mode")}
+            for d in docs]
+
+
+@app.get("/api/profiles/{dataset}")
+def profile_detail(dataset: str) -> dict[str, Any]:
+    """Latest stored profile for a dataset — full column statistics."""
+    from dq_core.metadata import resolver as _res
+    store = _res.store_from_engine(J.get_engine())
+    if store is None:
+        raise HTTPException(404, "metadata store unavailable")
+    docs = [d for d in store.collection("profiles").find({"dataset": dataset})]
+    if not docs:
+        raise HTTPException(404, f"no profile for {dataset}")
+    docs.sort(key=lambda d: str(d.get("profiled_at") or ""), reverse=True)
+    return docs[0]
+
+
+@app.get("/api/tables")
+def tables() -> list[str]:
+    """Tables/views visible to the shared Spark session."""
+    spark = J.get_spark()
+    return [r.tableName for r in spark.catalog.listTables()]
+
+
+class TableIn(BaseModel):
+    source: str                  # repo-relative file to register as a view
+    view_name: str
+
+
+@app.post("/api/tables/register")
+def register_table(body: TableIn) -> dict[str, Any]:
+    """Register a local file as a Spark temp view — makes TABLE sources work locally."""
+    spark = J.get_spark()
+    src = (ROOT / body.source).resolve()
+    if not str(src).startswith(str(ROOT.resolve())) or not src.exists():
+        raise HTTPException(400, f"source not found under repo: {body.source}")
+    df = _read_source(spark, src)
+    df.createOrReplaceTempView(body.view_name)
+    return {"ok": True, "view": body.view_name, "rows": df.count()}
+
+
+@app.get("/api/ai/activity")
+def ai_activity(limit: int = 150) -> dict[str, Any]:
+    """Flattened AI remediation activity across recent reports — decisions + outcomes."""
+    out: list[dict[str, Any]] = []
+    rdir = ROOT / "reports"
+    files = sorted(rdir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:30] if rdir.exists() else []
+    prov: dict[str, Any] = {}
+    for f in files:
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        rr = d.get("remediation_results") or {}
+        prov = (rr.get("summary") or {}).get("ai_provider") or prov
+        sim = rr.get("ai_outputs_are_simulated", prov.get("simulated"))
+        for dec in (rr.get("ai_decisions") or []):
+            out.append({"report": f.stem, "dataset": d.get("dataset"), "kind": "AI_DECISION",
+                        **dec, "simulated": sim})
+        for it in ((rr.get("outcome_audit") or {}).get("items") or []):
+            out.append({"report": f.stem, "dataset": d.get("dataset"), "kind": "OUTCOME",
+                        **it, "simulated": sim})
+        if len(out) >= limit:
+            break
+    return {"total": len(out), "records": out[:limit], "provider": prov}
+
+
+# ------------------------------------------------------------------ auto end-to-end
+class AutoIn(BaseModel):
+    source: str
+    dataset: str | None = None
+    pipeline_id: str
+    stage: str = "SILVER"
+    source_format: str = "AUTO"
+    platform: str = "STANDALONE_SPARK"
+    policy: str = "config/policies/default.yaml"
+    owner: str = "auto-e2e"
+    mode: str = "REMEDIATE"
+    approve_confidence: float = 0.0   # auto-approve candidates at/above this
+
+
+@app.post("/api/auto/run")
+def auto_run(body: AutoIn) -> dict[str, Any]:
+    """One-shot E2E: profile -> auto-approve rules -> publish+onboard -> governed DQ run."""
+    jid = J.submit("auto_e2e", lambda: _do_auto_e2e(body))
+    return {"job_id": jid}
+
+
+def _purge_pipeline_artifacts(ruleset_id: str, pipeline_id: str) -> None:
+    """Remove prior ruleset/manifest/pipeline artifacts so auto-e2e reruns are idempotent.
+
+    Published ruleset versions are immutable — a regenerated ruleset for the same
+    ruleset_id gets a different checksum (fresh profile evidence), so re-publishing
+    @1.0 would fail verification. Purging first gives each auto run a clean slate.
+    """
+    import json as _json
+    from dq_core.metadata import resolver as _res
+    store = _res.store_from_engine(J.get_engine())
+    if store is not None:
+        for coll in ("ruleset_versions", "ruleset_index", "pipelines", "manifests"):
+            try:
+                col = store.collection(coll)
+                for d in col.find({}):
+                    if ruleset_id.lower() in _json.dumps(d).lower() or pipeline_id.lower() in _json.dumps(d).lower():
+                        for m in ("delete_one", "remove_one", "remove", "delete"):
+                            if hasattr(col, m):
+                                try:
+                                    q = {"_id": d["_id"]} if "_id" in d else {
+                                        k: d[k] for k in ("ruleset_id", "version", "pipeline_id") if k in d}
+                                    getattr(col, m)(q)
+                                    break
+                                except Exception:
+                                    pass
+            except Exception:
+                pass
+    ds_name = ruleset_id.rsplit("_", 1)[0].lower()   # ruleset_id = "<dataset>_<stage>"
+    for p in (ROOT / "config" / "rulesets", ROOT / "config" / "pipelines"):
+        if p.exists():
+            for f in p.glob("*.yaml"):
+                stem = f.stem.lower()
+                if stem.startswith(ds_name) or pipeline_id.lower() in stem:
+                    try:
+                        f.unlink()
+                    except Exception:
+                        pass
+
+
+def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
+    _prog("phase=profile | auto-e2e: profiling source")
+    res = _do_bootstrap_preview(PreviewIn(source=body.source, dataset=body.dataset,
+                                        stage=body.stage, source_format=body.source_format))
+    approved = [c["rule_id"] for c in res["candidates"]
+                if (c.get("confidence") or 0) >= body.approve_confidence]
+    ds = body.dataset or res["dataset"]
+    _prog(f"phase=profile | profiled {res.get('row_count') or '?'} rows · "
+          f"{len(res.get('anomalies') or [])} anomalies · {len(res.get('candidates') or [])} candidate rules · "
+          f"{len(approved)} auto-approved")
+    _purge_pipeline_artifacts(res["ruleset_id"], body.pipeline_id.upper())
+    _prog(f"phase=validate | auto-e2e: {len(approved)}/{res['candidate_count']} rules approved — writing ruleset + manifest")
+    plat = body.platform.upper()
+    if plat in ("LOCAL", "LOCAL_SPARK", "SPARK"):
+        plat = "STANDALONE_SPARK"
+    fout = onboard_finalize(FinalizeIn(
+        preview_result=res, approved_rule_ids=approved, dataset=ds,
+        ruleset_id=res["ruleset_id"], pipeline_id=body.pipeline_id.upper(),
+        platform=plat, stage=body.stage, dq_mode=body.mode,
+        policy=body.policy, owner=body.owner, source=body.source,
+        source_format=body.source_format, publish=True, onboard=True, force=True))
+    # ── Gold stage: stricter re-validation — full Bronze→Silver→Gold in one run ──
+    try:
+        _prog("phase=validate | auto-e2e: building GOLD ruleset (stricter re-check)")
+        import yaml as _yaml
+        from dq_core.metadata.models import RuleSet as _RS
+        from dq_core.metadata.serialization import dump_yaml as _dump
+        approved_set = set(approved)
+        gold_dict = {"ruleset_id": f"{ds}_gold", "version": "1.0", "stage": "GOLD",
+                     "dataset": ds, "rules": []}
+        for c in res["candidates"]:
+            if c["rule_id"] in approved_set and isinstance(c.get("raw"), dict):
+                raw = dict(c["raw"]); raw["stage"] = "GOLD"; raw["ruleset_id"] = f"{ds}_gold"
+                raw["status"] = "APPROVED"
+                gold_dict["rules"].append(raw)
+        if gold_dict["rules"]:
+            gold_rs = _RS.from_dict(gold_dict)
+            gpath = ROOT / "config" / "rulesets" / f"{ds}_gold_v1.yaml"
+            from dq_core.metadata.serialization import save_ruleset as _sv
+            _sv(gold_rs, gpath)
+            _registry("rulesets").publish(gold_rs, published_by=body.owner or "auto-e2e", activate=True)
+            mpath = ROOT / "config" / "pipelines" / f"{body.pipeline_id.upper()}.yaml"
+            m = _yaml.safe_load(mpath.read_text(encoding="utf-8"))
+            rel = os.path.relpath(gpath, mpath.parent).replace("\\", "/")
+            m["pipeline"]["datasets"][0]["rulesets"]["GOLD"] = rel
+            if "GOLD" not in m["pipeline"]["datasets"][0].get("stages", []):
+                m["pipeline"]["datasets"][0].setdefault("stages", []).append("GOLD")
+            _dump(m, mpath)
+            fout["gold_ruleset"] = f"{ds}_gold@1.0"
+    except Exception as exc:
+        print(f"[auto-e2e] gold setup failed (silver still runs): {exc}")
+    _prog(f"phase=validate | ruleset {fout.get('ruleset')} + manifest written · "
+          f"pipeline {body.pipeline_id.upper()} registered · gold ruleset "
+          f"{fout.get('gold_ruleset') or 'n/a'}")
+    _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()} (bronze→silver→gold)")
+    run = _do_pipeline_run(body.pipeline_id.upper(), PipelineRunIn(dataset_id=ds, mode=body.mode))
+    stages = run.get("stages") or []
+    silver = next((s for s in stages if s.get("stage") == "SILVER"), {})
+    import glob as _g
+    reps = sorted(_g.glob(str(ROOT / "reports" / f"{ds}*silver*.json")), key=os.path.getmtime)
+    return {"dataset": ds, "ruleset": fout.get("ruleset"), "rules_approved": len(approved),
+            "rules_rejected": fout.get("rules_rejected"), "run": run,
+            "input": silver.get("input") or silver.get("input_rows"),
+            "accepted": silver.get("accepted"), "quarantined": silver.get("quarantined"),
+            "gate_passed": run.get("gate_passed"),
+            "report_path": reps[-1] if reps else ""}
 
 
 # ------------------------------------------------------------------ onboarding wizard
@@ -1308,25 +1884,65 @@ async def onboard_upload(file: UploadFile = File(...)) -> dict[str, Any]:
 
 
 class PreviewIn(BaseModel):
-    source: str                  # path relative to repo root (upload or sample_data)
+    source: str                  # path relative to repo root, OR table name / URI for TABLE|DELTA|JSON
     dataset: str | None = None
     stage: str = "SILVER"
+    source_format: str = "AUTO"  # AUTO|CSV|PARQUET|JSON|DELTA|TABLE
+
+
+def _read_any_source(spark: Any, source: str, fmt: str):
+    """Read a source by explicit format — files stay under repo root; TABLE/DELTA/URI pass through."""
+    from dq_core.io.sources import read_source, SourceSpec
+    f = (fmt or "AUTO").upper()
+    if f in ("TABLE", "DELTA", "JSON"):
+        _prog(f"phase=read | reading {f} source {source}")
+        return read_source(spark, SourceSpec(format=f, path=source))
+    src = (ROOT / source).resolve()
+    if not str(src).startswith(str(ROOT.resolve())) or not src.exists():
+        raise HTTPException(400, f"source not found under repo: {source}")
+    if f in ("CSV", "PARQUET"):
+        _prog(f"phase=read | reading {source} ({f})")
+        return read_source(spark, SourceSpec(format=f, path=str(src)))
+    return _read_source(spark, src)  # AUTO — suffix inference
 
 
 def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     """Profile + candidate rules for the wizard — same path as `dqctl bootstrap`."""
     from dq_core.generation.generator import CandidateRuleGenerator
     spark, engine = _spark_engine()
-    src = (ROOT / body.source).resolve()
-    if not str(src).startswith(str(ROOT.resolve())) or not src.exists():
-        raise HTTPException(400, f"source not found under repo: {body.source}")
-    df = _read_source(spark, src)
-    ds = body.dataset or src.stem
-    mode = _profile_mode_for(src, "FULL", engine)
+    ds = body.dataset or Path(body.source).stem
+    src_path = (ROOT / body.source).resolve()
+    mode = _profile_mode_for(src_path, "FULL", engine) if src_path.suffix and src_path.exists() else "SAMPLE"
+    df = _read_any_source(spark, body.source, body.source_format)
     _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
-    rep = engine.profile(df, ds, mode=mode)
+    rep = engine.profile(df, ds, mode=mode, on_phase=lambda m: _prog(f"phase=profile | {m}"))
+    # drift vs last stored baseline profile (profiles collection — written at finalize)
+    try:
+        from dq_core.metadata import resolver as _res
+        from dq_core.profiling.drift import detect_drift
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            docs = store.collection("profiles").find({"dataset": ds})
+            if docs:
+                base_cols = ((docs[-1].get("profile") or {}).get("columns")) or {}
+                for f in detect_drift(rep.columns, base_cols):
+                    rep.anomalies.append(f.to_anomaly())
+    except Exception:
+        pass
     _prog("phase=profile | generating candidate rules from profile")
     ruleset_id = f"{ds}_{body.stage.lower()}"
+    # persist profile baseline — feeds drift detection + Profiles viewer (best-effort)
+    try:
+        from dq_core.metadata import resolver as _res
+        from dq_core.runtime.utils import utc_now_iso
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            store.collection("profiles").insert_one({
+                "dataset": ds, "ruleset_id": ruleset_id, "stage": body.stage,
+                "profiled_at": utc_now_iso(), "row_count": getattr(rep, "row_count", None),
+                "profile_mode": mode, "profile": rep.to_dict()})
+    except Exception as exc:
+        print(f"[onboard] profile persist failed: {exc}")
     candidates = CandidateRuleGenerator().generate(rep, ruleset_id=ruleset_id,
                                                    version="1.0", stage=body.stage)
     cand = []
@@ -1354,7 +1970,8 @@ def onboard_preview(body: PreviewIn) -> dict[str, str]:
 
 
 class FinalizeIn(BaseModel):
-    preview_job_id: str
+    preview_job_id: str | None = None
+    preview_result: dict | None = None   # inline result for auto-e2e (skips job lookup)
     approved_rule_ids: list[str]
     dataset: str
     ruleset_id: str
@@ -1368,6 +1985,7 @@ class FinalizeIn(BaseModel):
     owner: str = ""
     description: str = ""
     source: str                  # path relative to repo root — used as manifest test_data
+    source_format: str = "AUTO"  # AUTO|CSV|PARQUET|JSON|DELTA|TABLE
     approved_by: str = "ui-onboard"
     publish: bool = False
     onboard: bool = False
@@ -1383,10 +2001,13 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
     from dq_core.metadata.serialization import dump_yaml, save_ruleset
     from dq_core.pipelines.manifest import PipelineManifest
 
-    job = J.get(body.preview_job_id)
-    if not job or job.get("kind") != "bootstrap_preview" or job.get("status") != "COMPLETED":
-        raise HTTPException(400, "preview job not found or not completed")
-    res = job["result"]
+    if body.preview_result is not None:
+        res = body.preview_result
+    else:
+        job = J.get(body.preview_job_id or "")
+        if not job or job.get("kind") != "bootstrap_preview" or job.get("status") != "COMPLETED":
+            raise HTTPException(400, "preview job not found or not completed")
+        res = job["result"]
     if res["ruleset_id"] != body.ruleset_id or res["dataset"] != body.dataset:
         raise HTTPException(400, "preview does not match requested ruleset/dataset")
 
@@ -1414,6 +2035,10 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
     test_data = os.path.relpath(src, manifest_path.parent).replace("\\", "/") \
         if src.exists() else body.source
     pid = body.pipeline_id.upper()
+    src_fmt = (body.source_format or "AUTO").upper()
+    if src_fmt == "AUTO":
+        src_fmt = ({"csv": "CSV", "parquet": "PARQUET", "json": "JSON"}
+                   .get(src.suffix.lower().lstrip("."), "PARQUET") if src.exists() else "TABLE")
     manifest = {"pipeline": {
         "pipeline_id": pid,
         "pipeline_name": body.pipeline_name or re.sub(r"[_-]+", " ", pid).title(),
@@ -1425,12 +2050,12 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
         "policy": body.policy,
         "datasets": [{
             "dataset_id": body.dataset,
-            "format": "CSV" if src.suffix.lower() == ".csv" else "PARQUET",
+            "format": src_fmt,
             "stages": ["BRONZE", body.stage.upper()],
             "rulesets": {body.stage.upper(): os.path.relpath(ruleset_path,
                                                              manifest_path.parent).replace("\\", "/")},
             "test_data": test_data,
-            "test_data_format": "CSV" if src.suffix.lower() == ".csv" else "PARQUET",
+            "test_data_format": src_fmt,
         }],
     }}
     dump_yaml(manifest, manifest_path)
@@ -1439,15 +2064,42 @@ def onboard_finalize(body: FinalizeIn) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(400, f"generated manifest failed validation: {exc}") from exc
 
+    try:  # persist onboarding artifacts to NoSQL meta collections (best-effort)
+        from dq_core.metadata import resolver as _res
+        store = _res.store_from_engine(J.get_engine())
+        if store is not None:
+            _res.save_manifest(store, mf)
+            store.collection("candidates").insert_one({
+                "ruleset_id": body.ruleset_id, "dataset": body.dataset, "version": "1.0",
+                "stage": body.stage, "candidate_count": len(res["candidates"]),
+                "approved_count": len(rs.rules), "rules": [c["raw"] for c in res["candidates"]],
+                "created_at": __import__("dq_core.runtime.utils", fromlist=["utc_now_iso"]).utc_now_iso()})
+            prof = res.get("profile") or res.get("profile_report")
+            if prof:
+                store.collection("profiles").insert_one({
+                    "dataset": body.dataset, "ruleset_id": body.ruleset_id,
+                    "profiled_at": prof.get("profiled_at") if isinstance(prof, dict) else None,
+                    "row_count": res.get("row_count"), "profile": prof})
+    except Exception as exc:
+        print(f"[onboard] finalize persist failed: {exc}")
     out = {"ok": True, "ruleset": f"{body.ruleset_id}@1.0",
            "ruleset_path": str(ruleset_path.relative_to(ROOT)).replace("\\", "/"),
            "manifest_path": str(manifest_path.relative_to(ROOT)).replace("\\", "/"),
            "rules_approved": len(rs.rules), "rules_rejected": len(cand_rs.rules) - len(rs.rules)}
+    warnings: list[str] = []
     if body.publish:
-        entry = _registry("rulesets").publish(rs, published_by=body.approved_by, activate=True)
-        out["published"] = {"checksum": entry["checksum"][:12]}
+        try:
+            entry = _registry("rulesets").publish(rs, published_by=body.approved_by, activate=True)
+            out["published"] = {"checksum": entry["checksum"][:12]}
+        except Exception as exc:
+            warnings.append(f"publish failed: {str(exc)[:200]}")
     if body.onboard:
-        entry = _registry("pipelines").onboard(mf, actor=body.approved_by)
-        out["onboarded"] = {"pipeline_id": pid, "state": entry["state"]}
+        try:
+            entry = _registry("pipelines").onboard(mf, actor=body.approved_by)
+            out["onboarded"] = {"pipeline_id": pid, "state": entry["state"]}
+        except Exception as exc:
+            warnings.append(f"onboard failed: {str(exc)[:200]}")
+    if warnings:
+        out["warnings"] = warnings
     out["manifest_yaml"] = manifest_path.read_text(encoding="utf-8")
     return out

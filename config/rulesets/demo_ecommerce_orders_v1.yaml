@@ -1,0 +1,499 @@
+ruleset:
+  ruleset_id: demo_ecommerce_orders_silver
+  dataset: demo_ecommerce_orders
+  version: '1.0'
+  stage: SILVER
+  description: Approved from candidates demo_ecommerce_orders_silver@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_001
+    name: order_id_not_null
+    description: order_id is populated in 100.0% of rows
+    dataset: demo_ecommerce_orders
+    column: order_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 300000
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_002
+    name: order_id_unique
+    description: order_id is unique in the profiled data (primary key candidate)
+    dataset: demo_ecommerce_orders
+    column: order_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 300000
+        rows: 300000
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_003
+    name: order_id_regex
+    description: order_id follows the structural pattern AA-9999999
+    dataset: demo_ecommerce_orders
+    column: order_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Z]{2}\-[0-9]{7}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AA-9999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_004
+    name: order_id_string_length
+    description: order_id length observed between 10 and 10
+    dataset: demo_ecommerce_orders
+    column: order_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: SILVER
+    config:
+      min: 10
+      max: 10
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 10
+        max_length: 10
+        avg_length: 10.0
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_005
+    name: customer_email_not_null
+    description: customer_email is populated in 98.8% of rows
+    dataset: demo_ecommerce_orders
+    column: customer_email
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 3630
+        null_percentage: 1.21
+        rows: 300000
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_006
+    name: customer_email_regex
+    description: customer_email contains e-mail addresses
+    dataset: demo_ecommerce_orders
+    column: customer_email
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      pattern: ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9821
+      evidence:
+        email_match_percentage: 98.21
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_007
+    name: order_date_not_null
+    description: order_date is populated in 100.0% of rows
+    dataset: demo_ecommerce_orders
+    column: order_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 300000
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_008
+    name: order_date_date_format
+    description: order_date is a date in yyyy-MM-dd
+    dataset: demo_ecommerce_orders
+    column: order_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9753
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 97.53
+          dd/MM/yyyy: 0.05
+          MM/dd/yyyy: 0.32
+        date_min: '2025-01-01'
+        date_max: '2025-12-28'
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_009
+    name: amount_usd_not_null
+    description: amount_usd is populated in 100.0% of rows
+    dataset: demo_ecommerce_orders
+    column: amount_usd
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 300000
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_010
+    name: amount_usd_data_type
+    description: amount_usd holds decimal numbers stored as text
+    dataset: demo_ecommerce_orders
+    column: amount_usd
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_011
+    name: amount_usd_range
+    description: amount_usd typically between -499.98 and 1999.99
+    dataset: demo_ecommerce_orders
+    column: amount_usd
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: -499.98
+      max: 1999.99
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -499.98
+        observed_max: 1999.99
+        p25: 480.85
+        p75: 1492.59
+        outliers: 0
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_012
+    name: status_not_null
+    description: status is populated in 99.2% of rows
+    dataset: demo_ecommerce_orders
+    column: status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 2380
+        null_percentage: 0.79
+        rows: 300000
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_013
+    name: status_allowed_values
+    description: status has 10 frequent categorical values
+    dataset: demo_ecommerce_orders
+    column: status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - PENDING
+      - DELIVERED
+      - CANCELLED
+      - SHIPPED
+      - REFUNDED
+      - PAID
+      - delivered!
+      - UNKNOWN
+      - 'Shipped '
+      - paid
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          PENDING: 48151
+          DELIVERED: 48124
+          CANCELLED: 48070
+          SHIPPED: 47979
+          REFUNDED: 47873
+          PAID: 47850
+          delivered!: 2431
+          UNKNOWN: 2415
+          'Shipped ': 2403
+          paid: 2324
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_014
+    name: category_not_null
+    description: category is populated in 100.0% of rows
+    dataset: demo_ecommerce_orders
+    column: category
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 300000
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_015
+    name: category_allowed_values
+    description: category has 7 frequent categorical values
+    dataset: demo_ecommerce_orders
+    column: category
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      values:
+      - electronics
+      - grocery
+      - home
+      - books
+      - toys
+      - apparel
+      - misc_unknown
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          electronics: 49561
+          grocery: 49269
+          home: 49260
+          books: 49249
+          toys: 49096
+          apparel: 49086
+          misc_unknown: 4479
+        excluded_rare_values: []
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_016
+    name: qty_not_null
+    description: qty is populated in 100.0% of rows
+    dataset: demo_ecommerce_orders
+    column: qty
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 300000
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_017
+    name: qty_data_type
+    description: qty holds whole numbers stored as text
+    dataset: demo_ecommerce_orders
+    column: qty
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        integer_castable_percentage: 100.0
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_018
+    name: qty_range
+    description: qty typically between -5 and 10
+    dataset: demo_ecommerce_orders
+    column: qty
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      min: -5
+      max: 10
+      data_type: int
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -5.0
+        observed_max: 10.0
+        p25: 3.0
+        p75: 8.0
+        outliers: 999
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  - rule_id: GEN_DEMO_ECOMMERCE_ORDERS_019
+    name: demo_ecommerce_orders_schema_validation
+    description: schema observed at profiling time
+    dataset: demo_ecommerce_orders
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: SILVER
+    config:
+      expected_columns:
+      - name: order_id
+        type: string
+      - name: customer_email
+        type: string
+      - name: order_date
+        type: string
+      - name: amount_usd
+        type: string
+      - name: status
+        type: string
+      - name: category
+        type: string
+      - name: qty
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 7
+      profiled_at: '2026-11-13T05:31:53Z'
+      profile_mode: FULL
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-13T05:33:49Z'
+  change_log:
+  - approved 19 of 19 candidate rules

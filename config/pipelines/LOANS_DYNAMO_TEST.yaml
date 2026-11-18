@@ -1,13 +1,13 @@
 pipeline:
-  pipeline_id: EMR_LOANS_PIPELINE
-  pipeline_name: Emr Loans Pipeline
+  pipeline_id: LOANS_DYNAMO_TEST
+  pipeline_name: Loans Dynamo Test
   platform: STANDALONE_SPARK
   runtime: PYSPARK
   integration_mode: INLINE
-  dq_mode: OBSERVE_ONLY
-  owner: synthetic-demo@example.com
-  description: SYNTHETIC AWS EMR loans pipeline (s3a parquet in real deployment) - onboarding sample
-  policy: ../policies/default.yaml
+  dq_mode: REMEDIATE
+  owner: auto-e2e
+  description: Onboarded via UI wizard from loans.csv (31 rows profiled)
+  policy: config/policies/default.yaml
   datasets:
   - dataset_id: loans
     format: CSV

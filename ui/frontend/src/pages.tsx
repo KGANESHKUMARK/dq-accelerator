@@ -10,12 +10,13 @@ const usePoll = (jobId: string | null, ms = 2500) => {
   useEffect(() => {
     if (!jobId) { setJob(null); return }
     setJob({ job_id: jobId, kind: '', status: 'QUEUED', progress: 'submitting…', submitted_at: new Date().toISOString() } as Job)
-    let dead = false; let pollTimer: number | undefined
+    let dead = false
+    const TERMINAL = ['COMPLETED', 'FAILED', 'CANCELLED']
     const es = new EventSource(`/api/jobs/${jobId}/stream`)
     es.addEventListener('status', ev => {
       const d = JSON.parse(ev.data)
       setJob(prev => prev ? { ...prev, status: d.status, progress: d.progress } : prev)
-      if (d.status === 'COMPLETED' || d.status === 'FAILED') {
+      if (TERMINAL.includes(d.status)) {
         es.close(); api.job(jobId).then(j => { if (!dead) setJob(j) }).catch(() => {})
       }
     })
@@ -23,14 +24,17 @@ const usePoll = (jobId: string | null, ms = 2500) => {
       const d = JSON.parse(ev.data)
       setJob(prev => prev ? { ...prev, progress: d.progress } : prev)
     })
-    es.onerror = () => {
-      es.close(); if (pollTimer !== undefined) return
-      pollTimer = window.setInterval(async () => {
-        try { const j = await api.job(jobId); if (!dead) setJob(j); if (j.status === 'COMPLETED' || j.status === 'FAILED') window.clearInterval(pollTimer) }
-        catch { /* keep polling */ }
-      }, ms)
-    }
-    return () => { dead = true; es.close(); if (pollTimer !== undefined) window.clearInterval(pollTimer) }
+    // Safety-net poll: SSE can silently stall during long quiet Spark phases —
+    // reconcile with the job record so terminal states are never missed.
+    const pollTimer = window.setInterval(async () => {
+      try {
+        const j = await api.job(jobId)
+        if (dead) return
+        setJob(j)
+        if (TERMINAL.includes(j.status)) { es.close(); window.clearInterval(pollTimer) }
+      } catch { /* keep polling */ }
+    }, ms)
+    return () => { dead = true; es.close(); window.clearInterval(pollTimer) }
   }, [jobId])
   return job
 }
@@ -63,6 +67,9 @@ const fmtClock = (ms: number) => {
 const JobStatus = ({ job }: { job: Job | null }) => {
   const [now, setNow] = useState(() => Date.now())
   const active = !!job && (job.status === 'RUNNING' || job.status === 'QUEUED')
+  const progRef = useRef(Date.now())
+  useEffect(() => { progRef.current = Date.now() }, [job?.progress])
+  const stallSec = active ? Math.max(0, Math.floor((now - progRef.current) / 1000)) : 0
   useEffect(() => {
     if (!active) return
     const t = window.setInterval(() => setNow(Date.now()), 1000)
@@ -76,7 +83,7 @@ const JobStatus = ({ job }: { job: Job | null }) => {
     let style: React.CSSProperties
     let marker = '○'
     if (job.status === 'COMPLETED') { style = { background: 'var(--success)', color: '#fff' }; marker = '✓' }
-    else if (job.status === 'FAILED') {
+    else if (job.status === 'FAILED' || job.status === 'CANCELLED') {
       if (i < cur) { style = { background: 'var(--success)', color: '#fff' }; marker = '✓' }
       else if (i === cur) { style = { background: 'var(--danger)', color: '#fff' }; marker = '✕' }
       else { style = { background: 'var(--border)', color: 'var(--muted)' } }
@@ -89,7 +96,7 @@ const JobStatus = ({ job }: { job: Job | null }) => {
   }
   const phases = job.result?.phases as Record<string, number> | undefined
   return (
-    <div className="card" style={{ borderLeft: `4px solid ${job.status === 'FAILED' ? 'var(--danger)' : 'var(--info)'}` }}>
+    <div className="card" style={{ borderLeft: `4px solid ${job.status === 'FAILED' ? 'var(--danger)' : job.status === 'CANCELLED' ? 'var(--warn)' : 'var(--info)'}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <span className={`badge ${job.status}`} style={{ fontSize: 12 }}>{job.status}</span>
         {active && <span className="spin" />}
@@ -98,7 +105,15 @@ const JobStatus = ({ job }: { job: Job | null }) => {
           {active ? `elapsed ${fmtClock(now - t0)}` : job.finished_at ? `took ${fmtClock(t1 - t0)}` : ''}
         </span>
         <span className="muted" style={{ fontSize: 11 }}>{job.job_id}</span>
+        {active && <button className="btn sm sec" onClick={() => api.cancelJob(job.job_id).catch(() => {})}>Cancel</button>}
       </div>
+      {stallSec > 240 && <div className="warn-box" style={{ marginBottom: 8, fontSize: 12 }}>No phase update for {Math.floor(stallSec / 60)}m — the job may be stuck on a heavy Spark phase. You can cancel it safely.</div>}
+      {(job.status === 'FAILED' || job.status === 'CANCELLED') && job.error && (
+        <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid var(--danger)', borderRadius: 6, padding: '8px 10px', marginBottom: 10 }}>
+          <div style={{ color: 'var(--danger)', fontWeight: 700, fontSize: 12, marginBottom: 4 }}>✕ JOB FAILED{job.progress ? ` — stopped at: ${job.progress}` : ''}</div>
+          <pre className="err" style={{ margin: 0, maxHeight: 200, overflow: 'auto', fontSize: 11, whiteSpace: 'pre-wrap' }}>{job.error}</pre>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
         {PHASE_LABELS.map((_, i) => chip(i))}
       </div>
@@ -108,7 +123,7 @@ const JobStatus = ({ job }: { job: Job | null }) => {
       {phases && <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>
         phase timings: {Object.entries(phases).map(([k, v]) => `${k} ${(v / 1000).toFixed(1)}s`).join(' · ')}
       </div>}
-      {job.error && <pre className="err" style={{ marginTop: 8 }}>{job.error}</pre>}
+      {job.error && job.status !== 'FAILED' && <pre className="err" style={{ marginTop: 8 }}>{job.error}</pre>}
       {job.result?.summary && <pre style={{ marginTop: 8 }}>{job.result.summary}</pre>}
     </div>
   )
@@ -135,22 +150,103 @@ const Sparkline = ({ data, color = '#3b82f6' }: { data: number[]; color?: string
   )
 }
 
-/* ---- Profile / anomaly views ---- */
-const AnomalyCard = ({ a }: { a: any }) => (
-  <div className="anomaly-card">
-    <span className="tag">{a.type}</span>
-    <div style={{ flex: 1 }}>
-      <b style={{ color: 'var(--info)' }}>{a.column}</b>
-      <span className="muted" style={{ marginLeft: 8 }}>{a.detail}</span>
-    </div>
-  </div>
-)
+/* ---- Dashboard widget visibility (Settings → localStorage) ---- */
+const WIDGETS = [
+  { key: 'kpis', label: 'Headline KPI tiles' },
+  { key: 'journey', label: 'Quality journey (medallion flow + score trend)' },
+  { key: 'processing', label: 'Processing breakdown' },
+  { key: 'remediation', label: 'Remediation summary' },
+  { key: 'quarantine', label: 'Quarantine breakdown' },
+  { key: 'toprules', label: 'Top failing rules' },
+  { key: 'trend', label: 'Run quality trend (metrics)' },
+  { key: 'datasets', label: 'Per-dataset processing table' },
+  { key: 'registry', label: 'Pipeline registry cards' },
+  { key: 'recent_runs', label: 'Recent DQ runs table' },
+  { key: 'jobqueue', label: 'Job queue table' },
+]
+const widgetVisible = (key: string): boolean => {
+  try { const w = JSON.parse(localStorage.getItem('dq_widgets') || '{}'); return w[key] !== false } catch { return true }
+}
+const loadWidgets = (): Record<string, boolean> => {
+  try { return JSON.parse(localStorage.getItem('dq_widgets') || '{}') } catch { return {} }
+}
 
-const ColCard = ({ c }: { c: any }) => (
+/* ---- Sidebar nav visibility (Settings → localStorage) ---- */
+const NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard' }, { key: 'pipelines', label: 'Pipelines' },
+  { key: 'onboard', label: 'Onboard' }, { key: 'rundq', label: 'Run DQ' },
+  { key: 'anomalies', label: 'Anomalies' }, { key: 'profiles', label: 'Profiles' }, { key: 'approvals', label: 'Approvals' },
+  { key: 'rulesets', label: 'Rule Sets' }, { key: 'reports', label: 'Reports' },
+]
+const loadNav = (): Record<string, boolean> => {
+  try { return JSON.parse(localStorage.getItem('dq_nav') || '{}') } catch { return {} }
+}
+
+/* ---- First-visit welcome card ---- */
+const WelcomeCard = () => {
+  const [show, setShow] = useState(() => !localStorage.getItem('dq_welcome_dismissed'))
+  if (!show) return null
+  const go = (p: string) => window.dispatchEvent(new CustomEvent('dq:navigate', { detail: p }))
+  const dismiss = () => { localStorage.setItem('dq_welcome_dismissed', '1'); setShow(false) }
+  const steps = [
+    { t: '1 · Onboard a pipeline', d: 'Upload a file or point at a table — the profiler discovers rules automatically', p: 'onboard' },
+    { t: '2 · Review candidate rules', d: 'Approve or reject generated rules — nothing executes unreviewed', p: 'onboard' },
+    { t: '3 · Run DQ', d: 'Execute Bronze → Silver → Gold against the published ruleset', p: 'rundq' },
+    { t: '4 · Watch quality', d: 'Dashboard journey, reports, quarantine inbox, metrics trend', p: 'dashboard' },
+  ]
+  return (
+    <div className="card" style={{ borderLeft: '3px solid var(--info)', marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div>
+          <h3>Welcome to DQ Accelerator</h3>
+          <p className="muted" style={{ fontSize: 12, margin: '4px 0 10px', maxWidth: 720 }}>
+            A governance layer for Apache Spark pipelines — it profiles your data, generates quality rules,
+            applies deterministic + AI remediation, quarantines low-confidence records, and keeps a full audit trail.
+            Runs on Databricks, Fabric, EMR, Dataproc, or local Spark — same engine everywhere.
+          </p>
+        </div>
+        <button className="btn sm sec" onClick={dismiss}>Don&apos;t show again</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 8 }}>
+        {steps.map(s => (
+          <div key={s.t} className="card" style={{ cursor: 'pointer', margin: 0 }} onClick={() => go(s.p)}>
+            <b style={{ fontSize: 12 }}>{s.t}</b>
+            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>{s.d}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ---- Profile / anomaly views ---- */
+const SEV_STYLE: Record<string, { border: string; bg: string; fg: string }> = {
+  ERROR: { border: 'var(--danger)', bg: 'rgba(239,68,68,.12)', fg: 'var(--danger)' },
+  WARNING: { border: '#d97706', bg: 'rgba(217,119,6,.12)', fg: '#d97706' },
+  INFO: { border: 'var(--info)', bg: 'rgba(59,130,246,.10)', fg: 'var(--info)' },
+}
+const AnomalyCard = ({ a }: { a: any }) => {
+  const sev = SEV_STYLE[(a.severity || 'WARNING').toUpperCase()] || SEV_STYLE.WARNING
+  return (
+    <div className="anomaly-card" style={{ borderLeft: `3px solid ${sev.border}`, background: sev.bg }}>
+      <span className="tag">{a.type}</span>
+      <span style={{ fontSize: 10, fontWeight: 700, color: sev.fg, textTransform: 'uppercase' }}>{a.severity || 'WARNING'}</span>
+      <div style={{ flex: 1 }}>
+        <b style={{ color: 'var(--info)' }}>{a.column}</b>
+        <span className="muted" style={{ marginLeft: 8 }}>{a.detail}</span>
+      </div>
+    </div>
+  )
+}
+
+const ColCard = ({ c, rowCount }: { c: any; rowCount?: number }) => {
+  const distinctPct = rowCount && c.non_null_count ? (100 * c.distinct_count / c.non_null_count) : null
+  return (
   <div className="colcard">
     <h4>{c.name}</h4>
     <div className="kv"><span>type</span><b>{c.data_type}{c.inferred_type !== c.data_type ? ` → ${c.inferred_type}` : ''}</b></div>
     <div className="kv"><span>distinct / unique</span><b>{c.distinct_count} / {c.unique_count ?? '-'}</b></div>
+    {distinctPct != null && <div style={{ marginTop: 4 }}><span className="muted">distinct ratio</span><Bar pct={distinctPct} color={distinctPct >= 90 ? '#22c55e' : distinctPct >= 50 ? '#f59e0b' : '#3b82f6'} /></div>}
     {c.mean != null && <div className="kv"><span>mean ± σ</span><b>{c.mean.toFixed(2)} ± {c.stddev?.toFixed(2)}</b></div>}
     {c.min != null && <div className="kv"><span>min – max</span><b>{String(c.min).slice(0, 14)} – {String(c.max).slice(0, 14)}</b></div>}
     {c.date_min && <div className="kv"><span>dates</span><b>{c.date_min} → {c.date_max}</b></div>}
@@ -159,7 +255,8 @@ const ColCard = ({ c }: { c: any }) => (
     <div style={{ marginTop: 6 }}><span className="muted">null rate</span><Bar pct={c.null_percentage} /></div>
     {c.top_values?.length ? <div className="muted" style={{ marginTop: 6 }}>top: {c.top_values.slice(0, 3).map((v: any) => `${v.value ?? v[0]} (${v.count ?? v[1]})`).join(', ')}</div> : null}
   </div>
-)
+  )
+}
 
 const ProfileView = ({ r, jid }: { r: any; jid?: string }) => (
   <div className="card">
@@ -169,7 +266,7 @@ const ProfileView = ({ r, jid }: { r: any; jid?: string }) => (
       <h4>Anomalies ({(r.anomalies?.length || 0) + (r.schema_anomalies?.length || 0)})</h4>
       {[...(r.anomalies || []), ...(r.schema_anomalies || [])].map((a: any, i: number) => <AnomalyCard a={a} key={i} />)}
     </>}
-    <div className="colgrid">{(r.columns || []).map((c: any) => <ColCard c={c} key={c.name} />)}</div>
+    <div className="colgrid">{(r.columns || []).map((c: any) => <ColCard c={c} rowCount={r.row_count} key={c.name} />)}</div>
   </div>
 )
 
@@ -322,6 +419,77 @@ const DonutBar = ({ label, value, total, color }: { label: string; value: number
   )
 }
 
+/* ---- Quality journey: medallion stage scores + score-over-runs ---- */
+const STAGE_COLOR: Record<string, string> = { BRONZE: '#94a3b8', SILVER: '#f59e0b', GOLD: '#22c55e' }
+const QualityJourney = ({ pipes }: { pipes: any[] }) => {
+  const [pid, setPid] = useState('')
+  const [j, setJ] = useState<any>(null)
+  const sel = pid || pipes[0]?.pipeline_id || ''
+  useEffect(() => {
+    if (!sel) { setJ(null); return }
+    api.pipelineJourney(sel).then(setJ).catch(() => setJ(null))
+  }, [sel])
+  if (!pipes.length) return null
+  const hist = j?.history || []
+  const maxScore = Math.max(10, ...hist.map((h: any) => h.score ?? 0))
+  return (
+    <div className="card" style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <h3 style={{ margin: 0 }}>Quality journey</h3>
+        <select value={sel} onChange={e => setPid(e.target.value)} style={{ marginLeft: 'auto' }}>
+          {pipes.map((p: any) => <option key={p.pipeline_id} value={p.pipeline_id}>{p.pipeline_id}</option>)}
+        </select>
+        {j?.latest_run_at && <span className="muted" style={{ fontSize: 11 }}>latest run {String(j.latest_run_at).slice(0, 16).replace('T', ' ')}</span>}
+      </div>
+      {/* medallion flow */}
+      {j?.stages?.length ? (
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: 14, overflowX: 'auto' }}>
+          {j.stages.map((s: any, i: number) => {
+            const sc = s.score
+            const col = sc == null ? '#64748b' : sc >= 90 ? '#22c55e' : sc >= 70 ? '#f59e0b' : '#ef4444'
+            return (
+              <div key={s.stage} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 150 }}>
+                {i > 0 && <div style={{ flex: '0 0 26px', height: 2, background: 'var(--border)', position: 'relative' }}>
+                  <div style={{ position: 'absolute', right: -1, top: -4, borderLeft: '6px solid var(--border)', borderTop: '5px solid transparent', borderBottom: '5px solid transparent' }} />
+                </div>}
+                <div style={{ flex: 1, border: `1.5px solid ${col}`, borderRadius: 10, padding: '10px 12px', background: `${col}14` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <b style={{ color: STAGE_COLOR[s.stage] ?? col, fontSize: 13 }}>{s.stage}</b>
+                    <b style={{ color: col, fontSize: 15 }}>{sc != null ? sc : '—'}</b>
+                  </div>
+                  <div className="muted" style={{ fontSize: 10, marginTop: 3 }}>{s.ruleset ?? 'no ruleset'}</div>
+                  <div className="muted" style={{ fontSize: 10 }}>{s.accepted?.toLocaleString?.() ?? '—'} accepted · {s.quarantined?.toLocaleString?.() ?? '—'} quarantined</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>No completed runs for this pipeline yet — run DQ to see the journey.</div>}
+      {/* score-over-runs */}
+      {hist.length > 1 && <>
+        <div className="muted" style={{ fontSize: 11, marginBottom: 4 }}>Quality score per run (oldest → newest) — watch it climb as rulesets improve</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 56 }}>
+          {hist.map((h: any, i: number) => {
+            const sc = h.score
+            const col = sc == null ? '#64748b' : sc >= 90 ? '#22c55e' : sc >= 70 ? '#f59e0b' : '#ef4444'
+            return (
+              <div key={i} title={`${String(h.ran_at).slice(0, 16)} · ${sc ?? '—'} · ${h.versions?.join(', ') ?? ''}`}
+                   style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                <div style={{ width: '100%', height: `${sc != null ? Math.max(6, (sc / maxScore) * 100) : 4}%`, background: col, borderRadius: '3px 3px 0 0', minHeight: 4 }} />
+              </div>
+            )
+          })}
+        </div>
+        <div className="muted" style={{ fontSize: 10, marginTop: 3, display: 'flex', justifyContent: 'space-between' }}>
+          <span>{String(hist[0]?.ran_at).slice(5, 16).replace('T', ' ')}</span>
+          <span>{hist[hist.length - 1]?.versions?.join(' · ') ?? ''}</span>
+          <span>{String(hist[hist.length - 1]?.ran_at).slice(5, 16).replace('T', ' ')}</span>
+        </div>
+      </>}
+    </div>
+  )
+}
+
 export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) => void } = {}) {
   const [summary, setSummary] = useState<any>(null)
   const [pipes, setPipes] = useState<any[]>([])
@@ -329,6 +497,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
   const [anomStats, setAnoStats] = useState<any>({})
   const [viewJob, setViewJob] = useState<Job | null>(null)
   const [trends, setTrends] = useState<Record<string, any[]>>({})
+  const [runMetrics, setRunMetrics] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   const load = () => {
@@ -336,6 +505,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     api.pipelines().then(setPipes)
     api.jobs().then(setJobs)
     api.anomalyStats().then(setAnoStats).catch(() => {})
+    api.metricsRecent(30).then(setRunMetrics).catch(() => {})
   }
   useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t) }, [])
   useEffect(() => {
@@ -352,8 +522,10 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     <div className="section-title">Data Quality Command Centre</div>
     {loading && <div className="info-box">Loading real metrics from {'{'}reports/{'}'}… <span className="spin" /></div>}
 
+    <WelcomeCard />
+
     {/* ── Row 1: headline KPIs ── */}
-    <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+    {widgetVisible('kpis') && <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
       <div className="stat-tile"><div className={`num ${scoreClass}`}>{scoreVal != null ? scoreVal + '%' : '—'}</div><div className="lbl">Acceptance rate</div></div>
       <div className="stat-tile"><div className="num">{(t.total_runs ?? 0)}</div><div className="lbl">Total DQ runs</div></div>
       <div className="stat-tile"><div className="num ok">{(t.gates_passed ?? 0)}</div><div className="lbl">Gates passed</div></div>
@@ -362,11 +534,14 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
       <div className="stat-tile"><div className="num ok">{(t.accepted_records ?? 0).toLocaleString()}</div><div className="lbl">Total accepted</div></div>
       <div className="stat-tile"><div className="num bad">{(t.quarantined_records ?? 0).toLocaleString()}</div><div className="lbl">Total quarantined</div></div>
       <div className="stat-tile"><div className="num warn">{anomStats['OPEN'] ?? 0}</div><div className="lbl">Open anomalies</div></div>
-    </div>
+    </div>}
+
+    {/* ── Row 1b: quality journey — the story in one glance ── */}
+    {widgetVisible('journey') && <QualityJourney pipes={pipes} />}
 
     {/* ── Row 2: processing breakdown + remediation ── */}
-    {t.input_records > 0 && <div className="card-row">
-      <div className="card">
+    {t.input_records > 0 && (widgetVisible('processing') || widgetVisible('remediation')) && <div className="card-row">
+      {widgetVisible('processing') && <div className="card">
         <h3>Processing breakdown <span className="muted">— all runs combined</span></h3>
         <DonutBar label="Accepted" value={t.accepted_records ?? 0} total={t.input_records ?? 0} color="#22c55e" />
         <DonutBar label="Quarantined" value={t.quarantined_records ?? 0} total={t.input_records ?? 0} color="#ef4444" />
@@ -377,8 +552,8 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
           <span>Rules failed: <b style={{ color: 'var(--danger)' }}>{(t.rules_failed ?? 0).toLocaleString()}</b></span>
           <span>Rule pass rate: <b style={{ color: 'var(--success)' }}>{t.rules_evaluated ? Math.round((t.rules_evaluated - t.rules_failed) / t.rules_evaluated * 100) + '%' : '—'}</b></span>
         </div>
-      </div>
-      <div className="card">
+      </div>}
+      {widgetVisible('remediation') && <div className="card">
         <h3>Remediation summary</h3>
         <div className="stat-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <div className="stat-tile"><div className="num ok">{t.deterministic_fixes ?? 0}</div><div className="lbl">Deterministic fixes</div></div>
@@ -395,12 +570,12 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
             </div>
           ))}
         </>}
-      </div>
+      </div>}
     </div>}
 
     {/* ── Row 3: quarantine breakdown + top failing rules ── */}
-    {summary && <div className="card-row">
-      {Object.keys(summary.quarantine_breakdown ?? {}).length > 0 && <div className="card">
+    {summary && (widgetVisible('quarantine') || widgetVisible('toprules')) && <div className="card-row">
+      {Object.keys(summary.quarantine_breakdown ?? {}).length > 0 && widgetVisible('quarantine') && <div className="card">
         <h3>Quarantine breakdown <span className="muted">— all runs</span></h3>
         {Object.entries(summary.quarantine_breakdown).map(([k, v]: any) => (
           <div key={k} style={{ marginBottom: 8 }}>
@@ -414,7 +589,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
         ))}
       </div>}
 
-      {(summary.top_failing_rules ?? []).length > 0 && <div className="card">
+      {(summary.top_failing_rules ?? []).length > 0 && widgetVisible('toprules') && <div className="card">
         <h3>Top failing rules <span className="muted">— across all datasets</span></h3>
         {summary.top_failing_rules.slice(0, 8).map((r: any) => (
           <div className="rule-row" key={r.rule_id}>
@@ -430,8 +605,30 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
       </div>}
     </div>}
 
+    {/* ── Row 3b: run quality trend (NoSQL metrics collection) ── */}
+    {runMetrics?.count > 0 && widgetVisible('trend') && <div className="card" style={{ marginTop: 12 }}>
+      <h3>Run quality trend <span className="muted">— last {runMetrics.count} runs · avg {runMetrics.avg_score ?? '—'} · source: metrics collection</span></h3>
+      {runMetrics.sparkline?.length > 1 && <div style={{ marginBottom: 10 }}><Sparkline data={runMetrics.sparkline} color="#3b82f6" /></div>}
+      <table className="tbl">
+        <thead><tr><th>When</th><th>Pipeline</th><th>Dataset</th><th>Stage</th><th>Score</th><th>Gate</th><th>In → Acc/Quar</th></tr></thead>
+        <tbody>
+          {(runMetrics.runs || []).slice(0, 8).map((m: any, i: number) => (
+            <tr key={i}>
+              <td className="muted" style={{ fontSize: 11 }}>{String(m.recorded_at || m.finished_at || '').slice(0, 19).replace('T', ' ')}</td>
+              <td>{m.pipeline_id ?? '—'}</td>
+              <td>{m.dataset ?? '—'}</td>
+              <td><span className="tag">{m.stage ?? '—'}</span></td>
+              <td><b className={m.quality_score >= 90 ? 'ok' : m.quality_score >= 70 ? 'warn' : 'err'}>{m.quality_score != null ? m.quality_score : '—'}</b></td>
+              <td><span className={`badge ${m.gate_passed ? 'COMPLETED' : 'FAILED'}`}>{m.gate_passed ? 'PASS' : 'FAIL'}</span></td>
+              <td className="muted" style={{ fontSize: 11 }}>{m.input_records?.toLocaleString() ?? '—'} → {(m.accepted_records ?? 0).toLocaleString()}/{(m.quarantined_records ?? 0).toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>}
+
     {/* ── Row 4: per-dataset processing table (REAL data) ── */}
-    {(summary?.by_dataset ?? []).length > 0 && <div className="card">
+    {(summary?.by_dataset ?? []).length > 0 && widgetVisible('datasets') && <div className="card">
       <h3>Dataset processing summary <span className="muted">— real data from all {summary.totals?.total_runs ?? 0} runs + {summary.profile_runs ?? 0} profiles</span></h3>
       <table>
         <thead><tr><th>Dataset</th><th>Runs</th><th>Total rows</th><th>Accepted</th><th>Quarantined</th><th>Acceptance %</th><th>Gate pass%</th><th>Det. fixes</th><th>AI fixes</th><th>Last run</th></tr></thead>
@@ -462,7 +659,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     </div>}
 
     {/* ── Row 5: pipeline status grid with real sparklines ── */}
-    <div className="card">
+    {widgetVisible('registry') && <div className="card">
       <h3>Pipeline registry</h3>
       {pipes.length === 0 && <div className="empty-state"><div className="icon">⬡</div><p>No pipelines yet — use Onboard to add one.</p></div>}
       <div className="pipe-grid">
@@ -500,10 +697,10 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
           )
         })}
       </div>
-    </div>
+    </div>}
 
     {/* ── Row 6: run timeline ── */}
-    {(summary?.timeline ?? []).length > 0 && <div className="card">
+    {(summary?.timeline ?? []).length > 0 && widgetVisible('recent_runs') && <div className="card">
       <h3>Recent DQ runs <span className="muted">— from reports on disk (real execution data)</span></h3>
       <table>
         <thead><tr><th>Run ID</th><th>Dataset</th><th>Mode</th><th>Input</th><th>Accepted</th><th>Quarantined</th><th>Pass rate</th><th>Gate</th><th>Det.fix</th><th>AI fix</th><th>Duration</th><th>Finished</th></tr></thead>
@@ -534,7 +731,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
     </div>}
 
     {/* ── Recent jobs (for running/queued status) ── */}
-    <div className="card">
+    {widgetVisible('jobqueue') && <div className="card">
       <h3>Job queue</h3>
       <table>
         <thead><tr><th>Job</th><th>Type</th><th>Status</th><th>Finished</th><th>Progress</th><th></th></tr></thead>
@@ -551,7 +748,7 @@ export function Dashboard({ onOpenPipeline }: { onOpenPipeline?: (id: string) =>
           ))}
         </tbody>
       </table>
-    </div>
+    </div>}
 
     {viewJob && <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -738,13 +935,44 @@ const resolveRel = (rel: string) => {
   return out.join('/')
 }
 
+/* ---- Live activity feed — recent jobs with live step progress ---- */
+const LiveJobsFeed = () => {
+  const [jobs, setJobs] = useState<any[]>([])
+  useEffect(() => {
+    let dead = false
+    const load = () => api.jobs().then(j => { if (!dead) setJobs((j || []).slice(0, 6)) }).catch(() => {})
+    load(); const t = setInterval(load, 3000)
+    return () => { dead = true; clearInterval(t) }
+  }, [])
+  if (!jobs.length) return null
+  return <div className="card" style={{ marginTop: 12 }}>
+    <h3>Live activity <span className="muted">— recent jobs & live steps</span></h3>
+    {jobs.map(j => (
+      <div key={j.job_id} style={{ padding: '5px 0', borderBottom: '1px solid var(--border, #2a2a2a)', fontSize: 12 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
+          <span className={`badge ${j.status === 'COMPLETED' ? 'COMPLETED' : j.status === 'FAILED' ? 'FAILED' : j.status === 'CANCELLED' ? 'FAILED' : 'REGISTERED'}`}>{j.status}</span>
+          <code style={{ fontSize: 11 }}>{j.job_id}</code>
+          <span className="tag">{j.kind}</span>
+          <span className="muted" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{j.progress || '—'}</span>
+        </div>
+        {(j.progress_log || []).slice(-4).map((m: string, i: number) => (
+          <div key={i} className="muted" style={{ fontSize: 11, paddingLeft: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↳ {m}</div>
+        ))}
+      </div>
+    ))}
+  </div>
+}
+
 export function Onboard() {
   const [step, setStep] = useState(0)
   const [datasets, setDatasets] = useState<any[]>([])
   const [source, setSource] = useState(''); const [dataset, setDataset] = useState('')
+  const [sourceFormat, setSourceFormat] = useState('AUTO')
   const [pipelineId, setPipelineId] = useState(''); const [platform, setPlatform] = useState('DATABRICKS')
   const [stage, setStage] = useState('SILVER'); const [dqMode, setDqMode] = useState('OBSERVE_ONLY')
   const [policy, setPolicy] = useState('../policies/default.yaml'); const [owner, setOwner] = useState('')
+  const [polFiles, setPolFiles] = useState<string[]>([])
+  useEffect(() => { api.policyFiles().then(setPolFiles).catch(() => {}) }, [])
   const [pub, setPub] = useState(true); const [onb, setOnb] = useState(true); const [force, setForce] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
   const [approved, setApproved] = useState<Set<string>>(new Set())
@@ -755,9 +983,11 @@ export function Onboard() {
   useEffect(() => { api.datasets().then(setDatasets) }, [])
   useEffect(() => { if (preview?.candidates) setApproved(new Set(preview.candidates.map((c: any) => c.rule_id))) }, [job?.status])
 
-  const pickDs = (path: string, name: string) => { setSource(path); setDataset(name); if (!pipelineId) setPipelineId(`${name.toUpperCase()}_PIPELINE`) }
+  const pickDs = (path: string, name: string) => { setSource(path); setDataset(name); setSourceFormat('AUTO'); if (!pipelineId) setPipelineId(`${name.toUpperCase()}_PIPELINE`) }
   const upload = async (f: File) => { setErr(''); try { const r = await api.upload(f); pickDs(r.path, r.filename.replace(/\.[^.]+$/, '').toLowerCase()) } catch (e: any) { setErr(e.message) } }
-  const runPreview = async () => { setErr(''); setResult(null); try { setJobId((await api.onboardPreview({ source, dataset, stage })).job_id); setStep(2) } catch (e: any) { setErr(e.message) } }
+  const [srcPeek, setSrcPeek] = useState<any>(null); const [srcPeekBusy, setSrcPeekBusy] = useState(false)
+  const peekSrc = async () => { setSrcPeekBusy(true); try { setSrcPeek(await api.sourcePreview(source)) } catch (e: any) { setSrcPeek({ error: e.message }) } finally { setSrcPeekBusy(false) } }
+  const runPreview = async () => { setErr(''); setResult(null); try { setJobId((await api.onboardPreview({ source, dataset, stage, source_format: sourceFormat })).job_id); setStep(2) } catch (e: any) { setErr(e.message) } }
   const [finishing, setFinishing] = useState(false)
   const previewBusy = !!job && (job.status === 'RUNNING' || job.status === 'QUEUED')
   const finalize = async () => {
@@ -770,9 +1000,97 @@ export function Onboard() {
   }
   const confColor = (c: number) => c >= 0.9 ? 'var(--success)' : c >= 0.7 ? 'var(--warn)' : 'var(--danger)'
 
+  // ── Auto E2E — one-click onboard + governed run ──
+  const [autoJobId, setAutoJobIdState] = useState<string | null>(() => localStorage.getItem('dq_auto_job'))
+  const setAutoJobId = (id: string | null) => { setAutoJobIdState(id); if (id) localStorage.setItem('dq_auto_job', id); else localStorage.removeItem('dq_auto_job') }
+  const autoJob = usePoll(autoJobId)
+  const [autoSrc, setAutoSrc] = useState(''); const [autoPid, setAutoPid] = useState(''); const [autoMode, setAutoMode] = useState('REMEDIATE')
+  const runAuto = async () => {
+    setErr('')
+    const stem = (autoSrc.split('/').pop() || '').replace(/\.[^.]+$/, '')
+    const dsName = stem.toLowerCase()
+    const pid = autoPid || `${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`
+    try {
+      const r = await api.autoRun({ source: autoSrc, dataset: dsName, pipeline_id: pid, mode: autoMode, stage, source_format: 'AUTO', policy: 'config/policies/default.yaml', approve_confidence: 0 })
+      setAutoPeek(null); setAutoJobId(r.job_id)
+    } catch (e: any) { setErr(e.message) }
+  }
+  const autoRes = autoJob?.status === 'COMPLETED' ? autoJob.result : null
+  const [onboardVis] = useState(() => {
+    try { return { auto: true, manual: true, ...JSON.parse(localStorage.getItem('dq_onboard_vis') || '{}') } } catch { return { auto: true, manual: true } }
+  })
+  const showAuto = onboardVis.auto !== false
+  const showManual = onboardVis.manual !== false
+  const [autoPeek, setAutoPeek] = useState<any>(null); const [autoPeekBusy, setAutoPeekBusy] = useState(false); const [autoUpBusy, setAutoUpBusy] = useState(false)
+  const clearAutoIfDone = () => { if (!autoJob || ['COMPLETED', 'FAILED', 'CANCELLED'].includes(autoJob.status)) setAutoJobId(null) }
+  const autoUpload = async (f: File) => {
+    setAutoUpBusy(true); setErr('')
+    try {
+      const r = await api.upload(f)
+      const stem = (r.filename || f.name).replace(/\.[^.]+$/, '').toLowerCase()
+      setAutoSrc(r.path); setAutoPid(`${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`); setAutoPeek(null); clearAutoIfDone()
+    } catch (e: any) { setErr(e.message) } finally { setAutoUpBusy(false) }
+  }
+  const peekAuto = async () => { setAutoPeekBusy(true); try { setAutoPeek(await api.sourcePreview(autoSrc)) } catch (e: any) { setAutoPeek({ error: e.message }) } finally { setAutoPeekBusy(false) } }
+
   return <>
     <div className="section-title">Onboard a pipeline</div>
 
+    {showAuto && <div className="card" style={{ borderColor: 'var(--accent, #4f8cff)' }}>
+      <h3>Auto E2E — one click: profile → rules → publish → run</h3>
+      <div className="info-box" style={{ marginBottom: 8 }}>Skips manual review — profiles the source, auto-approves all candidate rules, publishes the ruleset, onboards the pipeline, then runs governed DQ. Watch live progress below.</div>
+      <div className="form-grid">
+        <div className="field"><label>Source file</label>
+          <select value={autoSrc} onChange={e => { setAutoSrc(e.target.value); setAutoPeek(null); clearAutoIfDone(); const s = (e.target.value.split('/').pop() || '').replace(/\.[^.]+$/, ''); setAutoPid(`${s.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`) }}>
+            <option value="">— pick a dataset —</option>
+            {datasets.map((d: any) => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
+          </select>
+          <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+            <label className="btn sm sec" style={{ cursor: 'pointer', margin: 0 }}>{autoUpBusy ? 'Uploading…' : 'Browse / upload…'}<input type="file" accept=".csv,.parquet,.json" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && autoUpload(e.target.files[0])} /></label>
+            {autoSrc && <button className="btn sm sec" onClick={peekAuto} disabled={autoPeekBusy}>{autoPeekBusy ? 'Loading…' : 'Preview data'}</button>}
+          </div>
+        </div>
+        <div className="field"><label>Pipeline ID</label><input value={autoPid} onChange={e => setAutoPid(e.target.value)} placeholder="AUTO_GENERATED_PIPELINE" /></div>
+        <div className="field"><label>Mode</label>
+          <select value={autoMode} onChange={e => setAutoMode(e.target.value)}>
+            <option value="REMEDIATE">REMEDIATE — fix + quarantine</option>
+            <option value="ENFORCE">ENFORCE — gate only</option>
+            <option value="OBSERVE_ONLY">OBSERVE_ONLY — measure only</option>
+          </select>
+        </div>
+        <div className="field" style={{ justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={runAuto} disabled={!autoSrc || !!(autoJob && (autoJob.status === 'RUNNING' || autoJob.status === 'QUEUED'))}>▶ Run auto E2E</button>
+        </div>
+      </div>
+      {autoPeek && <div className="card" style={{ marginTop: 10 }}>
+        <h3>Source data preview <span className="muted">— first {autoPeek.shown ?? 0} rows of {autoSrc}</span></h3>
+        {autoPeek.error && <div className="warn-box">{autoPeek.error}</div>}
+        {autoPeek.rows?.length > 0 && <>
+          <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{autoPeek.columns.length} columns · sample only — full profiling happens during the run</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr>{autoPeek.columns.map((c: string) => <th key={c}>{c}</th>)}</tr></thead>
+              <tbody>
+                {autoPeek.rows.map((r: any, i: number) => (
+                  <tr key={i}>{autoPeek.columns.map((c: string) => <td key={c}>{r[c] == null ? '∅' : String(r[c])}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>}
+      </div>}
+      {autoJob && <div style={{ marginTop: 10 }}><JobStatus job={autoJob} /></div>}
+      {autoRes && <div className="info-box" style={{ marginTop: 8 }}>
+        ✅ Auto E2E done — <b>{autoRes.dataset}</b> · ruleset <b>{autoRes.ruleset}</b> · {autoRes.rules_approved} rules approved{autoRes.rules_rejected ? ` · ${autoRes.rules_rejected} rejected` : ''}
+        {(autoRes.run?.stages || []).map((s: any) => <div key={s.stage} style={{ marginTop: 2 }}>· {s.stage}: {s.status} — accepted {s.accepted ?? '—'} / quarantined {s.quarantined ?? '—'}</div>)}
+        <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+          <button className="btn sm sec" onClick={() => window.dispatchEvent(new CustomEvent('dq:navigate', { detail: 'profiles' }))}>View auto-created profile →</button>
+          <button className="btn sm sec" onClick={() => window.dispatchEvent(new CustomEvent('dq:navigate', { detail: 'rulesets' }))}>View ruleset + versions →</button>
+        </div>
+      </div>}
+    </div>}
+
+    {showManual && <>
     <div className="card">
       <div className="steps" style={{ marginBottom: 16 }}>
         {WIZ_STEPS.map((s, i) => <React.Fragment key={s}>
@@ -792,14 +1110,46 @@ export function Onboard() {
       <div className="field"><label>Sample datasets (sample_data/bronze)</label>
         <select value={source} onChange={e => pickDs(e.target.value, e.target.selectedOptions[0].dataset.n ?? '')}>
           <option value="">— choose a sample dataset —</option>
-          {datasets.map(d => <option key={d.id} value={d.path} data-n={d.id}>{d.id} — {d.path}</option>)}
+          {datasets.map(d => <option key={d.id} value={d.path} data-n={d.id}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''}{d.size_mb != null ? ` · ${d.size_mb} MB` : ''}</option>)}
         </select></div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '14px 0' }}>
         <div className="divider" style={{ flex: 1 }} /><span className="muted">or upload your own file</span><div className="divider" style={{ flex: 1 }} />
       </div>
       <div className="field"><label>Upload CSV / Parquet (any size)</label>
         <input type="file" accept=".csv,.parquet" onChange={e => e.target.files?.[0] && upload(e.target.files[0])} /></div>
-      {source && <div className="success-box">Source: <code>{source}</code></div>}
+      <div className="field"><label>…or connect a table / URI source</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <select value={sourceFormat} onChange={e => setSourceFormat(e.target.value)} style={{ minWidth: 190 }}>
+            <option value="AUTO">File (CSV / Parquet)</option>
+            <option value="TABLE">Table — catalog.schema.table</option>
+            <option value="DELTA">Delta path / URI</option>
+            <option value="JSON">JSON path / URI</option>
+          </select>
+          {sourceFormat !== 'AUTO' &&
+            <input style={{ flex: 1 }} placeholder={sourceFormat === 'TABLE' ? 'catalog.schema.table' : 'path or URI (dbfs:/, abfss://, /Volumes/…)'}
+              onChange={e => { setSource(e.target.value); const tail = e.target.value.split(/[/.]/).filter(Boolean).pop() || ''; if (!dataset && tail) setDataset(tail.toLowerCase()) }} />}
+        </div>
+        {sourceFormat !== 'AUTO' && <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>Runs spark.read.{sourceFormat === 'TABLE' ? 'table' : 'format'} — works on Databricks, Fabric, EMR, Dataproc</div>}
+      </div>
+      {source && <div className="success-box">Source: <code>{source}</code>{sourceFormat !== 'AUTO' ? ` [${sourceFormat}]` : ''} <button className="btn sm sec" style={{ marginLeft: 10 }} onClick={peekSrc} disabled={srcPeekBusy}>{srcPeekBusy ? 'Loading…' : 'Preview data'}</button></div>}
+      {srcPeek && <div className="card" style={{ marginTop: 10 }}>
+        <h3>Source data preview <span className="muted">— first {srcPeek.shown ?? 0} rows</span></h3>
+        {srcPeek.error && <div className="warn-box">{srcPeek.error}</div>}
+        {srcPeek.rows?.length > 0 && <>
+          <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{srcPeek.columns.length} columns · sample only</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr>{srcPeek.columns.map((c: string) => <th key={c}>{c}</th>)}</tr></thead>
+              <tbody>
+                {srcPeek.rows.map((r: any, i: number) => (
+                  <tr key={i}>{srcPeek.columns.map((c: string) => <td key={c} className="muted" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r[c] ?? '∅')}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>}
+        {srcPeek.rows?.length === 0 && <div className="empty-state"><p>No rows readable from this source.</p></div>}
+      </div>}
       <div className="btn-row"><button className="btn" disabled={!source} onClick={() => setStep(1)}>Next: set options →</button></div>
     </div>}
 
@@ -818,8 +1168,10 @@ export function Onboard() {
           <option>OBSERVE_ONLY</option><option>ENFORCE</option><option>REMEDIATE</option>
         </select></div>
         <div className="field"><label>Policy reference</label><select value={policy} onChange={e => setPolicy(e.target.value)}>
+          {polFiles.length ? polFiles.map(f => <option key={f} value={`../policies/${f}`}>{f.replace(/\.yaml$/, '')}</option>) : <>
           <option value="../policies/default.yaml">Default (banking)</option>
           <option value="../policies/healthcare.yaml">Healthcare (PHI)</option>
+          </>}
         </select></div>
         <div className="field span2"><label>Owner email</label><input value={owner} onChange={e => setOwner(e.target.value)} placeholder="team@example.com" /></div>
       </div>
@@ -850,6 +1202,11 @@ export function Onboard() {
     {step === 3 && preview && <div className="card">
       <h3>Step 4 · Review candidate rules</h3>
       <div className="info-box">{approved.size} of {preview.candidate_count} rules approved. Unchecked rules are excluded from the published ruleset. Colour = confidence (green ≥ 0.9 / amber ≥ 0.7 / red &lt; 0.7 — review carefully).</div>
+      <div className="btn-row" style={{ margin: '8px 0' }}>
+        <button className="btn sm sec" onClick={() => setApproved(new Set(preview.candidates.map((c: any) => c.rule_id)))}>Select all</button>
+        <button className="btn sm sec" onClick={() => setApproved(new Set())}>Clear all</button>
+        <button className="btn sm sec" onClick={() => setApproved(new Set(preview.candidates.filter((c: any) => (c.confidence ?? 0) >= 0.9).map((c: any) => c.rule_id)))}>High confidence (≥0.9) only</button>
+      </div>
       <div style={{ marginTop: 10 }}>
         {preview.candidates.map((c: any) => (
           <label className="rule-check-row" key={c.rule_id}>
@@ -876,6 +1233,7 @@ export function Onboard() {
         {result.published && <> · published <code>{result.published.checksum}</code></>}
         {result.onboarded && <> · <b>{result.onboarded.pipeline_id}</b> → <span className={`badge ${result.onboarded.state}`}>{result.onboarded.state}</span></>}
       </div>
+      {result.warnings?.length > 0 && <div className="warn-box" style={{ marginTop: 8 }}>{result.warnings.map((w: string, i: number) => <div key={i}>⚠ {w}</div>)}</div>}
       <div className="form-grid" style={{ marginTop: 12 }}>
         <div className="kv"><span>Ruleset file</span><code>{result.ruleset_path}</code></div>
         <div className="kv"><span>Manifest file</span><code>{result.manifest_path}</code></div>
@@ -887,6 +1245,9 @@ export function Onboard() {
         <button className="btn sec" onClick={() => { setStep(0); setSource(''); setJobId(null); setResult(null); setPipelineId('') }}>Onboard another</button>
       </div>
     </div>}
+    </>}
+
+    <LiveJobsFeed />
   </>
 }
 
@@ -911,6 +1272,13 @@ export function RunDQ() {
   const [pipeSel, setPipeSel] = useState('ADHOC')
   const [govDs, setGovDs] = useState<any[]>([])
   const [rsOpts, setRsOpts] = useState<{ label: string; value: string }[]>([])
+  const [rsFiles, setRsFiles] = useState<string[]>([])
+  const [polFiles, setPolFiles] = useState<string[]>([])
+  const [srcPrev, setSrcPrev] = useState<any>(null); const [srcPrevBusy, setSrcPrevBusy] = useState(false)
+  const [srcFmt, setSrcFmt] = useState('AUTO'); const [srcUri, setSrcUri] = useState('')
+  useEffect(() => { api.rulesetFiles().then(setRsFiles).catch(() => {}) }, [])
+  useEffect(() => { api.policyFiles().then(setPolFiles).catch(() => {}) }, [])
+  const previewSrc = async () => { setSrcPrevBusy(true); try { setSrcPrev(await api.sourcePreview(src)) } catch (e: any) { setSrcPrev({ error: e.message }) } finally { setSrcPrevBusy(false) } }
   const [src, setSrc] = useState(''); const [rs, setRs] = useState('config/rulesets/customers_v1.yaml')
   const [mode, setMode] = useState('OBSERVE_ONLY'); const [ds, setDs] = useState('customers')
   const [pid, setPid] = useState('UI_RUN'); const [pol, setPol] = useState('config/policies/default.yaml')
@@ -946,7 +1314,7 @@ export function RunDQ() {
   const busy = jobActive(job) || jobActive(prof)
   const submit = async () => {
     setErr('')
-    try { const r = await api.run({ source: src, ruleset: rs, mode, dataset: ds, pipeline_id: pid, policy: pol }); setJobId(r.job_id) }
+    try { const r = await api.run({ source: srcFmt !== 'AUTO' && ['TABLE', 'DELTA', 'JSON'].includes(srcFmt) ? srcUri : src, source_format: srcFmt === 'AUTO' ? 'AUTO' : srcFmt, ruleset: rs, mode, dataset: ds, pipeline_id: pid, policy: pol }); setJobId(r.job_id) }
     catch (e: any) { setErr(e.message) }
   }
   const submitProfile = async () => {
@@ -959,7 +1327,9 @@ export function RunDQ() {
     try { const r = await api.pipelineRun(pipeSel, { dataset_id: ds, mode }); setJobId(r.job_id) }
     catch (e: any) { setErr(e.message) }
   }
-  const rsOptions = governed ? rsOpts : ADHOC_RS.map(([l, v]) => ({ label: l, value: v }))
+  const rsOptions = governed ? rsOpts : (rsFiles.length
+    ? rsFiles.map(f => ({ label: f.replace(/\.yaml$/, ''), value: `config/rulesets/${f}` }))
+    : ADHOC_RS.map(([l, v]) => ({ label: l, value: v })))
 
   return <>
     <div className="section-title">Run Data Quality</div>
@@ -979,9 +1349,33 @@ export function RunDQ() {
             ? <select value={ds} onChange={e => applyDs(govDs.find((x: any) => x.dataset_id === e.target.value))}>
                 {govDs.map((d: any) => <option key={d.dataset_id} value={d.dataset_id}>{d.dataset_id}</option>)}
               </select>
-            : <select value={src} onChange={e => { setSrc(e.target.value); setDs(e.target.selectedOptions[0].text.split(' — ')[0]) }}>
-                {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}</option>)}
-              </select>}
+            : <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <select value={srcFmt} onChange={e => setSrcFmt(e.target.value)} style={{ minWidth: 105 }}>
+                  <option value="AUTO">File</option>
+                  <option value="TABLE">Table</option>
+                  <option value="DELTA">Delta</option>
+                  <option value="JSON">JSON</option>
+                </select>
+                {['TABLE', 'DELTA', 'JSON'].includes(srcFmt)
+                  ? <input style={{ flex: 1 }} placeholder={srcFmt === 'TABLE' ? 'catalog.schema.table' : 'path or URI (dbfs:/, abfss://, /Volumes/…)'} value={srcUri} onChange={e => setSrcUri(e.target.value)} />
+                  : <>
+                      <select value={src} onChange={e => {
+                        const v = e.target.value; setSrc(v); setDs(e.target.selectedOptions[0].text.split(' — ')[0]); setSrcPrev(null)
+                        const stem = (v.split('/').pop() || '').replace(/\.[^.]+$/, '')
+                        if (!stem) return
+                        const cands = rsFiles.filter(f => f.startsWith(stem) && f.endsWith('.yaml'))
+                        const nonGold = cands.filter(f => !f.includes('gold'))
+                        const pool = (nonGold.length ? nonGold : cands).sort()
+                        if (pool.length) setRs(`config/rulesets/${pool[pool.length - 1]}`)
+                        setPid(`${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_ADHOC`)
+                        if (/patient|health|clinical|phi/i.test(stem) && polFiles.includes('healthcare.yaml')) setPol('config/policies/healthcare.yaml')
+                        else if (polFiles.includes('default.yaml')) setPol('config/policies/default.yaml')
+                      }} style={{ flex: 1 }}>
+                        {datasets.map(d => <option key={d.path} value={d.path}>{d.id} — {d.path}{d.rows ? ` · ${Number(d.rows).toLocaleString()} rows` : ''} · {d.size_mb} MB</option>)}
+                      </select>
+                      {src && <button className="btn sm sec" onClick={previewSrc} disabled={srcPrevBusy}>{srcPrevBusy ? 'Loading…' : 'Preview data'}</button>}
+                    </>}
+              </div>}
         </div>
         {governed && <div className="field"><label>Source (test_data)</label><input value={src} readOnly /></div>}
         <div className="field"><label>Rule set</label>
@@ -991,8 +1385,10 @@ export function RunDQ() {
         </div>
         <div className="field"><label>Policy{governed ? ' (from manifest, locked)' : ''}</label>
           <select value={pol} onChange={e => setPol(e.target.value)} disabled={governed}>
+            {polFiles.length ? polFiles.map(f => <option key={f} value={`config/policies/${f}`}>{f.replace(/\.yaml$/, '')}</option>) : <>
             <option value="config/policies/default.yaml">Default (banking)</option>
             <option value="config/policies/healthcare.yaml">Healthcare (PHI)</option>
+            </>}
           </select>
         </div>
         <div className="field"><label>Mode</label>
@@ -1005,11 +1401,29 @@ export function RunDQ() {
         </div>
         <div className="field"><label>View past result</label>
           <select value="" onChange={e => { const id = e.target.value; if (!id) return; if (past.find(x => x.job_id === id)?.kind === 'profile') setPjob(id); else setJobId(id); e.target.value = '' }}>
-            <option value="">— completed jobs —</option>
-            {past.filter(x => x.status === 'COMPLETED').map(x => <option key={x.job_id} value={x.job_id}>{x.job_id} · {x.kind}</option>)}
+            <option value="">— past jobs (incl. failed) —</option>
+            {past.filter(x => x.status === 'COMPLETED' || x.status === 'FAILED').map(x => <option key={x.job_id} value={x.job_id}>{x.job_id} · {x.kind}{x.status === 'FAILED' ? ' ✗ FAILED' : ''}</option>)}
           </select>
         </div>
       </div>
+      {srcPrev && <div className="card">
+        <h3>Source data preview <span className="muted">— first {srcPrev.shown ?? 0} rows of {srcPrev.source}</span></h3>
+        {srcPrev.error && <div className="warn-box">{srcPrev.error}</div>}
+        {srcPrev.rows?.length > 0 && <>
+          <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{srcPrev.columns.length} columns · sample only — full profiling happens during the run</div>
+          <div style={{ overflowX: 'auto' }}>
+            <table>
+              <thead><tr>{srcPrev.columns.map((c: string) => <th key={c}>{c}</th>)}</tr></thead>
+              <tbody>
+                {srcPrev.rows.map((r: any, i: number) => (
+                  <tr key={i}>{srcPrev.columns.map((c: string) => <td key={c} className="muted" style={{ fontSize: 11, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r[c] ?? '∅')}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>}
+        {srcPrev.rows?.length === 0 && <div className="empty-state"><p>No rows readable from this source.</p></div>}
+      </div>}
       {governed && <div className="info-box">Governed mode — dataset, source, ruleset and policy are locked to the manifest. Only the execution mode is adjustable.</div>}
       {err && <div className="warn-box">{err}</div>}
       <div className="btn-row">
@@ -1176,6 +1590,94 @@ export function Approvals() {
         ))}
       </> : <p className="muted" style={{ marginTop: 8 }}>No decisions recorded yet.</p>}
     </div>
+
+    {decisions && (() => {
+      const seen = new Map<string, any>()
+      for (const a of decisions.approvals ?? []) {
+        const k = `${a.dataset}|${a.column}|${a.original_value}|${a.approved_value}`
+        const cur = seen.get(k)
+        seen.set(k, cur ? { ...cur, count: cur.count + 1 } : { ...a, count: 1 })
+      }
+      const mem = [...seen.values()]
+      if (!mem.length) return null
+      return <div className="card">
+        <h3>Remembered corrections <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>— auto-applied on future runs (HUMAN_APPROVED_AI)</span></h3>
+        <div className="info-box" style={{ marginTop: 6 }}>Steward-approved fixes the engine remembers — same bad value is corrected automatically without re-asking. {mem.length} unique correction{mem.length === 1 ? '' : 's'}.</div>
+        {mem.map((a: any, i: number) => (
+          <div key={i} className="approval-row" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr auto' }}>
+            <span className="tag">{a.dataset}</span>
+            <span className="muted">{a.column}</span>
+            <span className="val-orig">{a.original_value}</span>
+            <span className="val-new">{a.approved_value}</span>
+            <span className="muted" style={{ fontSize: 11 }}>×{a.count} approved · {String(a.approved_at ?? '').slice(0, 10)}</span>
+          </div>
+        ))}
+      </div>
+    })()}
+  </>
+}
+
+/* ============================================================
+   PROFILES — stored profile baselines
+   ============================================================ */
+export function Profiles() {
+  const [list, setList] = useState<any[]>([])
+  const [sel, setSel] = useState(''); const [det, setDet] = useState<any>(null); const [err, setErr] = useState('')
+  useEffect(() => { api.profiles().then(setList).catch(() => {}) }, [])
+  const load = async (ds: string) => {
+    setSel(ds); setDet(null); setErr('')
+    try { setDet(await api.profileDetail(ds)) } catch (e: any) { setErr(e.message) }
+  }
+  const prof = det?.profile || {}
+  const colEntries = Object.entries(prof.columns || {}) as [string, any][]
+  const statKeys = [...new Set(colEntries.flatMap(([, c]) => Object.keys(c || {}).filter(k => ['string', 'number', 'boolean'].includes(typeof (c || {})[k]))))].slice(0, 14)
+  const anomalies = prof.anomalies || det?.anomalies || []
+  return <>
+    <div className="section-title">Profiles</div>
+    <div className="card">
+      <h3>Stored profile baselines</h3>
+      <div className="info-box">Column statistics captured during onboarding — also used as drift-detection baselines on re-onboard. {list.length} profile{list.length === 1 ? '' : 's'} stored.</div>
+      <div className="form-grid" style={{ marginTop: 10 }}>
+        <div className="field"><label>Dataset</label>
+          <select value={sel} onChange={e => load(e.target.value)}>
+            <option value="">— choose a profiled dataset —</option>
+            {list.map((p: any) => <option key={`${p.dataset}-${p.profiled_at}`} value={p.dataset}>{p.dataset} · {p.profile_mode} · {String(p.profiled_at || '').slice(0, 10)}</option>)}
+          </select>
+        </div>
+      </div>
+      {err && <div className="warn-box">{err}</div>}
+      {det && <>
+        <div className="kv" style={{ marginTop: 8 }}>
+          <span>dataset</span><b>{det.dataset}</b>
+          <span>ruleset</span><b>{det.ruleset_id}</b>
+          <span>stage</span><b>{det.stage}</b>
+          <span>rows</span><b>{det.row_count?.toLocaleString?.() ?? det.row_count ?? '—'}</b>
+          <span>mode</span><b>{det.profile_mode}</b>
+          <span>profiled at</span><b className="muted">{String(det.profiled_at || '').replace('T', ' ').slice(0, 19)}</b>
+        </div>
+        {anomalies.length > 0 && <div style={{ marginTop: 10 }}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Anomalies ({anomalies.length})</div>
+          {anomalies.slice(0, 20).map((a: any, i: number) => (
+            <div key={i} className="approval-row" style={{ gridTemplateColumns: 'auto 1fr auto' }}>
+              <span className={`badge ${a.severity === 'ERROR' ? 'FAILED' : 'REGISTERED'}`}>{a.severity || 'INFO'}</span>
+              <span>{a.column ? `${a.column} — ` : ''}{a.type || a.anomaly_type || ''} {a.detail || a.message || ''}</span>
+              <span className="muted" style={{ fontSize: 11 }}>{a.confidence != null ? `${Math.round(a.confidence * 100)}%` : ''}</span>
+            </div>
+          ))}
+        </div>}
+        {colEntries.length > 0 && <div style={{ marginTop: 12, overflowX: 'auto' }}>
+          <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Column statistics ({colEntries.length} columns)</div>
+          <table>
+            <thead><tr><th>column</th>{statKeys.map(k => <th key={k}>{k}</th>)}</tr></thead>
+            <tbody>
+              {colEntries.map(([name, c]: any) => (
+                <tr key={name}><td><b>{name}</b></td>{statKeys.map(k => <td key={k} className="muted" style={{ fontSize: 11 }}>{String(c?.[k] ?? '—')}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>}
+      </>}
+    </div>
   </>
 }
 
@@ -1185,6 +1687,7 @@ export function Approvals() {
 export function RuleSets() {
   const [rs, setRs] = useState<any[]>([]); const [yaml, setYaml] = useState(''); const [msg, setMsg] = useState(''); const [err, setErr] = useState('')
   const [diff, setDiff] = useState<any>(null); const [selRs, setSelRs] = useState<any>(null)
+  const [rsRules, setRsRules] = useState<any>(null)
 
   const load = () => api.rulesets().then(setRs)
   useEffect(() => { load() }, [])
@@ -1202,6 +1705,9 @@ export function RuleSets() {
   const showDiff = async (id: string) => {
     try { setDiff(await api.rulesetDiff(id)) } catch (e: any) { setErr(e.message) }
   }
+  const showRules = async (id: string) => {
+    try { setRsRules(await api.rulesetRules(id)) } catch (e: any) { setErr(e.message) }
+  }
 
   const grouped: Record<string, any[]> = rs.reduce((a: Record<string, any[]>, r: any) => { (a[r.ruleset_id] = a[r.ruleset_id] ?? []).push(r); return a }, {})
 
@@ -1218,7 +1724,10 @@ export function RuleSets() {
               <span className="muted">{versions[0]?.dataset} · {versions.length} version{versions.length !== 1 ? 's' : ''}</span>
               {active && <span className="badge ACTIVE" style={{ marginLeft: 10 }}>v{active.version} active</span>}
             </div>
-            <button className="btn sm sec" onClick={() => showDiff(rid)}>Diff</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn sm sec" onClick={() => showRules(rid)}>Rules ({versions[0]?.rules ?? '—'})</button>
+              <button className="btn sm sec" onClick={() => showDiff(rid)}>Diff</button>
+            </div>
           </div>
           <table style={{ marginTop: 12 }}>
             <thead><tr><th>Version</th><th>Rules</th><th>Checksum</th><th>Published</th><th>Status</th><th></th></tr></thead>
@@ -1241,6 +1750,34 @@ export function RuleSets() {
         </div>
       )
     })}
+
+    {rsRules && (
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <h3>Rules — {rsRules.ruleset_id} <span className="muted">({rsRules.count} rules)</span></h3>
+          <button className="btn sm sec" onClick={() => setRsRules(null)}>✕</button>
+        </div>
+        <div style={{ overflowX: 'auto', marginTop: 8 }}>
+          <table>
+            <thead><tr><th>Rule</th><th>Name</th><th>Type</th><th>Column</th><th>Severity</th><th>Conf</th><th>Status</th><th>Description</th></tr></thead>
+            <tbody>
+              {rsRules.rules.map((r: any) => (
+                <tr key={r.rule_id}>
+                  <td><code style={{ fontSize: 10 }}>{r.rule_id}</code></td>
+                  <td>{r.name}</td>
+                  <td><span className="tag">{r.rule_type}</span></td>
+                  <td className="muted">{r.column ?? '—'}</td>
+                  <td><span className={`badge ${r.severity === 'ERROR' ? 'FAILED' : 'REGISTERED'}`}>{r.severity}</span></td>
+                  <td style={{ color: (r.confidence ?? 0) >= 0.9 ? '#22c55e' : '#eab308', fontWeight: 700 }}>{r.confidence ?? '—'}</td>
+                  <td className="muted">{r.status ?? '—'}</td>
+                  <td className="muted" style={{ maxWidth: 320 }}>{r.description}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
 
     {diff && (
       <div className="card">
@@ -1277,8 +1814,13 @@ export function RuleSets() {
    ============================================================ */
 export function Reports() {
   const [reps, setReps] = useState<any[]>([]); const [sel, setSel] = useState<any>(null); const [selName, setSelName] = useState('')
-  useEffect(() => { api.reports().then(setReps) }, [])
+  const [avail, setAvail] = useState<any>(null); const [dpStage, setDpStage] = useState('silver')
+  const [dpDs, setDpDs] = useState(''); const [dp, setDp] = useState<any>(null); const [dpBusy, setDpBusy] = useState(false)
+  const [aiAct, setAiAct] = useState<any>(null)
+  useEffect(() => { api.reports().then(setReps); api.dataAvailable().then(setAvail).catch(() => {}); api.aiActivity().then(setAiAct).catch(() => {}) }, [])
   const open = async (name: string) => { const d = await api.report(name); setSel(d); setSelName(name) }
+  const loadPreview = async () => { setDpBusy(true); try { setDp(await api.dataPreview(dpDs, dpStage)) } catch (e: any) { setDp({ error: e.message }) } finally { setDpBusy(false) } }
+  const stageDs = (avail?.[dpStage] ?? []) as string[]
 
   const scoreFor = (r: any) => {
     const m = r.execution_metrics
@@ -1303,6 +1845,69 @@ export function Reports() {
           ))}
         </tbody>
       </table>
+    </div>
+
+    {/* ── AI activity — what the AI remediation actually did ── */}
+    <div className="card">
+      <h3>AI activity <span className="muted">— remediation decisions &amp; outcomes across runs</span></h3>
+      {aiAct?.provider && <div className="info-box" style={{ marginBottom: 8 }}>
+        Provider: <b>{aiAct.provider.provider}</b> · {aiAct.provider.model_endpoint}
+        {aiAct.provider.simulated ? ' · ⚠ SIMULATED (MockAI)' : ' · live LLM'}
+        {aiAct.provider.simulated === false && ' · real Databricks call'}
+      </div>}
+      {!aiAct?.records?.length && <div className="empty-state"><p>No AI activity yet — run DQ in REMEDIATE mode on data with fixable violations.</p></div>}
+      {aiAct?.records?.length > 0 && <>
+        <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>{aiAct.total} records · newest first</div>
+        <div style={{ overflowX: 'auto', maxHeight: 420, overflowY: 'auto' }}>
+          <table>
+            <thead><tr><th>kind</th><th>dataset</th><th>column</th><th>value</th><th>proposal</th><th>confidence</th><th>outcome</th><th>sim</th></tr></thead>
+            <tbody>
+              {aiAct.records.map((r: any, i: number) => (
+                <tr key={i}>
+                  <td><span className={`badge ${r.kind === 'AI_DECISION' ? 'REGISTERED' : 'COMPLETED'}`}>{r.kind === 'AI_DECISION' ? 'AI' : 'OUT'}</span></td>
+                  <td className="muted" style={{ fontSize: 11 }}>{r.dataset}</td>
+                  <td><b style={{ fontSize: 11 }}>{r.column ?? '—'}</b></td>
+                  <td className="muted" style={{ fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r.original_value ?? r.value ?? '—')}</td>
+                  <td className="muted" style={{ fontSize: 11, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r.proposed_value ?? r.corrected_value ?? r.proposal ?? '—')}</td>
+                  <td style={{ fontSize: 11, fontWeight: 700, color: (r.confidence ?? 0) >= 0.9 ? 'var(--success)' : (r.confidence ?? 0) >= 0.7 ? 'var(--warn)' : 'var(--danger)' }}>{r.confidence != null ? `${Math.round(r.confidence * 100)}%` : '—'}</td>
+                  <td><span className={`badge ${String(r.outcome ?? r.decision ?? r.status ?? '').includes('APPLIED') || String(r.outcome ?? '').includes('ACCEPTED') ? 'COMPLETED' : String(r.outcome ?? r.decision ?? '').includes('QUAR') || String(r.outcome ?? '').includes('APPROVAL') ? 'REGISTERED' : 'FAILED'}`}>{r.outcome ?? r.decision ?? r.status ?? '—'}</span></td>
+                  <td>{r.simulated ? <span className="badge FAILED" style={{ fontSize: 9 }}>SIM</span> : <span className="badge COMPLETED" style={{ fontSize: 9 }}>LIVE</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>}
+    </div>
+
+    {/* ── Stage data preview — actual output rows ── */}
+    <div className="card">
+      <h3>Stage data preview <span className="muted">— actual Bronze / Silver / Gold / Quarantine rows</span></h3>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+        <select value={dpStage} onChange={e => { setDpStage(e.target.value); setDpDs(''); setDp(null) }}>
+          {['bronze', 'silver', 'gold', 'quarantine'].map(s => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+        </select>
+        <select value={dpDs} onChange={e => { setDpDs(e.target.value); setDp(null) }} style={{ minWidth: 200 }}>
+          <option value="">— dataset —</option>
+          {stageDs.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <button className="btn sm" disabled={!dpDs || dpBusy} onClick={loadPreview}>{dpBusy ? 'Loading…' : 'Preview rows'}</button>
+        {dp && !dp.error && <span className="muted" style={{ fontSize: 11 }}>{dp.shown} rows shown{dp.columns ? ` · ${dp.columns.length} cols` : ''}</span>}
+      </div>
+      {dp?.error && <div className="warn-box">{dp.error}</div>}
+      {dp && !dp.error && dp.rows?.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table>
+            <thead><tr>{dp.columns.map((c: string) => <th key={c}>{c}</th>)}</tr></thead>
+            <tbody>
+              {dp.rows.map((r: any, i: number) => (
+                <tr key={i}>{dp.columns.map((c: string) => <td key={c} className="muted" style={{ fontSize: 11, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(r[c] ?? '∅')}</td>)}</tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {dp && !dp.error && dp.rows?.length === 0 && <div className="empty-state"><p>No rows in this stage for {dpDs}.</p></div>}
     </div>
 
     {sel && (() => {
@@ -1346,6 +1951,9 @@ export function Reports() {
                           <b style={{ textTransform: 'capitalize' }}>{name}</b>
                           <span className={cls} style={{ fontWeight: 700 }}>{measured ? p.score : '—'}</span>
                         </div>
+                        {measured && <div style={{ height: 4, borderRadius: 2, background: 'var(--border)', margin: '5px 0 3px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.min(100, p.score)}%`, background: p.score >= 90 ? 'var(--success)' : p.score >= 70 ? '#d97706' : 'var(--danger)', borderRadius: 2 }} />
+                        </div>}
                         <div className="muted" style={{ fontSize: 10, marginTop: 2 }}>{p.status === 'MEASURED' ? `${p.rules ?? 0} rules` : p.status}</div>
                       </div>
                     )
@@ -1417,6 +2025,31 @@ export function Settings() {
   const [assistantOn, setAssistantOn] = useState<boolean>(true)
   const [chatLog, setChatLog] = useState<any[]>([])
   const [reloadMsg, setReloadMsg] = useState<string>('')
+  const [meta, setMeta] = useState<any>(null)
+  const [metaBackend, setMetaBackend] = useState<string>('nosql')
+  const [metaEngine, setMetaEngine] = useState<string>('tinydb')
+  const [metaMsg, setMetaMsg] = useState<string>('')
+  const [metaColl, setMetaColl] = useState<{name: string; count: number; docs: any[]} | null>(null)
+  const [widgets, setWidgets] = useState<Record<string, boolean>>(loadWidgets)
+  const toggleWidget = (key: string) => setWidgets(prev => {
+    const next = { ...prev, [key]: prev[key] === false ? true : false }
+    localStorage.setItem('dq_widgets', JSON.stringify(next))
+    return next
+  })
+  const [nav, setNav] = useState<Record<string, boolean>>(loadNav)
+  const toggleNav = (key: string) => setNav(prev => {
+    const next = { ...prev, [key]: prev[key] === false ? true : false }
+    localStorage.setItem('dq_nav', JSON.stringify(next))
+    return next
+  })
+  const [onboardVis, setOnboardVis] = useState<Record<string, boolean>>(() => {
+    try { return { auto: true, manual: true, ...JSON.parse(localStorage.getItem('dq_onboard_vis') || '{}') } } catch { return { auto: true, manual: true } }
+  })
+  const toggleOnboardVis = (key: string) => setOnboardVis(prev => {
+    const next = { ...prev, [key]: !(prev[key] ?? true) }
+    localStorage.setItem('dq_onboard_vis', JSON.stringify(next))
+    return next
+  })
   useEffect(() => {
     api.health().then(setHealth)
     api.aiStatus().then(setAi).catch(() => {})
@@ -1424,7 +2057,25 @@ export function Settings() {
     api.systemStatus().then(setSys).catch(() => {})
     api.assistantEnabled().then(r => setAssistantOn(r.enabled)).catch(() => {})
     api.chatLog().then(r => setChatLog(r.entries ?? [])).catch(() => {})
+    api.metadataStatus().then(m => {
+      setMeta(m)
+      setMetaBackend(m?.backend ?? 'file')
+      setMetaEngine(m?.metadata_engine ?? 'tinydb')
+    }).catch(() => {})
   }, [])
+
+  const browseCollection = (name: string) => {
+    api.metadataCollection(name, 25).then(setMetaColl).catch(e => setMetaColl({name, count: -1, docs: [{error: String(e)}]}))
+  }
+  const applyMetaSwitch = async () => {
+    setMetaMsg('switching…')
+    try {
+      await api.metadataSwitch({ backend: metaBackend, engine: metaBackend === 'nosql' ? metaEngine : undefined })
+      await api.reloadEngine(false)
+      const m = await api.metadataStatus()
+      setMeta(m); setMetaMsg(`switched to ${m.backend}${m.metadata_engine ? '/' + m.metadata_engine : ''} — engine reloaded`)
+    } catch (e: any) { setMetaMsg('switch failed: ' + String(e)) }
+  }
 
   const dqxReady = ai && ai.provider === 'DQXProvider' && !ai.simulated
   const mockReady = ai && ai.provider === 'MockAIProvider'
@@ -1491,6 +2142,90 @@ export function Settings() {
       <div className="info-box" style={{ marginTop: 10, fontSize: 11 }}>
         Use <b>Apply</b> after editing <code>config/engine.yaml</code> (provider, thresholds) — no backend restart needed.
         Use <b>Reload + restart Spark</b> only when changing <code>runtime.*</code> (memory, master, partitions) — takes ~30 s.
+      </div>
+    </div>
+
+    <div className="card">
+      <div className="card">
+        <h3>Dashboard widgets <span className="muted">— show/hide dashboard cards (saved locally)</span></h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 6 }}>
+          {WIDGETS.map(w => (
+            <label key={w.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={widgets[w.key] !== false} onChange={() => toggleWidget(w.key)} />
+              {w.label}
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="card">
+        <h3>Sidebar tabs <span className="muted">— show/hide left-nav pages (saved locally)</span></h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
+          {NAV_ITEMS.map(n => (
+            <label key={n.key} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={nav[n.key] !== false} onChange={() => toggleNav(n.key)} />
+              {n.label}
+            </label>
+          ))}
+        </div>
+        <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>Settings stays visible so you can always re-enable tabs.</div>
+      </div>
+      <div className="card">
+        <h3>Onboard page sections <span className="muted">— show/hide auto vs manual run pipeline (saved locally)</span></h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 6 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={onboardVis.auto !== false} onChange={() => toggleOnboardVis('auto')} />
+            Auto run pipeline — Auto E2E card
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={onboardVis.manual !== false} onChange={() => toggleOnboardVis('manual')} />
+            Manual run pipeline — step-by-step wizard
+          </label>
+        </div>
+        <div className="muted" style={{ fontSize: 11, marginTop: 6 }}>Hide one to demo a single flow — e.g. only Auto E2E, or only the manual wizard.</div>
+      </div>
+      <h3>Metadata store <span className="badge">{meta?.backend ?? '—'}{meta?.metadata_engine ? ' / ' + meta.metadata_engine : ''}</span></h3>
+      {meta && <div className="form-grid" style={{ marginBottom: 12 }}>
+        <div className="kv"><span>Backend</span><b>{meta.backend}</b></div>
+        <div className="kv"><span>Store</span><code style={{ fontSize: 11 }}>{meta.store_type ?? meta.store_path ?? '—'}</code></div>
+        {meta.store_path && <div className="kv"><span>Location</span><code style={{ fontSize: 11, wordBreak: 'break-all' }}>{meta.store_path}</code></div>}
+      </div>}
+      {meta?.collections && <table style={{ marginBottom: 12 }}>
+        <thead><tr><th>Collection (meta table)</th><th>Documents</th><th></th></tr></thead>
+        <tbody>
+          {Object.entries(meta.collections).map(([k, v]: [string, any]) => (
+            <tr key={k}>
+              <td><code style={{ fontSize: 11 }}>{k}</code></td>
+              <td><b>{v}</b></td>
+              <td><button style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => browseCollection(k)}>browse</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>}
+      {metaColl && <div style={{ marginBottom: 12 }}>
+        <h4 style={{ margin: '4px 0' }}>{metaColl.name} — {metaColl.count} doc(s){metaColl.count > 25 ? ' (first 25)' : ''}</h4>
+        <pre style={{ maxHeight: 220, overflow: 'auto', fontSize: 10, background: 'var(--bg)', padding: 8, borderRadius: 4 }}>{JSON.stringify(metaColl.docs, null, 1).slice(0, 6000)}</pre>
+      </div>}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 12 }}>Backend</label>
+        <select value={metaBackend} onChange={e => setMetaBackend(e.target.value)} style={{ padding: '4px 8px' }}>
+          <option value="file">file (YAML/JSON registry)</option>
+          <option value="nosql">nosql (document store)</option>
+        </select>
+        {metaBackend === 'nosql' && <>
+          <label style={{ fontSize: 12 }}>Engine</label>
+          <select value={metaEngine} onChange={e => setMetaEngine(e.target.value)} style={{ padding: '4px 8px' }}>
+            <option value="tinydb">tinydb (embedded)</option>
+            <option value="mongodb">mongodb</option>
+            <option value="dynamodb">dynamodb</option>
+          </select>
+        </>}
+        <button className="primary" style={{ padding: '6px 14px' }} onClick={applyMetaSwitch}>Switch + reload engine</button>
+        {metaMsg && <span className="muted" style={{ fontSize: 11 }}>{metaMsg}</span>}
+      </div>
+      <div className="info-box" style={{ marginTop: 10, fontSize: 11 }}>
+        Stores do <b>not</b> auto-sync — switching backends shows that store's own state.
+        Migrate file→nosql with <code>scripts/migrate_registry_to_nosql.py</code>.
+        DynamoDB needs AWS creds or <code>metadata.endpoint_url</code> for DynamoDB Local.
       </div>
     </div>
 

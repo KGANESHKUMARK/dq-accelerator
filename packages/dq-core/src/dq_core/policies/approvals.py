@@ -42,6 +42,10 @@ class ApprovalStore:
             return cls()
         doc = load_document(path)
         items = doc.get("approvals") or []
+        return cls.from_documents(items)
+
+    @classmethod
+    def from_documents(cls, items: Iterable[Mapping[str, Any]]) -> "ApprovalStore":
         return cls(Approval(dataset=str(i["dataset"]), column=str(i["column"]), original_value=str(i["original_value"]),
                             approved_value=str(i["approved_value"]), approved_by=str(i.get("approved_by", "")),
                             approved_at=str(i.get("approved_at", "")), ticket=str(i.get("ticket", ""))) for i in items)
@@ -91,6 +95,10 @@ class RejectionStore:
             return cls()
         doc = load_document(path)
         items = doc.get("rejections") or []
+        return cls.from_documents(items)
+
+    @classmethod
+    def from_documents(cls, items: Iterable[Mapping[str, Any]]) -> "RejectionStore":
         return cls(Rejection(dataset=str(i.get("dataset", "")), column=str(i.get("column", "")),
                              original_value=str(i.get("original_value", "")),
                              proposed_value=str(i.get("proposed_value", i.get("corrected_value", ""))),

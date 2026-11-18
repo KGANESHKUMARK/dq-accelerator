@@ -1,0 +1,22 @@
+pipeline:
+  pipeline_id: GOLD_FLOW_TEST2
+  pipeline_name: Gold Flow Test2
+  platform: STANDALONE_SPARK
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: auto-e2e
+  description: Onboarded via UI wizard from patients_minimal.csv (3 rows profiled)
+  policy: config/policies/healthcare.yaml
+  datasets:
+  - dataset_id: patients_minimal
+    format: CSV
+    stages:
+    - BRONZE
+    - SILVER
+    - GOLD
+    rulesets:
+      SILVER: ../rulesets/patients_minimal_v1.yaml
+      GOLD: ../rulesets/patients_minimal_gold_v1.yaml
+    test_data: ../../sample_data/minimal/patients_minimal.csv
+    test_data_format: CSV

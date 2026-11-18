@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { api } from './api'
 import {
   Dashboard, Pipelines, Onboard, RunDQ,
-  Anomalies, Approvals, RuleSets, Reports, Settings, ChatPanel
+  Anomalies, Profiles, Approvals, RuleSets, Reports, Settings, ChatPanel
 } from './pages'
 
 type Page = {
@@ -20,11 +20,29 @@ const PAGES: Page[] = [
   { id: 'onboard',    label: 'Onboard',         icon: '＋', component: Onboard },
   { id: 'rundq',      label: 'Run DQ',          icon: '▶', component: RunDQ },
   { id: 'anomalies',  label: 'Anomalies',       icon: '⚠', section: 'OBSERVE',    component: Anomalies },
+  { id: 'profiles',   label: 'Profiles',        icon: '∿', component: Profiles },
   { id: 'approvals',  label: 'Approvals',       icon: '✓', component: Approvals },
   { id: 'rulesets',   label: 'Rule Sets',       icon: '⊞', section: 'CONFIGURE',  component: RuleSets },
   { id: 'reports',    label: 'Reports',         icon: '▤', component: Reports },
   { id: 'settings',   label: 'Settings',        icon: '⚙', section: 'SYSTEM',     component: Settings },
 ]
+
+// Demo-scoped nav: admin/internal tabs hidden by default; Settings → Sidebar tabs
+// can re-enable any of them (stored in localStorage dq_nav).
+const DEMO_HIDE = new Set<string>()
+const navVisible = (id: string): boolean => {
+  try {
+    const n = JSON.parse(localStorage.getItem('dq_nav') || 'null')
+    if (n && typeof n === 'object' && id in n) return n[id] !== false
+    return !DEMO_HIDE.has(id)
+  } catch { return !DEMO_HIDE.has(id) }
+}
+
+const SparkBadge = () => {
+  const [master, setMaster] = useState('…')
+  useEffect(() => { api.getConfig().then(c => setMaster(c?.runtime?.spark_master ?? 'local')).catch(() => setMaster('local')) }, [])
+  return <span className="muted" style={{ fontSize: 12 }}>Spark {master}</span>
+}
 
 export default function App() {
   const [pageId, setPageId] = useState('dashboard')
@@ -32,6 +50,12 @@ export default function App() {
   const openPipeline = (id: string) => { setPipeFocus(id); setPageId('pipelines') }
   const [health, setHealth] = useState<string>('')
   const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    const go = (e: Event) => setPageId((e as CustomEvent).detail)
+    window.addEventListener('dq:navigate', go)
+    return () => window.removeEventListener('dq:navigate', go)
+  }, [])
 
   useEffect(() => {
     api.health().then(h => setHealth(h.status)).catch(() => setHealth('offline'))
@@ -54,7 +78,7 @@ export default function App() {
           <span>Data Quality Platform</span>
         </div>
         <nav className="sidebar-nav">
-          {PAGES.map(p => (
+          {PAGES.filter(p => p.id === 'settings' || navVisible(p.id)).map(p => (
             <React.Fragment key={p.id}>
               {p.section && <div className="nav-section">{p.section}</div>}
               <div
@@ -85,7 +109,7 @@ export default function App() {
             <b>{page.label}</b>
           </div>
           <div className="top-bar-right">
-            <span className="muted" style={{ fontSize: 12 }}>Spark local[8] · SQLite registry</span>
+            <SparkBadge />
           </div>
         </div>
         <div className="page-content">

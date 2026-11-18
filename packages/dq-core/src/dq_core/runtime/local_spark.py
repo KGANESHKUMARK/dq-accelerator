@@ -143,6 +143,14 @@ def _spark_conf(settings: LocalSparkSettings, dirs: dict[str, Path], shim_jar: P
         "spark.ui.showConsoleProgress": "false",
         "spark.sql.shuffle.partitions": str(settings.shuffle_partitions),
         "spark.default.parallelism": str(settings.shuffle_partitions),
+        # AQE: auto-coalesces small shuffle partitions → big win for small/medium data
+        "spark.sql.adaptive.enabled": "true",
+        "spark.sql.adaptive.coalescePartitions.enabled": "true",
+        "spark.sql.adaptive.coalescePartitions.minPartitionSize": "1mb",
+        "spark.sql.adaptive.advisoryPartitionSizeInBytes": "64mb",
+        # Codegen: raise the limit so wide profiler plans stay in whole-stage codegen
+        "spark.sql.codegen.maxFields": "300",
+        "spark.sql.codegen.aggregate.map.twolevel.enabled": "true",
         "spark.sql.session.timeZone": settings.timezone,
         "spark.local.dir": str(dirs["spark-local"]),
         "spark.sql.warehouse.dir": dirs["warehouse"].as_uri(),
@@ -267,6 +275,12 @@ def create_local_spark_session(settings: LocalSparkSettings | None = None) -> An
     builder = SparkSession.builder
     for key, value in conf.items():
         builder = builder.config(key, value)
+    if os.environ.get("DQ_OUTPUT_FORMAT", "").lower() == "delta":
+        try:
+            from delta import configure_spark_with_delta_pip
+            builder = configure_spark_with_delta_pip(builder)
+        except ImportError:
+            pass
     try:
         spark = builder.getOrCreate()
     finally:

@@ -7,8 +7,14 @@ engine:
   include_dq_columns_in_accepted: false
 
   registry:
-    backend: file              # file | sqlite  (sqlite = SQL store at db_path; PostgreSQL plugs in via same interface)
+    backend: nosql             # file | sqlite | nosql (nosql = document store: tinydb|mongodb|dynamodb)
     db_path: ../data/registry.db              # used when backend=sqlite
+    metadata:                                # used when backend=nosql
+      engine: tinydb                         # tinydb (embedded) | mongodb | dynamodb
+      db_path: ../data/metadata.nosql.json   # tinydb JSON document store
+      # engine: dynamodb → region/table_prefix/endpoint_url (DynamoDB Local) / aws_profile
+      #   e.g. endpoint_url: http://localhost:8002 + dummy AWS creds env vars
+      #   NOTE: ruleset publish→enforce chain has a DynamoDB bug (B-backlog) — tinydb is demo-safe
     rulesets_path: ../registry/rulesets       # used when backend=file
     pipelines_path: ../registry/pipelines     # used when backend=file
     enforce_published_immutability: true      # file content must match the published checksum
@@ -16,8 +22,8 @@ engine:
     enforce_pipeline_lifecycle: true          # PAUSED / OFFBOARDED pipelines pass data through untouched
 
   profiling:
-    mode: FULL                 # FULL | SAMPLE | APPROXIMATE
-    sample_fraction: 0.10
+    mode: SAMPLE               # FULL | SAMPLE | APPROXIMATE
+    sample_fraction: 0.05
     sample_seed: 42
     max_allowed_values: 20
     top_values: 10
@@ -49,21 +55,31 @@ engine:
 
   # DQ Assistant chatbot — toggle from Settings page (edited in place, comments preserved)
   assistant:
-    enabled: true
+    enabled: false
     log_path: ../logs/assistant/chat_log.jsonl   # one JSON per conversation turn
+
+  # Alerting — webhook notifications on quality-gate failures / quarantine spikes
+  alerts:
+    enabled: false
+    webhook_url: null                # Slack/Teams/any HTTP POST endpoint (JSON payload)
+    events: [gate_fail]              # gate_fail | quarantine_threshold | always
+    fail_pipeline: false             # true → halt pipeline when gate fails (post-report)
+    timeout_seconds: 10
+    min_quarantine_rate: 1.0         # quarantine_threshold fires at/above this rate (0.05 = 5%)
 
   outputs:
     base_path: ../data
     reports_path: ../reports
-    format: parquet
+    format: parquet          # parquet | delta  (delta = ACID tables + _delta_log, queryable as catalog.schema.table)
     write_mode: overwrite
+    # catalog: dq           # optional namespace: <base>/dq/bronze/<dataset>  ==  dq.bronze.<dataset>
 
   # Local Spark runtime tuning (used by UI backend + CLI local harness).
   # On Databricks/Fabric/EMR these are ignored — the cluster provides Spark.
   # Override any value via env var: DQ_DRIVER_MEMORY, DQ_SPARK_MASTER, DQ_SHUFFLE_PARTITIONS
   runtime:
     spark_master: local[4]
-    driver_memory: 3g
+    driver_memory: 2g
     shuffle_partitions: 16
     # Executor memory only applies to standalone/cluster mode, not local[*]
     executor_memory: 2g
