@@ -29,7 +29,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 500
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_002
     name: contact_id_unique
@@ -50,7 +50,7 @@ ruleset:
       evidence:
         distinct_count: 501
         rows: 500
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_003
     name: contact_id_regex
@@ -73,7 +73,7 @@ ruleset:
         dominant_pattern: A99999
         share: 1.0
         other_patterns: []
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_004
     name: contact_id_string_length
@@ -97,7 +97,7 @@ ruleset:
         min_length: 6
         max_length: 6
         avg_length: 6.0
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_005
     name: name_not_null
@@ -119,7 +119,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 500
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_006
     name: name_string_length
@@ -143,7 +143,7 @@ ruleset:
         min_length: 7
         max_length: 11
         avg_length: 10.028
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_007
     name: email_not_null
@@ -165,7 +165,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 500
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_008
     name: email_regex
@@ -186,7 +186,7 @@ ruleset:
       confidence: 0.966
       evidence:
         email_match_percentage: 96.6
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_009
     name: phone_not_null
@@ -208,7 +208,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 500
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_010
     name: phone_range
@@ -236,7 +236,7 @@ ruleset:
         p75: 18136035575.0
         outliers: 14
         method: IQR fences clipped to observed range - business review required
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_011
     name: status_not_null
@@ -258,7 +258,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 500
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_012
     name: status_allowed_values
@@ -288,7 +288,7 @@ ruleset:
           PENDING: 118
           INACTIVE: 111
         excluded_rare_values: []
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_013
     name: created_date_not_null
@@ -310,7 +310,7 @@ ruleset:
         null_count: 0
         null_percentage: 0.0
         rows: 500
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_014
     name: created_date_date_format
@@ -334,7 +334,7 @@ ruleset:
           yyyy-MM-dd: 100.0
         date_min: '2023-01-01'
         date_max: '2025-12-31'
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   - rule_id: GEN_CONTACTS_500_015
     name: contacts_500_schema_validation
@@ -368,12 +368,12 @@ ruleset:
       confidence: 0.9
       evidence:
         column_count: 6
-      profiled_at: '2026-11-16T16:37:57Z'
+      profiled_at: '2026-11-16T17:29:59Z'
       profile_mode: FULL
   status: DRAFT
   created_by: ''
   created_at: ''
   approved_by: ui-onboard
-  approved_at: '2026-11-16T16:39:11Z'
+  approved_at: '2026-11-16T17:31:30Z'
   change_log:
   - approved 15 of 15 candidate rules
