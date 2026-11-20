@@ -1,0 +1,719 @@
+ruleset:
+  ruleset_id: financial_txn_1gb_bronze
+  dataset: financial_txn_1gb
+  version: '1.0'
+  stage: BRONZE
+  description: Approved from candidates financial_txn_1gb_bronze@1.0
+  owner: ''
+  record_key: []
+  lookups: {}
+  parent_version: null
+  rules:
+  - rule_id: GEN_FINANCIAL_TXN_1GB_001
+    name: txn_id_not_null
+    description: txn_id is populated in 99.2% of rows
+    dataset: financial_txn_1gb
+    column: txn_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 76
+        null_percentage: 0.76
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_002
+    name: txn_id_unique
+    description: txn_id looks like an identifier (100.1% unique)
+    dataset: financial_txn_1gb
+    column: txn_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 1.0007
+        duplicate_value_count: 0
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_003
+    name: txn_id_regex
+    description: txn_id follows the structural pattern AAA9999999999
+    dataset: financial_txn_1gb
+    column: txn_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      pattern: ^[A-Z]{3}[0-9]{10}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA9999999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_004
+    name: txn_id_string_length
+    description: txn_id length observed between 13 and 13
+    dataset: financial_txn_1gb
+    column: txn_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: BRONZE
+    config:
+      min: 13
+      max: 13
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 13
+        max_length: 13
+        avg_length: 13.0
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_005
+    name: account_id_not_null
+    description: account_id is populated in 100.0% of rows
+    dataset: financial_txn_1gb
+    column: account_id
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_006
+    name: account_id_unique
+    description: account_id looks like an identifier (97.3% unique)
+    dataset: financial_txn_1gb
+    column: account_id
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.8
+      evidence:
+        unique_ratio: 0.9729
+        duplicate_value_count: 271
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_007
+    name: account_id_regex
+    description: account_id follows the structural pattern AAA9999999
+    dataset: financial_txn_1gb
+    column: account_id
+    rule_type: REGEX
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      pattern: ^[A-Z]{3}[0-9]{7}$
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        dominant_pattern: AAA9999999
+        share: 1.0
+        other_patterns: []
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_008
+    name: account_id_string_length
+    description: account_id length observed between 10 and 10
+    dataset: financial_txn_1gb
+    column: account_id
+    rule_type: STRING_LENGTH
+    scope: ROW_LEVEL
+    severity: WARNING
+    stage: BRONZE
+    config:
+      min: 10
+      max: 10
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        min_length: 10
+        max_length: 10
+        avg_length: 10.0
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_009
+    name: txn_date_not_null
+    description: txn_date is populated in 100.0% of rows
+    dataset: financial_txn_1gb
+    column: txn_date
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_010
+    name: txn_date_date_format
+    description: txn_date is a date in yyyy-MM-dd
+    dataset: financial_txn_1gb
+    column: txn_date
+    rule_type: DATE_FORMAT
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      format: yyyy-MM-dd
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9923
+      evidence:
+        date_format_matches:
+          yyyy-MM-dd: 99.23
+        date_min: '2020-01-01'
+        date_max: '2024-12-28'
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_011
+    name: amount_not_null
+    description: amount is populated in 100.0% of rows
+    dataset: financial_txn_1gb
+    column: amount
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_012
+    name: amount_data_type
+    description: amount holds decimal numbers stored as text
+    dataset: financial_txn_1gb
+    column: amount
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_013
+    name: amount_range
+    description: amount typically between -26233.68 and 49998.75
+    dataset: financial_txn_1gb
+    column: amount
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      min: -26233.68
+      max: 49998.75
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -49734.3
+        observed_max: 49998.75
+        p25: 11995.41
+        p75: 37481.47
+        outliers: 41
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_014
+    name: balance_after_not_null
+    description: balance_after is populated in 100.0% of rows
+    dataset: financial_txn_1gb
+    column: balance_after
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_015
+    name: balance_after_unique
+    description: balance_after is unique in the profiled data (primary key candidate)
+    dataset: financial_txn_1gb
+    column: balance_after
+    rule_type: UNIQUE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        distinct_count: 9997
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_016
+    name: balance_after_data_type
+    description: balance_after holds decimal numbers stored as text
+    dataset: financial_txn_1gb
+    column: balance_after
+    rule_type: DATA_TYPE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 1.0
+      evidence:
+        numeric_castable_percentage: 100.0
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_017
+    name: balance_after_range
+    description: balance_after typically between -51800.74 and 99999.78
+    dataset: financial_txn_1gb
+    column: balance_after
+    rule_type: RANGE
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      min: -51800.74
+      max: 99999.78
+      data_type: decimal(18,2)
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.6
+      evidence:
+        observed_min: -99081.91
+        observed_max: 99999.78
+        p25: 24023.52
+        p75: 74573.03
+        outliers: 29
+        method: IQR fences clipped to observed range - business review required
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_018
+    name: txn_type_not_null
+    description: txn_type is populated in 100.0% of rows
+    dataset: financial_txn_1gb
+    column: txn_type
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_019
+    name: txn_type_allowed_values
+    description: txn_type has 5 frequent categorical values
+    dataset: financial_txn_1gb
+    column: txn_type
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      values:
+      - FEE
+      - CREDIT
+      - DEBIT
+      - REFUND
+      - TRANSFER
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          FEE: 2055
+          CREDIT: 2018
+          DEBIT: 1995
+          REFUND: 1989
+          TRANSFER: 1943
+        excluded_rare_values: []
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_020
+    name: status_not_null
+    description: status is populated in 100.0% of rows
+    dataset: financial_txn_1gb
+    column: status
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_021
+    name: status_allowed_values
+    description: status has 5 frequent categorical values
+    dataset: financial_txn_1gb
+    column: status
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      values:
+      - REVERSED
+      - COMPLETED
+      - PENDING
+      - FAILED
+      - INVALID_STATUS
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          REVERSED: 2546
+          COMPLETED: 2524
+          PENDING: 2465
+          FAILED: 2397
+          INVALID_STATUS: 68
+        excluded_rare_values: []
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_022
+    name: currency_not_null
+    description: currency is populated in 99.3% of rows
+    dataset: financial_txn_1gb
+    column: currency
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.75
+      evidence:
+        null_count: 68
+        null_percentage: 0.68
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_023
+    name: currency_allowed_values
+    description: currency has 5 frequent categorical values
+    dataset: financial_txn_1gb
+    column: currency
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      values:
+      - USD
+      - GBP
+      - INR
+      - EUR
+      - AED
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          USD: 2046
+          GBP: 1995
+          INR: 1994
+          EUR: 1988
+          AED: 1909
+        excluded_rare_values: []
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_024
+    name: channel_not_null
+    description: channel is populated in 100.0% of rows
+    dataset: financial_txn_1gb
+    column: channel
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_025
+    name: channel_allowed_values
+    description: channel has 5 frequent categorical values
+    dataset: financial_txn_1gb
+    column: channel
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      values:
+      - WEB
+      - BRANCH
+      - API
+      - ATM
+      - MOBILE
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          WEB: 2046
+          BRANCH: 2037
+          API: 1986
+          ATM: 1968
+          MOBILE: 1963
+        excluded_rare_values: []
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_026
+    name: region_not_null
+    description: region is populated in 100.0% of rows
+    dataset: financial_txn_1gb
+    column: region
+    rule_type: NOT_NULL
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config: {}
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.95
+      evidence:
+        null_count: 0
+        null_percentage: 0.0
+        rows: 10000
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_027
+    name: region_allowed_values
+    description: region has 5 frequent categorical values
+    dataset: financial_txn_1gb
+    column: region
+    rule_type: ALLOWED_VALUES
+    scope: ROW_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      values:
+      - WEST
+      - SOUTH
+      - NORTH
+      - EAST
+      - CENTRAL
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.85
+      evidence:
+        value_counts:
+          WEST: 2053
+          SOUTH: 2032
+          NORTH: 2018
+          EAST: 1954
+          CENTRAL: 1943
+        excluded_rare_values: []
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  - rule_id: GEN_FINANCIAL_TXN_1GB_028
+    name: financial_txn_1gb_schema_validation
+    description: schema observed at profiling time
+    dataset: financial_txn_1gb
+    column: null
+    rule_type: SCHEMA_VALIDATION
+    scope: DATASET_LEVEL
+    severity: ERROR
+    stage: BRONZE
+    config:
+      expected_columns:
+      - name: txn_id
+        type: string
+      - name: account_id
+        type: string
+      - name: txn_date
+        type: string
+      - name: amount
+        type: string
+      - name: balance_after
+        type: string
+      - name: txn_type
+        type: string
+      - name: status
+        type: string
+      - name: currency
+        type: string
+      - name: channel
+        type: string
+      - name: region
+        type: string
+      allow_extra_columns: false
+    remediation: {}
+    version: '1.0'
+    status: APPROVED
+    generation:
+      generator: dq-core-generator-0.1.0
+      confidence: 0.9
+      evidence:
+        column_count: 10
+      profiled_at: '2026-11-20T10:49:58Z'
+      profile_mode: APPROXIMATE
+  status: DRAFT
+  created_by: ''
+  created_at: ''
+  approved_by: ui-onboard
+  approved_at: '2026-11-20T10:51:35Z'
+  change_log:
+  - approved 28 of 28 candidate rules

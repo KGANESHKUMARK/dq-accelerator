@@ -186,16 +186,18 @@ Open in this order — tells the whole story in ~10 min:
 | `bank_transactions.csv` | 5.3MB / 50K rows | ~3-4 min E2E | **Main demo** — fast complete loop, 993 quarantined, score 99.6 |
 | `goat_herd_animals` | small | fastest | **AI fixes + approvals** — real LLM `AI_APPLIED @0.95`, `HUMAN_APPROVED_AI @0.80` |
 | `hotel_reservations.parquet` | 42.8MB / **1M rows** | ~5-10 min | **"Million rows" proof** — parquet ingest is fast |
-| `college_students.csv` | 202MB / 2.1M rows | profile ~4-5min SAMPLE | **"Big file" story** — auto-SAMPLE above 50MB protects RAM |
-| `cdr_records.csv` | 1GB / 6.3M rows | Bronze OK → local OOM | **Honest boundary** — cluster territory |
+| `college_students.csv` | 203MB / 2.1M rows | profile ~2-4min SAMPLE 10% → ≤50K rows | **"Big file" story** — DQX-style row cap keeps profiling bounded |
+| `financial_txn_1gb.csv` | 647MB / 8M rows | **Auto E2E Bronze = 2 min 54 s (verified)** | **"Near-1GB" proof** — APPROXIMATE 30% → 10K rows profiled, 28 rules |
+| `cdr_records.csv` | 1GB / 6.3M rows | Bronze profile bounded (≤10K rows); full Silver validation on 6.3M rows is the heavy step | **Honest boundary** — cluster territory for full E2E |
 
 ## 7. The "bigger data, faster" answer (say it verbatim)
 
-> *"Local single-node Spark on a laptop. The same wheel on Databricks,
-> EMR, or Dataproc with 8-16 workers is 5-10× faster — 1M rows in seconds.
-> We proved Bronze ingest of 1GB / 6.3M rows (→ 295MB parquet) before
-> hitting this laptop's RAM ceiling — a hardware limit, not a framework
-> limit. On a cluster this is a non-issue."*
+> *"Local single-node Spark on a laptop. Profiling follows the Databricks DQX
+> pattern — sample generously (30%), then cap the rows actually profiled
+> (10K for >500MB files), so a 677MB / 8M-row CSV onboards end-to-end in
+> under 3 minutes. The same wheel on Databricks, EMR, or Dataproc with
+> 8-16 workers is 5-10× faster — 1M rows in seconds. Validation still
+> scans every row; only the statistics-gathering step is bounded."*
 
 ## 8. Expectation → Evidence map
 

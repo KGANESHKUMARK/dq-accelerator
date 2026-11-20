@@ -283,6 +283,7 @@ Full 21-step CLI demo script: `docs/poc_demo_script.md`.
 | `demo_hospital_encounters` | 50,000 | ~22 | 48,405 | 1,595 (~3.2%) | Full B→S→G verified |
 | `demo_ecommerce_orders` | 300,000 | 19 | 290,490 | 9,510 (~3.2%) | Bad emails, mixed dates, negatives |
 | `demo_telco_events` | **1,000,000** | 22 | 974,714 | 25,286 (~2.5%) | SAMPLE profiling auto-engaged; `.parquet` = 32 MB vs 74 MB CSV |
+| `financial_txn_1gb` (uploads) | **8,000,000** / 677.7 MB CSV | 28 | — (Bronze-only run) | — | DQX-style profiling: APPROXIMATE 30% → **10K rows profiled**; Auto E2E in **2 min 54 s** |
 | `demo_bank_loans` | 60,000 | 33 | — | — | Dup loan IDs, bad dates, negative income |
 
 All gates PASS (quarantine rates far under the 40% policy threshold).
@@ -325,7 +326,7 @@ Ingest manifest: source SHA-256 0a819f28… + schema + row count + timestamp
 | Area | Capability | Where |
 |---|---|---|
 | **Onboarding** | Upload CSV/Parquet → auto-profile → candidate rules → steward review → ruleset+manifest+register in one flow | Onboard |
-| **Profiling** | Schema, nulls, duplicates, distinct counts, formats, ranges, categories, anomalies; FULL vs SAMPLE mode for large files | engine |
+| **Profiling** | Schema, nulls, duplicates, distinct counts, formats, ranges, categories, anomalies; auto-detected FULL/SAMPLE/APPROXIMATE by file size with DQX-style row limits (see `docs/profiling.md`) | engine |
 | **Rule engine** | NOT_NULL, UNIQUE, REGEX, RANGE, ALLOWED_VALUES, DATE_FORMAT, DATA_TYPE, STRING_LENGTH, DUPLICATE, REFERENTIAL_INTEGRITY, BUSINESS_RULE, SCHEMA_VALIDATION | rulesets |
 | **Remediation** | Deterministic fixes (TRIM, DEDUPLICATE, lookup…) → AI proposals → confidence gate → revalidate → quarantine | REMEDIATE mode |
 | **AI governance** | DQXProvider→Databricks Model Serving (Llama-3.3) or MockAI; per-decision `provider/model_version/simulated`; `max_requests_per_run` bound | engine.yaml + .env |
@@ -355,7 +356,7 @@ Ingest manifest: source SHA-256 0a819f28… + schema + row count + timestamp
 | "Do auto re-runs keep version history?" | Auto-E2E purges prior same-pipeline artifacts so reruns are idempotent — version history accumulates through the manual wizard/publish path instead. |
 | "NoSQL as a data source?" | `demo_mongo_claims.json` proves document-shaped data (MongoDB-style `_id` + nested objects) flows through the same pipeline via the JSON source. Native MongoDB ingestion via spark-mongo connector is a roadmap item (needs cluster JVM deps). |
 | "Pipelines are real?" | Manifests labelled `platform: DATABRICKS/FABRIC/...` are **synthetic stand-ins** for client pipelines (no client assets were supplied). Integration pattern is real and tested. |
-| "1M rows = auto-sampling?" | Telco 1M profiling auto-engages SAMPLE mode (check report `mode=SAMPLE`); validation still covers all rows. Hotel parquet may run FULL under the 50 MB threshold. |
+| "1M+ rows = auto-sampling?" | Yes — file size auto-selects mode + a hard row cap on *profiled* rows (DQX-style: sample 30%, profile ≤10K for >500MB files; see `docs/profiling.md`). Profiling feeds rule generation only — validation still scans every row. Verified: 677MB / 8M-row CSV → Auto E2E (Bronze) in 2 min 54 s. |
 | "Production-ready?" | POC scope: no auth/RBAC, scheduling, multi-tenancy, or external alerting — those are P5+ roadmap. Formal schema-contract enforcement (expected-schema YAML → hard drift reject) is a noted gap; ODCS import + profile-driven type rules cover most of it. |
 
 ---

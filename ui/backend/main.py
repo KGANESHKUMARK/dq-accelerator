@@ -696,47 +696,33 @@ _BIG_FILE = 50 * 1024 * 1024      # FULL profile above this risks OOM on the loc
 # Configurable via engine.yaml -> validation.large_file_threshold_mb
 
 
-def _profile_mode_for(src: Path, requested: str, engine=None) -> str:
-    try:
-        threshold = _BIG_FILE
-        if engine is not None:
-            threshold = engine.config.validation.large_file_threshold_mb * 1024 * 1024
-        if requested.upper() == "FULL" and src.stat().st_size > threshold:
-            return "SAMPLE"
-    except OSError:
-        pass
-    return requested.upper()
-
-
-def _sample_fraction_for(src: Path, engine=None) -> float | None:
-    """Adaptive sample fraction: smaller samples for very large files.
-    Returns None to use engine default. Targets ~100K rows regardless of file size."""
+def _auto_profile_config(src: Path, engine=None) -> tuple[str, float | None, int | None]:
+    """DQX-style auto-detect: sample generously, limit rows actually profiled.
+    Mirrors databrickslabs/dqx which samples 30% then limits to 1000 records.
+    Returns (mode, sample_fraction, limit_rows)."""
     try:
         size_mb = src.stat().st_size / (1024 * 1024)
-        # >500MB: use 1% (≈80K rows for 8M-row file) instead of default 5%
-        if size_mb > 500:
-            return 0.01
-        # >200MB: use 2%
-        if size_mb > 200:
-            return 0.02
-        # >100MB: use 3%
-        if size_mb > 100:
-            return 0.03
+        if size_mb > 500:      # >500MB — very large: sample 30%, profile ≤10K rows
+            return "APPROXIMATE", 0.30, 10_000
+        elif size_mb > 100:    # >100MB — large: sample 10%, profile ≤50K rows
+            return "SAMPLE", 0.10, 50_000
+        elif size_mb > 50:     # >50MB — medium: sample 5%, profile ≤100K rows
+            return "SAMPLE", 0.05, 100_000
     except OSError:
         pass
-    return None  # use engine default
+    return "FULL", None, None   # <50MB — small: profile all rows, no limit
 
 
 def _do_profile(body: ProfileIn) -> dict[str, Any]:
     spark, engine = _spark_engine()
     src = ROOT / body.source
-    mode = _profile_mode_for(src, body.mode, engine)
+    mode, sample_frac, limit_rows = _auto_profile_config(src, engine)
     ds = body.dataset or src.stem
-    sample_frac = _sample_fraction_for(src, engine)
     df, parquet_tmp = _read_for_profiling(spark, body.source, "AUTO", ds)
-    _prog(f"phase=profile | profiling {ds} ({mode}{f', sample={sample_frac:.0%}' if sample_frac else ''}) — computing column statistics")
+    _prog(f"phase=profile | profiling {ds} ({mode}{f', sample={sample_frac:.0%}' if sample_frac else ''}, limit={limit_rows or 'none'}) — computing column statistics")
     try:
         rep = engine.profile(df, ds, mode=mode, sample_fraction=sample_frac,
+                             limit_rows=limit_rows,
                              on_phase=lambda m: _prog(f"phase=profile | {m}"))
     finally:
         _cleanup_parquet_tmp(parquet_tmp)
@@ -2000,13 +1986,13 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     spark, engine = _spark_engine()
     ds = body.dataset or Path(body.source).stem
     src_path = (ROOT / body.source).resolve()
-    mode = _profile_mode_for(src_path, "FULL", engine) if src_path.suffix and src_path.exists() else "SAMPLE"
+    mode, sample_frac, limit_rows = _auto_profile_config(src_path, engine)
 
     df, parquet_tmp = _read_for_profiling(spark, body.source, body.source_format, ds)
-    sample_frac = _sample_fraction_for(src_path, engine)
-    _prog(f"phase=profile | profiling {ds} ({mode}{f', sample={sample_frac:.0%}' if sample_frac else ''}) — computing column statistics")
+    _prog(f"phase=profile | profiling {ds} ({mode}{f', sample={sample_frac:.0%}' if sample_frac else ''}, limit={limit_rows or 'none'}) — computing column statistics")
     try:
         rep = engine.profile(df, ds, mode=mode, sample_fraction=sample_frac,
+                             limit_rows=limit_rows,
                              on_phase=lambda m: _prog(f"phase=profile | {m}"))
     finally:
         _cleanup_parquet_tmp(parquet_tmp)

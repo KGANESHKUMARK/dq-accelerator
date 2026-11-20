@@ -65,8 +65,13 @@ UI: Onboard → Step1 source → Step2 options → Step3 profile → Step4 rules
  │       ├─ _read_any_source()        NEW: AUTO|CSV|PARQUET|JSON|DELTA|TABLE
  │       │     files → repo-root guard; TABLE→spark.read.table,
  │       │     DELTA→spark.read.format("delta"), JSON→json reader
- │       ├─ _profile_mode_for()       >50MB file → SAMPLE else FULL
- │       ├─ engine.profile(df, ds)    profiling/profiler.py
+ │       ├─ _read_for_profiling()     large CSV → temp Parquet first (columnar)
+ │       ├─ _auto_profile_config()    DQX-style file-size auto-detect →
+ │       │       (mode, sample_fraction, limit_rows):
+ │       │       <50MB FULL · 50-100MB SAMPLE 5%/≤100K · 100-500MB SAMPLE 10%/≤50K
+ │       │       >500MB APPROXIMATE 30%/≤10K — sample generously, cap profiled rows
+ │       ├─ engine.profile(df, ds, mode, sample_fraction, limit_rows)
+ │       │                            profiling/profiler.py — .limit() after sampling
  │       │     column stats (null%, distinct, percentiles, IQR outliers,
  │       │     robust z-score, top values, date formats, whitespace…)
  │       │     _anomalies()           ALL_NULL/HIGH_NULL_RATE/DOMINANT_VALUE/

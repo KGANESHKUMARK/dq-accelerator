@@ -132,6 +132,6 @@ Outcome evidence — **every path exercised with the real Databricks LLM**
 | Question | Answer |
 |---|---|
 | "Did you run this on real Databricks Spark?" | Honest: engine + LLM endpoint verified; cloud Spark cluster run is the one open P4 item — contract-tested, not yet executed. |
-| "What about 1 GB files?" | Local 1 GB CDR benchmark exists (~60s profile); memory/partitions configurable via `engine.yaml` + env vars. |
+| "What about 1 GB files?" | Verified: 677MB / 8M-row CSV → Auto E2E (Bronze) in **2 min 54 s**. Profiling auto-selects APPROXIMATE mode and caps profiled rows at 10K (DQX-style sample-then-limit); large CSVs are converted to temp Parquet first. Validation still scans all rows — only statistics gathering is bounded. |
 | "Can we approve quarantined rows?" | Yes — Quarantine page approve/reject feeds the approvals store; approved corrections apply as `HUMAN_APPROVED_AI` next run. |
 | "Other platforms?" | Fabric/EMR/Dataproc manifests + adapter contracts ship in repo; same `dq-core` wheel drops into any PySpark job. |

@@ -9,6 +9,8 @@ Automatic data profiling over existing Spark DataFrames. Implemented in
 report = engine.profile(df, "customers", mode="FULL")            # default
 report = engine.profile(df, "customers", mode="SAMPLE", sample_fraction=0.10)
 report = engine.profile(df, "customers", mode="APPROXIMATE")     # approx_count_distinct etc.
+report = engine.profile(df, "customers", mode="APPROXIMATE",
+                        sample_fraction=0.30, limit_rows=10_000)  # DQX-style cap
 ```
 
 | Mode | Behaviour |
@@ -17,8 +19,62 @@ report = engine.profile(df, "customers", mode="APPROXIMATE")     # approx_count_
 | `SAMPLE` | Deterministic sample (`sample_fraction`, seeded) then full profiling on the sample; `sampled=True`, `sample_fraction` recorded |
 | `APPROXIMATE` | Uses `approx_count_distinct` / approx aggregates for speed on large data; `approximate=True` flagged in the report |
 
+`limit_rows` (optional) applies `.limit(n)` **after** sampling and before any
+profiling pass — the DQX pattern: *sample generously, cap what you actually
+profile*. It composes with every mode (`FULL` + `limit_rows` also works).
+
 All modes are **distributed** — stats are computed with Spark aggregations; the
 driver only collects per-column summary rows, never the dataset.
+
+## 1a. Auto-detect strategy (DQX-style, used by the UI/backend)
+
+The backend never asks the user to pick a profiling mode. `_auto_profile_config()`
+in `ui/backend/main.py` chooses `(mode, sample_fraction, limit_rows)` from the
+**source file size**, mirroring `databrickslabs/dqx` (which samples 30% then
+limits to 1,000 records — we scale the cap to our file sizes):
+
+| Source size | Mode | Sample | Row limit | Rows actually profiled |
+|---|---|---|---|---|
+| < 50 MB | `FULL` | — | — | all rows |
+| 50–100 MB | `SAMPLE` | 5% | 100,000 | ≤ 100K |
+| 100–500 MB | `SAMPLE` | 10% | 50,000 | ≤ 50K |
+| > 500 MB | `APPROXIMATE` | 30% | 10,000 | ≤ 10K |
+
+Thresholds are constants inside `_auto_profile_config()` — tune them there for a
+POC; promoting them to `engine.yaml` is a straightforward follow-up.
+
+The same config feeds **all three profiling entry points**: the standalone
+`/api/profile` job, the onboarding bootstrap preview (wizard Step 3), and Auto
+E2E (which calls the preview path) — so every route gets identical behaviour.
+
+### Large-file read path
+
+For CSV sources above the threshold, `_read_for_profiling()` first converts the
+file to a **temporary Parquet** directory (`.tmp/profile_<ds>_<ts>.parquet`),
+profiles the Parquet, then deletes it in a `finally` block. Columnar reads are
+~10–50× faster than re-parsing CSV text in every Spark job, and Parquet footer
+metadata lets `row_count` skip a full `count()` scan in sampled modes.
+
+### Verified numbers (local Spark, this machine)
+
+| File | Size | Rows | Auto config | Profiling rows | Auto E2E (BRONZE) |
+|---|---|---|---|---|---|
+| `contacts_500.parquet` | <1 MB | 500 | FULL | 500 | ~30 s |
+| `financial_txn_1gb.csv` | 677.7 MB | 8,000,000 | APPROXIMATE 30% → 10K | **10,000** | **2 min 54 s** |
+
+Before the row limit, the same 677 MB file took ~9.75 min to profile (~80K
+sampled rows, 1% fraction, no cap). The cap — not the sample fraction — is what
+makes large-file profiling fast.
+
+### Honest trade-offs
+
+- Values rarer than ~0.1% of rows may be absent from the profiled sample, so
+  `top_values` / `candidate_allowed_values` can miss them and approximate
+  distinct counts are less exact. Null rates, min/max, means, percentiles,
+  outlier counts and pattern detection remain statistically sound.
+- **Profiling only feeds rule generation.** Silver/Gold validation still scans
+  and checks **every row** — governance coverage is unchanged; only the
+  statistics-gathering step is bounded (exactly like DQX).
 
 ## 2. What is profiled (per column)
 
