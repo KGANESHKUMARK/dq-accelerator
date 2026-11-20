@@ -14,9 +14,9 @@ quality gates, metrics and audit reports.
 > **Real Databricks Model Serving LLM calls are working** — DQXProvider uses LiteLLM
 > to call `databricks-meta-llama-3-3-70b-instruct` for value correction with confidence
 > scoring. MockAI remains as automatic fallback when credentials are absent.
-> See `docs/testing_report.md` for exactly what was verified and how.
+> See `docs/reference/testing_report.md` for exactly what was verified and how.
 >
-> **Current development boundary:** `docs/POC_CONTEXT.md`. Remaining POC work
+> **Current development boundary:** `docs/poc/POC_CONTEXT.md`. Remaining POC work
 > is P0–P4 in `ROADMAP.md`; production orchestration remains deferred.
 
 ## What is in the box
@@ -139,7 +139,7 @@ Microsoft Fabric Spark, or a standalone local Spark app.
 ```powershell
 # one-command onboarding: profile a source file -> approved ruleset + manifest
 dqctl bootstrap data/new_source.csv --dataset orders --pipeline-id ORDERS_PIPELINE \
-    --copy --publish --onboard          # see docs/PROJECT_GUIDE.md §6.3.1 for all flags
+    --copy --publish --onboard          # see docs/guides/PROJECT_GUIDE.md §6.3.1 for all flags
 
 dqctl pipeline onboard --manifest config/pipelines/customer_pipeline.yaml
 dqctl pipeline list
@@ -164,43 +164,43 @@ dqctl run sample_data/bronze/customers.csv --ruleset config/rulesets/customers_v
 
 | Document | Read it if you… |
 |---|---|
-| [`docs/PROJECT_GUIDE.md`](docs/PROJECT_GUIDE.md) | Want the master guide: what it is, setup, full structure, how to run everything |
-| [`docs/SETUP.md`](docs/SETUP.md) | Are setting up on a fresh machine (`DQ_start.bat`, prerequisites, `.env`) |
-| [`docs/end_to_end_demo.md`](docs/end_to_end_demo.md) | Are about to present — fresh machine → live demo runbook in order |
-| [`docs/ui_demo_guide.md`](docs/ui_demo_guide.md) | Are demoing the UI to a client — tab-by-tab walkthrough |
+| [`docs/guides/PROJECT_GUIDE.md`](docs/guides/PROJECT_GUIDE.md) | Want the master guide: what it is, setup, full structure, how to run everything |
+| [`docs/guides/SETUP.md`](docs/guides/SETUP.md) | Are setting up on a fresh machine (`DQ_start.bat`, prerequisites, `.env`) |
+| [`docs/presentation/end_to_end_demo.md`](docs/presentation/end_to_end_demo.md) | Are about to present — fresh machine → live demo runbook in order |
+| [`docs/guides/ui_demo_guide.md`](docs/guides/ui_demo_guide.md) | Are demoing the UI to a client — tab-by-tab walkthrough |
 
 ### Developers
 
 | Document | Read it if you… |
 |---|---|
-| [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) | Are joining the project — build phases, verification, release process, extension points |
-| [`docs/architecture.md`](docs/architecture.md) | Need the architecture: HLD/LLD diagrams, component map, status, failure model |
-| [`docs/spark_core_engine.md`](docs/spark_core_engine.md) | Are hacking on `dq-core` internals — module-by-module LLD |
-| [`docs/testing_report.md`](docs/testing_report.md) | Want the executed-test evidence and defect log |
-| [`docs/POC.md`](docs/POC.md) | Need the POC use case + P0–P4 verification status |
-| [`docs/POC_CONTEXT.md`](docs/POC_CONTEXT.md) | Need authoritative POC guardrails and priorities |
+| [`docs/guides/DEVELOPER_GUIDE.md`](docs/guides/DEVELOPER_GUIDE.md) | Are joining the project — build phases, verification, release process, extension points |
+| [`docs/architecture/architecture.md`](docs/architecture/architecture.md) | Need the architecture: HLD/LLD diagrams, component map, status, failure model |
+| [`docs/architecture/spark_core_engine.md`](docs/architecture/spark_core_engine.md) | Are hacking on `dq-core` internals — module-by-module LLD |
+| [`docs/reference/testing_report.md`](docs/reference/testing_report.md) | Want the executed-test evidence and defect log |
+| [`docs/poc/POC.md`](docs/poc/POC.md) | Need the POC use case + P0–P4 verification status |
+| [`docs/poc/POC_CONTEXT.md`](docs/poc/POC_CONTEXT.md) | Need authoritative POC guardrails and priorities |
 | [`ROADMAP.md`](ROADMAP.md) | Want the forward plan (post-POC phases) |
 
 ### Feature deep-dives (engine internals)
 
 | Document | Covers |
 |---|---|
-| [`docs/profiling.md`](docs/profiling.md) | Profiling modes (FULL/SAMPLE/APPROXIMATE), metrics, anomalies |
-| [`docs/rule_management.md`](docs/rule_management.md) | RuleSet versioning, registry, publish immutability, diff/rollback |
-| [`docs/remediation.md`](docs/remediation.md) | Deterministic + AI remediation flows, outcome taxonomy |
-| [`docs/confidence_policy.md`](docs/confidence_policy.md) | 90% threshold, sensitive columns, approvals/rejections memory |
-| [`docs/quarantine.md`](docs/quarantine.md) | Quarantine schema, statuses, revalidation |
-| [`docs/medallion_data_flow.md`](docs/medallion_data_flow.md) | Bronze/Silver/Gold stage execution + physical persistence |
-| [`docs/pipeline_adapters.md`](docs/pipeline_adapters.md) | Portability matrix + per-platform adapter contracts |
+| [`docs/concepts/profiling.md`](docs/concepts/profiling.md) | Profiling modes (FULL/SAMPLE/APPROXIMATE), metrics, anomalies |
+| [`docs/concepts/rule_management.md`](docs/concepts/rule_management.md) | RuleSet versioning, registry, publish immutability, diff/rollback |
+| [`docs/concepts/remediation.md`](docs/concepts/remediation.md) | Deterministic + AI remediation flows, outcome taxonomy |
+| [`docs/concepts/confidence_policy.md`](docs/concepts/confidence_policy.md) | 90% threshold, sensitive columns, approvals/rejections memory |
+| [`docs/concepts/quarantine.md`](docs/concepts/quarantine.md) | Quarantine schema, statuses, revalidation |
+| [`docs/architecture/medallion_data_flow.md`](docs/architecture/medallion_data_flow.md) | Bronze/Silver/Gold stage execution + physical persistence |
+| [`docs/concepts/pipeline_adapters.md`](docs/concepts/pipeline_adapters.md) | Portability matrix + per-platform adapter contracts |
 
 ### Demo & assessment assets
 
 | Document | Covers |
 |---|---|
-| [`docs/poc_demo_script.md`](docs/poc_demo_script.md) | 21-step CLI demo script with expected output |
-| [`docs/presentation_deck.md`](docs/presentation_deck.md) | Slide-ready narrative for stakeholder presentations |
-| [`docs/databricks_pipeline_assessment.md`](docs/databricks_pipeline_assessment.md) | Assessment of the supplied/synthetic pipeline assets |
-| [`docs/databricks_onboarding.md`](docs/databricks_onboarding.md) | Step-by-step Databricks workspace onboarding pattern |
+| [`docs/presentation/poc_demo_script.md`](docs/presentation/poc_demo_script.md) | 21-step CLI demo script with expected output |
+| [`docs/presentation/presentation_deck.md`](docs/presentation/presentation_deck.md) | Slide-ready narrative for stakeholder presentations |
+| [`docs/presentation/databricks_pipeline_assessment.md`](docs/presentation/databricks_pipeline_assessment.md) | Assessment of the supplied/synthetic pipeline assets |
+| [`docs/guides/databricks_onboarding.md`](docs/guides/databricks_onboarding.md) | Step-by-step Databricks workspace onboarding pattern |
 
 ## Honest scope statement
 

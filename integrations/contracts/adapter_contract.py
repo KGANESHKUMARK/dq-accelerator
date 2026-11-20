@@ -4,7 +4,7 @@ Every future platform adapter (Dataproc, Microsoft Fabric, Airflow DAG, ADF acti
 post-hook, Kafka/Flink consumer) must implement this interface. The local Databricks adapter
 uses it implicitly through the `DataQualityEngine.run()` facade.
 
-Portability design notes (see docs/pipeline_adapters.md):
+Portability design notes (see docs/concepts/pipeline_adapters.md):
 * Airflow and ADF are orchestration systems, not Spark runtimes – they call `dqctl run` or
   invoke a Databricks / Dataproc job via their operators.
 * dbt and warehouse SQL systems need a SQL execution adapter (not yet implemented).
@@ -74,7 +74,7 @@ class AirflowCliAdapter(PlatformAdapter):
 
     Implementation: BashOperator / KubernetesPodOperator calls `dqctl run` and publishes
     the JSON report to XCom; the DQ core engine does not run inside the Airflow worker.
-    See docs/pipeline_adapters.md#airflow.
+    See docs/concepts/pipeline_adapters.md#airflow.
     """
 
     platform_name = "AIRFLOW_CLI"
@@ -82,14 +82,14 @@ class AirflowCliAdapter(PlatformAdapter):
     def execute(self, context: PipelineContext, ruleset: RuleSet, policy: RemediationPolicyConfig,
                 mode: IntegrationMode, **kwargs: Any) -> DQResult:
         raise NotImplementedError(
-            "AirflowCliAdapter is a contract placeholder. See docs/pipeline_adapters.md#airflow.")
+            "AirflowCliAdapter is a contract placeholder. See docs/concepts/pipeline_adapters.md#airflow.")
 
 
 class AdfActivityAdapter(PlatformAdapter):
     """CONTRACT ONLY. Azure Data Factory is an orchestrator, not a Spark runtime.
 
     Implementation: ADF WebActivity calls the DQ REST endpoint or invokes a Databricks job
-    that includes the DQ engine. See docs/pipeline_adapters.md#azure-data-factory.
+    that includes the DQ engine. See docs/concepts/pipeline_adapters.md#azure-data-factory.
     """
 
     platform_name = "ADF"
@@ -97,7 +97,7 @@ class AdfActivityAdapter(PlatformAdapter):
     def execute(self, context: PipelineContext, ruleset: RuleSet, policy: RemediationPolicyConfig,
                 mode: IntegrationMode, **kwargs: Any) -> DQResult:
         raise NotImplementedError(
-            "AdfActivityAdapter is a contract placeholder. See docs/pipeline_adapters.md#adf.")
+            "AdfActivityAdapter is a contract placeholder. See docs/concepts/pipeline_adapters.md#adf.")
 
 
 class DataprocAdapter(SparkDataFrameAdapter):

@@ -4,7 +4,7 @@ LOCAL HARNESS ONLY. :class:`dq_core.DataQualityEngine` never calls this module -
 inline in an existing pipeline it always uses ``dataframe.sparkSession``. This module exists so
 that standalone examples, the CLI and the test-suite can create and manage their own session.
 
-Windows specifics handled here (documented in docs/spark_core_engine.md):
+Windows specifics handled here (documented in docs/architecture/spark_core_engine.md):
 
 * Spark's ``spark-class2.cmd`` writes its launcher output to an unquoted ``%TEMP%`` path, which
   breaks when the scratch directory contains spaces. On Windows we therefore ask Spark's own

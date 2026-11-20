@@ -480,7 +480,7 @@ def _do_run(body: RunIn) -> dict[str, Any]:
     from dq_core.context import PipelineContext
     t0 = time.monotonic()
     spark, engine = _spark_engine()
-    rs = engine.load_ruleset(str(ROOT / body.ruleset))
+    rs = engine.load_ruleset(_cfg(body.ruleset) or str(ROOT / body.ruleset))
     src = ROOT / body.source
     if (body.source_format or "AUTO").upper() in ("TABLE", "DELTA", "JSON") or not src.exists():
         df = _read_any_source(spark, body.source, body.source_format)
@@ -507,7 +507,7 @@ def _do_run(body: RunIn) -> dict[str, Any]:
         n_rules = len(getattr(rs, "rules", []) or [])
     sample_note = f" (sampled {file_size_mb:.0f}MB -> ~{target_rows:,} rows)" if sampled else ""
     _prog(f"phase=validate | validating {rs.ref} on {src.name}{sample_note} — mode={body.mode}, {n_rules} rules")
-    res = engine.run(df, rs, str(ROOT / body.policy) if body.policy else None, ctx, mode=body.mode,
+    res = engine.run(df, rs, _cfg(body.policy) or None, ctx, mode=body.mode,
                      on_phase=lambda k: _prog(_RUN_PHASE_LABELS.get(k, f"phase=validate | {k}")))
     _prog(f"phase=report | engine finished in {time.monotonic() - t0:.1f}s — writing report")
     out = ROOT / "reports"
@@ -973,6 +973,139 @@ def metadata_switch(body: MetadataSwitchIn) -> dict[str, Any]:
             "note": "call /api/engine/reload (restart_spark=false) to apply"}
 
 
+# ------------------------------------------------------------------ factory reset
+class ResetIn(BaseModel):
+    confirm: str = ""
+
+
+@app.post("/api/admin/reset")
+def admin_reset(body: ResetIn) -> dict[str, Any]:
+    """Factory reset for demos: wipe ALL generated DQ state — metadata store,
+    job history, medallion outputs, reports, rulesets, manifests, approvals.
+    Keeps uploads, sample_data, policies, engine config, lookups, integrations."""
+    if body.confirm != "RESET":
+        raise HTTPException(400, 'confirmation required — send {"confirm": "RESET"}')
+    active = J.active_job()
+    if active:
+        raise HTTPException(409, f"job {active} is still active — wait for it to finish or cancel first")
+    summary = _do_factory_reset()
+    try:
+        J.reload_engine(restart_spark=False)   # drop cached store/registries → fresh empty state
+    except Exception:
+        pass
+    return {"ok": True, "engine_reloaded": True, **summary}
+
+
+def _do_factory_reset() -> dict[str, Any]:
+    """Delete all generated DQ state under ROOT. Fixed paths only — no user input."""
+    import shutil
+    summary: dict[str, Any] = {
+        "categories": {}, "bytes_freed": 0,
+        "kept": ["data/uploads", "sample_data", "config/policies", "config/engine*.yaml",
+                 "config/rules", "config/ai", "integrations", "docs", ".env"],
+    }
+
+    def _size(p: Path) -> int:
+        if p.is_file():
+            try:
+                return p.stat().st_size
+            except OSError:
+                return 0
+        total = 0
+        for f in p.rglob("*"):
+            try:
+                if f.is_file():
+                    total += f.stat().st_size
+            except OSError:
+                pass
+        return total
+
+    def _wipe_dir(path: Path, label: str) -> None:
+        """Delete all contents of a directory (the dir itself is kept)."""
+        n_files = n_bytes = 0
+        if not path.exists():
+            summary["categories"][label] = {"files": 0, "bytes": 0}
+            return
+        for child in path.iterdir():
+            try:
+                sz = _size(child)
+                if child.is_dir():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+                n_files += 1
+                n_bytes += sz
+            except OSError as exc:
+                summary["categories"].setdefault("_errors", []).append(f"{child}: {exc}")
+        summary["categories"][label] = {"files": n_files, "bytes": n_bytes}
+        summary["bytes_freed"] += n_bytes
+
+    def _wipe_glob(parent: Path, patterns: list[str], label: str) -> None:
+        n_files = n_bytes = 0
+        seen: set[Path] = set()
+        for pat in patterns:
+            for f in parent.glob(pat):
+                if f in seen:
+                    continue
+                seen.add(f)
+                try:
+                    n_bytes += _size(f)
+                    if f.is_dir():
+                        shutil.rmtree(f)
+                    else:
+                        f.unlink()
+                    n_files += 1
+                except OSError as exc:
+                    summary["categories"].setdefault("_errors", []).append(f"{f}: {exc}")
+        summary["categories"][label] = {"files": n_files, "bytes": n_bytes}
+        summary["bytes_freed"] += n_bytes
+
+    # 1. Metadata document store — pipelines, rulesets, jobs, profiles,
+    #    manifests, approvals, metrics (TinyDB read() treats a missing file as empty)
+    meta = ROOT / "data" / "metadata.nosql.json"
+    if meta.exists():
+        sz = meta.stat().st_size
+        meta.unlink()
+        summary["categories"]["metadata_store"] = {"files": 1, "bytes": sz}
+        summary["bytes_freed"] += sz
+    legacy = ROOT / "data" / "registry.nosql.json"
+    if legacy.exists():
+        legacy.unlink()
+
+    # 2. Job history — delete rows, keep the SQLite file (open handle on Windows)
+    summary["categories"]["job_history"] = {"files": 0, "bytes": 0, "rows": J.reset_jobs()}
+
+    # 3. Anomaly inbox — delete rows on the open connection (the file itself
+    #    can't be unlinked while _ano_conn holds it on Windows)
+    try:
+        summary["categories"]["anomalies_db"] = {"rows": reset_anomalies()}
+    except Exception as exc:
+        summary["categories"]["anomalies_db"] = {"skipped": str(exc)}
+
+    # 4. Medallion outputs — bronze/silver/gold raw+accepted+quarantine+audit
+    for d in ("bronze", "silver", "gold", "quarantine", "audit"):
+        _wipe_dir(ROOT / "data" / d, f"data/{d}")
+
+    # 5. Report JSONs
+    _wipe_glob(ROOT / "reports", ["*.json"], "reports")
+
+    # 6. Published ruleset + pipeline manifest YAMLs (git-tracked → restorable)
+    _wipe_glob(ROOT / "config" / "rulesets", ["*.yaml", "*.yml"], "config/rulesets")
+    _wipe_glob(ROOT / "config" / "pipelines", ["*.yaml", "*.yml"], "config/pipelines")
+
+    # 7. Human approval decisions → empty lists (keep file structure)
+    appr = ROOT / "config" / "approvals"
+    for name, key in (("approved_corrections.yaml", "approvals"),
+                      ("rejected_corrections.yaml", "rejections")):
+        f = appr / name
+        if f.exists():
+            sz = f.stat().st_size
+            f.write_text(f"{key}: []\n", encoding="utf-8")
+            summary["categories"][f"approvals/{name}"] = {"files": 1, "bytes": sz}
+
+    return summary
+
+
 # ------------------------------------------------------------------ health score
 @app.get("/api/health/score")
 def health_score() -> dict[str, Any]:
@@ -1316,6 +1449,16 @@ _ano_lock = __import__("threading").Lock()
 
 def _anomaly_conn():
     return _ano_conn
+
+
+def reset_anomalies() -> int:
+    """Delete all anomaly rows — keeps table + open connection (the file
+    can't be deleted while _ano_conn holds it on Windows)."""
+    with _ano_lock:
+        n = _ano_conn.execute("SELECT COUNT(*) FROM anomalies").fetchone()[0]
+        _ano_conn.execute("DELETE FROM anomalies")
+        _ano_conn.commit()
+    return n
 
 
 def _ingest_anomalies(job_result: dict[str, Any], pipeline_id: str) -> int:

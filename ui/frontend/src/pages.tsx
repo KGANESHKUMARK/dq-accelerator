@@ -26,13 +26,25 @@ const usePoll = (jobId: string | null, ms = 2500) => {
     })
     // Safety-net poll: SSE can silently stall during long quiet Spark phases —
     // reconcile with the job record so terminal states are never missed.
+    // Give up after consecutive fetch failures — the job row may have been
+    // deleted (factory reset) or the backend restarted; don't spin forever.
+    let fails = 0
     const pollTimer = window.setInterval(async () => {
       try {
         const j = await api.job(jobId)
         if (dead) return
+        fails = 0
         setJob(j)
         if (TERMINAL.includes(j.status)) { es.close(); window.clearInterval(pollTimer) }
-      } catch { /* keep polling */ }
+      } catch {
+        fails += 1
+        if (fails >= 5 && !dead) {
+          es.close(); window.clearInterval(pollTimer)
+          setJob(prev => prev ? { ...prev, status: 'NOT_FOUND',
+            progress: 'job not found — it may have been cleared by a reset or the backend restarted',
+            finished_at: new Date().toISOString() } : prev)
+        }
+      }
     }, ms)
     return () => { dead = true; es.close(); window.clearInterval(pollTimer) }
   }, [jobId])
@@ -928,6 +940,10 @@ export function Pipelines({ focusPipeline }: { focusPipeline?: string | null } =
    ============================================================ */
 const WIZ_STEPS = ['Source', 'Options', 'Profile', 'Review rules', 'Finalize']
 const resolveRel = (rel: string) => {
+  // Manifest-relative paths always contain '..' (../policies/x.yaml,
+  // ../../data/uploads/x.csv). Anything else is already repo-root-relative
+  // (e.g. config/policies/default.yaml written by Auto E2E) — pass through.
+  if (!rel.split('/').includes('..')) return rel
   const out: string[] = []
   for (const s of `config/pipelines/${rel}`.split('/')) {
     if (s === '..') out.pop(); else if (s && s !== '.') out.push(s)
@@ -2136,6 +2152,9 @@ export function Settings() {
   const [metaEngine, setMetaEngine] = useState<string>('tinydb')
   const [metaMsg, setMetaMsg] = useState<string>('')
   const [metaColl, setMetaColl] = useState<{name: string; count: number; docs: any[]} | null>(null)
+  const [resetText, setResetText] = useState('')
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetResult, setResetResult] = useState<any>(null)
   const [widgets, setWidgets] = useState<Record<string, boolean>>(loadWidgets)
   const toggleWidget = (key: string) => setWidgets(prev => {
     const next = { ...prev, [key]: prev[key] === false ? true : false }
@@ -2183,6 +2202,19 @@ export function Settings() {
     } catch (e: any) { setMetaMsg('switch failed: ' + String(e)) }
   }
 
+  const doFactoryReset = async () => {
+    setResetBusy(true); setResetResult(null)
+    try {
+      const r = await api.adminReset(resetText)
+      setResetResult(r)
+      setResetText('')
+      api.metadataStatus().then(m => {
+        setMeta(m); setMetaBackend(m?.backend ?? 'file'); setMetaEngine(m?.metadata_engine ?? 'tinydb')
+      }).catch(() => {})
+    } catch (e: any) { setResetResult({ error: String(e?.message ?? e) }) }
+    setResetBusy(false)
+  }
+
   const dqxReady = ai && ai.provider === 'DQXProvider' && !ai.simulated
   const mockReady = ai && ai.provider === 'MockAIProvider'
 
@@ -2221,7 +2253,7 @@ export function Settings() {
           <span key={k}><code>{k}</code>: <b style={{ color: v ? 'var(--success)' : 'var(--danger)' }}>{v ? 'set' : 'not set'}</b></span>
         ))}
       </div>
-      <div className="info-box" style={{ marginTop: 10 }}>Set env vars before running <code>DQ_start.bat</code> to enable the real LLM. One-time setup guide: <code>docs/SETUP.md</code></div>
+      <div className="info-box" style={{ marginTop: 10 }}>Set env vars before running <code>DQ_start.bat</code> to enable the real LLM. One-time setup guide: <code>docs/guides/SETUP.md</code></div>
     </div>}
 
     <div className="card">
@@ -2444,6 +2476,39 @@ export function Settings() {
           </div>
         ))}
       </div>
+    </div>
+
+    <div className="card" style={{ borderColor: 'var(--danger)' }}>
+      <h3 style={{ color: 'var(--danger)' }}>Danger zone — factory reset</h3>
+      <p className="muted" style={{ fontSize: 12, margin: '4px 0' }}>
+        Wipes <b>all</b> generated DQ state: metadata store (pipelines, rulesets, jobs, profiles, manifests),
+        job history, Bronze/Silver/Gold/quarantine/audit outputs, reports, ruleset + manifest YAMLs,
+        and approval decisions. Irreversible — for a clean demo slate.
+      </p>
+      <p className="muted" style={{ fontSize: 12, margin: '4px 0' }}>
+        <b>Keeps:</b> uploaded files (<code>data/uploads</code>), <code>sample_data</code>, policies,
+        engine config, lookups, integrations, docs. Ruleset/manifest YAMLs are git-tracked —
+        restore with <code>git checkout -- config/</code> if needed.
+      </p>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+        <input value={resetText} onChange={e => setResetText(e.target.value)}
+          placeholder='type RESET to confirm' autoComplete="off"
+          style={{ padding: '6px 10px', width: 200, fontFamily: 'monospace' }} />
+        <button disabled={resetBusy || resetText !== 'RESET'} onClick={doFactoryReset}
+          style={{ padding: '6px 16px', background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 4, cursor: resetText === 'RESET' && !resetBusy ? 'pointer' : 'not-allowed', opacity: resetText === 'RESET' && !resetBusy ? 1 : 0.5 }}>
+          {resetBusy ? 'Resetting…' : 'Factory reset'}
+        </button>
+        {resetResult && !resetResult.error && <span className="muted" style={{ fontSize: 11 }}>
+          done — freed {((resetResult.bytes_freed ?? 0) / 1048576).toFixed(1)} MB
+        </span>}
+      </div>
+      {resetResult && (resetResult.error
+        ? <div className="warn-box" style={{ marginTop: 10, fontSize: 12 }}>Reset failed: {resetResult.error}</div>
+        : <div className="success-box" style={{ marginTop: 10, fontSize: 12 }}>
+            <b>Reset complete.</b> Metadata store, job history, medallion outputs, reports,
+            rulesets, manifests and approvals cleared. Engine reloaded — UI is now empty.
+            {resetResult.categories?.job_history?.rows ? ` (${resetResult.categories.job_history.rows} job rows removed)` : ''}
+          </div>)}
     </div>
   </>
 }

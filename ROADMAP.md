@@ -191,11 +191,14 @@ Review anomalies → Fix / quarantine → Audit trail
 
 ### CP10 · Documentation
 - [x] `README.md` — setup, CLI reference, quick start
-- [x] `docs/architecture.md` — full system architecture + development status
-- [x] `docs/PROJECT_GUIDE.md` — setup, structure, CLI §6.3 (bootstrap §6.3.1, wizard §6.3.2)
-- [x] `docs/spark_core_engine.md`, `remediation.md`, `quarantine.md`, `profiling.md`,
-  `rule_management.md`, `pipeline_adapters.md`, `databricks_onboarding.md`,
-  `testing_report.md`, `poc_demo_script.md`, `confidence_policy.md`, `medallion_data_flow.md`
+- [x] `docs/architecture/architecture.md` — full system architecture + development status
+- [x] `docs/guides/PROJECT_GUIDE.md` — setup, structure, CLI §6.3 (bootstrap §6.3.1, wizard §6.3.2)
+- [x] `docs/architecture/spark_core_engine.md`, `docs/concepts/remediation.md`,
+  `docs/concepts/quarantine.md`, `docs/concepts/profiling.md`,
+  `docs/concepts/rule_management.md`, `docs/concepts/pipeline_adapters.md`,
+  `docs/guides/databricks_onboarding.md`, `docs/reference/testing_report.md`,
+  `docs/presentation/poc_demo_script.md`, `docs/concepts/confidence_policy.md`,
+  `docs/architecture/medallion_data_flow.md`
 
 ---
 
@@ -388,9 +391,9 @@ framework that can be inserted into an existing PySpark pipeline and operated
 through UI and CLI. It is **not** a cloud deployment project or a production
 control plane.
 
-Authoritative context and guardrails: `docs/POC_CONTEXT.md`.
-Architecture status and diagrams: `docs/architecture.md`.
-Client presentation points: `docs/presentation_deck.md`.
+Authoritative context and guardrails: `docs/poc/POC_CONTEXT.md`.
+Architecture status and diagrams: `docs/architecture/architecture.md`.
+Client presentation points: `docs/presentation/presentation_deck.md`.
 
 Done means implemented and verified on local Spark unless a row explicitly says
 otherwise. Remote cloud execution is still unverified.
@@ -495,6 +498,28 @@ otherwise. Remote cloud execution is still unverified.
 | B7 | **Formal schema-contract enforcement** | Expected-schema YAML → hard drift rejection (Great-Expectations-style `expect_column_to_exist`). ODCS import + profile-driven DATA_TYPE rules cover ~90%; strict contract gate is the gap | Medium |
 | B8 | **Auto-E2E confidence floor + version accumulation** | Auto-E2E auto-approves ALL candidates (`approve_confidence=0`) and purges prior artifacts for idempotency — fine for demo, but a confidence floor (>0) and version-preserving reruns would strengthen the governance story | Small |
 | B9 | **Rule-batching perf** | Validation runs ~1 Spark job per rule phase; batching row-level rule flags into fewer actions could cut local run time 3–5× | Medium |
+
+---
+
+## DQX parity gap register — verified against `databrickslabs/dqx` source (cloned to `.tmp/dqx-ref`)
+
+Gaps identified by reading DQX profiler/engine/docs in depth. Ordered by demo value.
+
+| # | Gap vs DQX | DQX reference | Our status | Effort |
+|---|---|---|---|---|
+| G1 | Stratified sampling | `profiler.py` `sampleBy` via `sample_by_column` + per-stratum `sample_fraction` dict | Uniform `sample()` only | Small |
+| G2 | Rule/check type breadth | 80+ `check_funcs.py` built-ins | ~12 rule types | Medium |
+| G3 | Scheduled runs | Quality-checker workflow (Databricks job on wildcard patterns) | On-demand only | Medium |
+| G4 | Incremental/partition validation | Pattern-based table re-validation | Full-table every run | Medium |
+| G5 | Streaming DQ | `is_streaming` + micro-batch `apply_checks` | Batch only (also B4) | Large |
+| G6 | DLT expectations generation | `profiler/dlt_generator.py` → `@dlt.expect` SQL/Python | Not implemented | Small |
+| G7 | PII detection | `pii/` — presidio + spaCy models | Sensitive-column policy gates only | Medium |
+| G8 | ML row-anomaly scoring | `anomaly/` — Isolation Forest + SHAP + MLflow | `anomalies.db` heuristics | Large |
+| G9 | MCP server / agent surface | `mcp-server/` | DQ Assistant chatbot only | Medium |
+| G10 | Live cluster proof | n/a (Databricks-native) | P4 remainder — needs workspace | External |
+| G11 | `docs/DQX_COMPARISON.md` | — | Comparison done in chat only | Small |
+
+**Already at-or-above DQX parity (do not rebuild):** versioned rulesets w/ checksum+diff+rollback, pipeline manifests + lifecycle, medallion orchestration, confidence-gated AI remediation (DQX only flags/quarantines), steward approval inbox, outcome audit taxonomy, 7 quality pillars, multi-backend metadata store (tinydb/mongo/dynamo), UI onboarding wizard (≈ DQX Studio).
 
 ---
 

@@ -86,7 +86,7 @@ if "%MISSING%"=="1" (
     echo ============================================================
     echo   Missing required software - install the items above,
     echo   then re-run DQ_start.bat
-    echo   Full guide: docs\SETUP.md
+    echo   Full guide: docs\guides\SETUP.md
     echo ============================================================
     pause
     exit /b 1
@@ -153,7 +153,7 @@ start "DQ-Backend" powershell -NoExit -Command ^
 
 timeout /t 4 >nul
 
-rem Frontend dev window (hot reload; alternatively backend can serve dist/ - see SETUP.md)
+rem Frontend dev window (hot reload; alternatively backend can serve dist/ - see docs\guides\SETUP.md)
 start "DQ-Frontend" powershell -NoExit -Command "Set-Location '%ROOT%\ui\frontend'; npm run dev 2>&1 | Tee-Object -Append '%LOGDIR%\frontend\frontend_console.log'"
 
 timeout /t 4 >nul

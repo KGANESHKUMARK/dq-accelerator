@@ -60,5 +60,6 @@ export const api = {
   metricsRecent: (limit = 30, dataset?: string) => fetch(`${B}/metrics/recent?limit=${limit}${dataset ? `&dataset=${encodeURIComponent(dataset)}` : ''}`).then(j),
   dataAvailable: () => fetch(`${B}/data/available`).then(j),
   dataPreview: (dataset: string, stage: string, limit = 50) => fetch(`${B}/data/preview?dataset=${encodeURIComponent(dataset)}&stage=${stage}&limit=${limit}`).then(j),
+  adminReset: (confirm: string) => fetch(`${B}/admin/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm }) }).then(j),
 }
 export type Job = { job_id: string; kind: string; status: string; progress?: string; result?: any; error?: string; submitted_at: string; started_at?: string; finished_at?: string }
