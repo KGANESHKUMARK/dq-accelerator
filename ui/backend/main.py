@@ -1746,6 +1746,11 @@ class AutoIn(BaseModel):
     owner: str = "auto-e2e"
     mode: str = "REMEDIATE"
     approve_confidence: float = 0.0   # auto-approve candidates at/above this
+    # layers controls which medallion stages are processed.
+    # Default = ["BRONZE"] — profile + generate rules, no Silver/Gold DQ run.
+    # ["BRONZE","SILVER"] — full Silver DQ run after Bronze ingest.
+    # ["BRONZE","SILVER","GOLD"] — full three-layer pipeline (requires Gold ruleset).
+    layers: list[str] = ["BRONZE"]
 
 
 @app.post("/api/auto/run")
@@ -1795,15 +1800,66 @@ def _purge_pipeline_artifacts(ruleset_id: str, pipeline_id: str) -> None:
 
 
 def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
+    layers = [l.upper() for l in (body.layers or ["BRONZE"])]
+    run_silver = "SILVER" in layers
+    run_gold = "GOLD" in layers and run_silver
+
+    # ── STEP 1: Profile + generate candidate rules (always) ──────────────────
     _prog("phase=profile | auto-e2e: profiling source")
+    # Profile always targets the layer that will hold the data. Use SILVER as
+    # ruleset namespace only when Silver DQ will actually run; otherwise BRONZE.
+    profile_stage = body.stage if run_silver else "BRONZE"
     res = _do_bootstrap_preview(PreviewIn(source=body.source, dataset=body.dataset,
-                                        stage=body.stage, source_format=body.source_format))
+                                          stage=profile_stage, source_format=body.source_format))
     approved = [c["rule_id"] for c in res["candidates"]
                 if (c.get("confidence") or 0) >= body.approve_confidence]
     ds = body.dataset or res["dataset"]
     _prog(f"phase=profile | profiled {res.get('row_count') or '?'} rows · "
-          f"{len(res.get('anomalies') or [])} anomalies · {len(res.get('candidates') or [])} candidate rules · "
-          f"{len(approved)} auto-approved")
+          f"{len(res.get('anomalies') or [])} anomalies · "
+          f"{len(res.get('candidates') or [])} candidate rules · "
+          f"{len(approved)} auto-approved · layers={','.join(layers)}")
+
+    # ── BRONZE-ONLY: ingest + rules only, no Silver/Gold DQ run ──────────────
+    if not run_silver:
+        _prog("phase=validate | auto-e2e: Bronze-only mode — writing candidate ruleset (no Silver/Gold DQ run)")
+        _purge_pipeline_artifacts(res["ruleset_id"], body.pipeline_id.upper())
+        plat = body.platform.upper()
+        if plat in ("LOCAL", "LOCAL_SPARK", "SPARK"):
+            plat = "STANDALONE_SPARK"
+        fout = onboard_finalize(FinalizeIn(
+            preview_result=res, approved_rule_ids=approved, dataset=ds,
+            ruleset_id=res["ruleset_id"], pipeline_id=body.pipeline_id.upper(),
+            platform=plat, stage="BRONZE", dq_mode=body.mode,
+            policy=body.policy, owner=body.owner, source=body.source,
+            source_format=body.source_format, publish=True, onboard=True, force=True))
+        _prog(f"phase=done | Bronze ruleset {fout.get('ruleset')} written — "
+              f"add Silver/Gold layers when transformation pipeline is defined")
+        return {
+            "dataset": ds,
+            "ruleset": fout.get("ruleset"),
+            "rules_approved": len(approved),
+            "rules_rejected": fout.get("rules_rejected"),
+            "layers": layers,
+            "run": {
+                "pipeline_id": body.pipeline_id.upper(),
+                "dataset": ds,
+                "mode": "BRONZE_ONLY",
+                "stages": [{
+                    "stage": "BRONZE",
+                    "status": "PROFILED",
+                    "candidate_rules": len(approved),
+                    "row_count": res.get("row_count"),
+                    "anomalies": len(res.get("anomalies") or []),
+                }],
+            },
+            "input": res.get("row_count"),
+            "accepted": None,
+            "quarantined": None,
+            "gate_passed": None,
+            "report_path": "",
+        }
+
+    # ── SILVER (and optionally GOLD): full pipeline run ───────────────────────
     _purge_pipeline_artifacts(res["ruleset_id"], body.pipeline_id.upper())
     _prog(f"phase=validate | auto-e2e: {len(approved)}/{res['candidate_count']} rules approved — writing ruleset + manifest")
     plat = body.platform.upper()
@@ -1815,47 +1871,24 @@ def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
         platform=plat, stage=body.stage, dq_mode=body.mode,
         policy=body.policy, owner=body.owner, source=body.source,
         source_format=body.source_format, publish=True, onboard=True, force=True))
-    # ── Gold stage: stricter re-validation — full Bronze→Silver→Gold in one run ──
-    try:
-        _prog("phase=validate | auto-e2e: building GOLD ruleset (stricter re-check)")
-        import yaml as _yaml
-        from dq_core.metadata.models import RuleSet as _RS
-        from dq_core.metadata.serialization import dump_yaml as _dump
-        approved_set = set(approved)
-        gold_dict = {"ruleset_id": f"{ds}_gold", "version": "1.0", "stage": "GOLD",
-                     "dataset": ds, "rules": []}
-        for c in res["candidates"]:
-            if c["rule_id"] in approved_set and isinstance(c.get("raw"), dict):
-                raw = dict(c["raw"]); raw["stage"] = "GOLD"; raw["ruleset_id"] = f"{ds}_gold"
-                raw["status"] = "APPROVED"
-                gold_dict["rules"].append(raw)
-        if gold_dict["rules"]:
-            gold_rs = _RS.from_dict(gold_dict)
-            gpath = ROOT / "config" / "rulesets" / f"{ds}_gold_v1.yaml"
-            from dq_core.metadata.serialization import save_ruleset as _sv
-            _sv(gold_rs, gpath)
-            _registry("rulesets").publish(gold_rs, published_by=body.owner or "auto-e2e", activate=True)
-            mpath = ROOT / "config" / "pipelines" / f"{body.pipeline_id.upper()}.yaml"
-            m = _yaml.safe_load(mpath.read_text(encoding="utf-8"))
-            rel = os.path.relpath(gpath, mpath.parent).replace("\\", "/")
-            m["pipeline"]["datasets"][0]["rulesets"]["GOLD"] = rel
-            if "GOLD" not in m["pipeline"]["datasets"][0].get("stages", []):
-                m["pipeline"]["datasets"][0].setdefault("stages", []).append("GOLD")
-            _dump(m, mpath)
-            fout["gold_ruleset"] = f"{ds}_gold@1.0"
-    except Exception as exc:
-        print(f"[auto-e2e] gold setup failed (silver still runs): {exc}")
+
+    # Gold stage only if explicitly requested via layers=["BRONZE","SILVER","GOLD"]
+    # NOTE: Gold rules must reflect actual Gold-layer transformations — we do NOT
+    # copy Silver rules to Gold because the data is not transformed between layers.
+    # Gold rulesets should be provided separately by the pipeline owner.
+    if run_gold:
+        _prog("phase=validate | auto-e2e: Gold layer requested — Gold ruleset must be provided separately")
+
     _prog(f"phase=validate | ruleset {fout.get('ruleset')} + manifest written · "
-          f"pipeline {body.pipeline_id.upper()} registered · gold ruleset "
-          f"{fout.get('gold_ruleset') or 'n/a'}")
-    _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()} (bronze→silver→gold)")
+          f"pipeline {body.pipeline_id.upper()} registered")
+    _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()} (bronze→silver)")
     run = _do_pipeline_run(body.pipeline_id.upper(), PipelineRunIn(dataset_id=ds, mode=body.mode))
     stages = run.get("stages") or []
     silver = next((s for s in stages if s.get("stage") == "SILVER"), {})
     import glob as _g
     reps = sorted(_g.glob(str(ROOT / "reports" / f"{ds}*silver*.json")), key=os.path.getmtime)
     return {"dataset": ds, "ruleset": fout.get("ruleset"), "rules_approved": len(approved),
-            "rules_rejected": fout.get("rules_rejected"), "run": run,
+            "rules_rejected": fout.get("rules_rejected"), "layers": layers, "run": run,
             "input": silver.get("input") or silver.get("input_rows"),
             "accepted": silver.get("accepted"), "quarantined": silver.get("quarantined"),
             "gate_passed": run.get("gate_passed"),

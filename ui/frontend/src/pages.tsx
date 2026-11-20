@@ -1005,13 +1005,18 @@ export function Onboard() {
   const setAutoJobId = (id: string | null) => { setAutoJobIdState(id); if (id) localStorage.setItem('dq_auto_job', id); else localStorage.removeItem('dq_auto_job') }
   const autoJob = usePoll(autoJobId)
   const [autoSrc, setAutoSrc] = useState(''); const [autoPid, setAutoPid] = useState(''); const [autoMode, setAutoMode] = useState('REMEDIATE')
+  const [autoLayers, setAutoLayers] = useState<string[]>(['BRONZE'])
+  const toggleLayer = (layer: string) => setAutoLayers(prev =>
+    prev.includes(layer) ? prev.filter(l => l !== layer) : [...prev, layer].sort((a, b) => ['BRONZE','SILVER','GOLD'].indexOf(a) - ['BRONZE','SILVER','GOLD'].indexOf(b))
+  )
   const runAuto = async () => {
     setErr('')
     const stem = (autoSrc.split('/').pop() || '').replace(/\.[^.]+$/, '')
     const dsName = stem.toLowerCase()
     const pid = autoPid || `${stem.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_PIPELINE`
+    const targetStage = autoLayers.includes('SILVER') ? 'SILVER' : 'BRONZE'
     try {
-      const r = await api.autoRun({ source: autoSrc, dataset: dsName, pipeline_id: pid, mode: autoMode, stage, source_format: 'AUTO', policy: 'config/policies/default.yaml', approve_confidence: 0 })
+      const r = await api.autoRun({ source: autoSrc, dataset: dsName, pipeline_id: pid, mode: autoMode, stage: targetStage, layers: autoLayers, source_format: 'AUTO', policy: 'config/policies/default.yaml', approve_confidence: 0 })
       setAutoPeek(null); setAutoJobId(r.job_id)
     } catch (e: any) { setErr(e.message) }
   }
@@ -1058,6 +1063,27 @@ export function Onboard() {
             <option value="OBSERVE_ONLY">OBSERVE_ONLY — measure only</option>
           </select>
         </div>
+        <div className="field" style={{ gridColumn: '1 / -1' }}>
+          <label>Process layers</label>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+            {(['BRONZE', 'SILVER', 'GOLD'] as const).map(layer => (
+              <label key={layer} className="chk" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox"
+                  checked={autoLayers.includes(layer)}
+                  disabled={layer === 'BRONZE'}
+                  onChange={() => toggleLayer(layer)} />
+                <span style={{ fontWeight: 600, color: layer === 'BRONZE' ? '#f59e0b' : layer === 'SILVER' ? '#94a3b8' : '#fbbf24' }}>{layer}</span>
+              </label>
+            ))}
+            <span className="muted" style={{ fontSize: 11, maxWidth: 420 }}>
+              {autoLayers.length === 1 && autoLayers[0] === 'BRONZE'
+                ? 'Bronze only: ingest raw data + generate DQ rules. Add Silver/Gold when your pipeline has defined transformation stages.'
+                : autoLayers.includes('SILVER') && !autoLayers.includes('GOLD')
+                  ? 'Bronze + Silver: ingest + run full Silver DQ validation.'
+                  : 'Full pipeline: Bronze → Silver → Gold (Gold ruleset must be defined separately).'}
+            </span>
+          </div>
+        </div>
         <div className="field" style={{ justifyContent: 'flex-end' }}>
           <button className="btn" onClick={runAuto} disabled={!autoSrc || !!(autoJob && (autoJob.status === 'RUNNING' || autoJob.status === 'QUEUED'))}>▶ Run auto E2E</button>
         </div>
@@ -1082,7 +1108,19 @@ export function Onboard() {
       {autoJob && <div style={{ marginTop: 10 }}><JobStatus job={autoJob} /></div>}
       {autoRes && <div className="info-box" style={{ marginTop: 8 }}>
         ✅ Auto E2E done — <b>{autoRes.dataset}</b> · ruleset <b>{autoRes.ruleset}</b> · {autoRes.rules_approved} rules approved{autoRes.rules_rejected ? ` · ${autoRes.rules_rejected} rejected` : ''}
-        {(autoRes.run?.stages || []).map((s: any) => <div key={s.stage} style={{ marginTop: 2 }}>· {s.stage}: {s.status} — accepted {s.accepted ?? '—'} / quarantined {s.quarantined ?? '—'}</div>)}
+        {autoRes.layers && <span className="muted" style={{ marginLeft: 8, fontSize: 11 }}>layers: {(autoRes.layers as string[]).join(' → ')}</span>}
+        {(autoRes.run?.stages || []).map((s: any) => (
+          <div key={s.stage} style={{ marginTop: 2 }}>
+            · <b>{s.stage}</b>: {s.status}
+            {s.accepted != null && <> — accepted <b>{s.accepted}</b> / quarantined <b>{s.quarantined ?? 0}</b>{s.quality_score != null && <> · score <b>{s.quality_score}</b></>}</>}
+            {s.candidate_rules != null && <> — <b>{s.candidate_rules}</b> candidate rules · {s.row_count?.toLocaleString() ?? '?'} rows profiled</>}
+          </div>
+        ))}
+        {autoRes.run?.mode === 'BRONZE_ONLY' && (
+          <div className="muted" style={{ marginTop: 6, fontSize: 11 }}>
+            Bronze-only run: data ingested to Bronze layer, DQ rules generated. Enable Silver/Gold layers above when transformation pipeline is defined.
+          </div>
+        )}
         <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
           <button className="btn sm sec" onClick={() => window.dispatchEvent(new CustomEvent('dq:navigate', { detail: 'profiles' }))}>View auto-created profile →</button>
           <button className="btn sm sec" onClick={() => window.dispatchEvent(new CustomEvent('dq:navigate', { detail: 'rulesets' }))}>View ruleset + versions →</button>
@@ -1686,8 +1724,10 @@ export function Profiles() {
    ============================================================ */
 export function RuleSets() {
   const [rs, setRs] = useState<any[]>([]); const [yaml, setYaml] = useState(''); const [msg, setMsg] = useState(''); const [err, setErr] = useState('')
-  const [diff, setDiff] = useState<any>(null); const [selRs, setSelRs] = useState<any>(null)
+  const [diff, setDiff] = useState<any>(null)
   const [rsRules, setRsRules] = useState<any>(null)
+  // per-ruleset comparison selectors: { [rid]: { from: string, to: string } }
+  const [compareSelectors, setCompareSelectors] = useState<Record<string, { from: string; to: string }>>({})
 
   const load = () => api.rulesets().then(setRs)
   useEffect(() => { load() }, [])
@@ -1702,11 +1742,23 @@ export function RuleSets() {
     try { await api.rulesetAction(id, action, version); setMsg(`${id}@${version} → ${action}`); load() }
     catch (e: any) { setErr(e.message) }
   }
-  const showDiff = async (id: string) => {
-    try { setDiff(await api.rulesetDiff(id)) } catch (e: any) { setErr(e.message) }
+  const showDiff = async (id: string, fromV?: string, toV?: string) => {
+    setErr('')
+    try { setDiff(await api.rulesetDiff(id, fromV, toV)) } catch (e: any) { setErr(e.message) }
   }
   const showRules = async (id: string) => {
     try { setRsRules(await api.rulesetRules(id)) } catch (e: any) { setErr(e.message) }
+  }
+  const getCompare = (rid: string, versions: any[]) => {
+    const sel = compareSelectors[rid]
+    const vList = versions.map((v: any) => v.version)
+    const from = sel?.from || vList[0] || ''
+    const to = sel?.to || vList[vList.length - 1] || ''
+    return { from, to }
+  }
+  const setCompare = (rid: string, key: 'from' | 'to', value: string, versions: any[]) => {
+    const current = getCompare(rid, versions)
+    setCompareSelectors(prev => ({ ...prev, [rid]: { ...current, [key]: value } }))
   }
 
   const grouped: Record<string, any[]> = rs.reduce((a: Record<string, any[]>, r: any) => { (a[r.ruleset_id] = a[r.ruleset_id] ?? []).push(r); return a }, {})
@@ -1716,6 +1768,8 @@ export function RuleSets() {
 
     {Object.entries(grouped).map(([rid, versions]: [string, any[]]) => {
       const active = versions.find((v: any) => v.active)
+      const { from: cmpFrom, to: cmpTo } = getCompare(rid, versions)
+      const vList = versions.map((v: any) => v.version)
       return (
         <div className="card" key={rid}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1724,13 +1778,12 @@ export function RuleSets() {
               <span className="muted">{versions[0]?.dataset} · {versions.length} version{versions.length !== 1 ? 's' : ''}</span>
               {active && <span className="badge ACTIVE" style={{ marginLeft: 10 }}>v{active.version} active</span>}
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="btn sm sec" onClick={() => showRules(rid)}>Rules ({versions[0]?.rules ?? '—'})</button>
-              <button className="btn sm sec" onClick={() => showDiff(rid)}>Diff</button>
-            </div>
+            <button className="btn sm sec" onClick={() => showRules(rid)}>Rules ({versions[0]?.rules ?? '—'})</button>
           </div>
+
+          {/* Version table */}
           <table style={{ marginTop: 12 }}>
-            <thead><tr><th>Version</th><th>Rules</th><th>Checksum</th><th>Published</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Version</th><th>Rules</th><th>Checksum</th><th>Published</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
               {versions.map((v: any) => (
                 <tr key={v.version}>
@@ -1741,12 +1794,57 @@ export function RuleSets() {
                   <td>{v.active ? <span className="badge ACTIVE">ACTIVE</span> : <span className="badge DRAFT">inactive</span>}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {!v.active && <button className="btn sm success" onClick={() => act(rid, 'activate', v.version)}>Activate</button>}
-                    {v.active && versions.length > 1 && <button className="btn sm warn" onClick={() => { const prev = versions.find((x: any) => !x.active); if (prev) act(rid, 'rollback', prev.version) }}>Rollback</button>}
+                    {v.active && versions.length > 1 && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span className="muted" style={{ fontSize: 11 }}>Rollback to:</span>
+                        <select style={{ fontSize: 11, padding: '1px 4px' }}
+                          onChange={e => { if (e.target.value) act(rid, 'rollback', e.target.value); e.target.value = '' }}
+                          defaultValue="">
+                          <option value="">— pick version —</option>
+                          {versions.filter((x: any) => !x.active).map((x: any) => (
+                            <option key={x.version} value={x.version}>v{x.version}</option>
+                          ))}
+                        </select>
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {/* Set active version + compare controls */}
+          <div style={{ marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Set active version dropdown */}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span className="muted" style={{ fontSize: 12 }}>Active version:</span>
+              <select style={{ fontSize: 12, padding: '2px 6px' }}
+                value={active?.version || ''}
+                onChange={e => { if (e.target.value && e.target.value !== active?.version) act(rid, 'activate', e.target.value) }}>
+                {vList.map((v: string) => <option key={v} value={v}>v{v}</option>)}
+              </select>
+            </span>
+
+            {/* Version comparison controls — only show if 2+ versions */}
+            {vList.length >= 2 && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+                <span className="muted" style={{ fontSize: 12 }}>Compare:</span>
+                <select style={{ fontSize: 12, padding: '2px 6px' }}
+                  value={cmpFrom}
+                  onChange={e => setCompare(rid, 'from', e.target.value, versions)}>
+                  {vList.map((v: string) => <option key={v} value={v}>v{v}</option>)}
+                </select>
+                <span className="muted">vs</span>
+                <select style={{ fontSize: 12, padding: '2px 6px' }}
+                  value={cmpTo}
+                  onChange={e => setCompare(rid, 'to', e.target.value, versions)}>
+                  {vList.map((v: string) => <option key={v} value={v}>v{v}</option>)}
+                </select>
+                <button className="btn sm sec" onClick={() => showDiff(rid, cmpFrom, cmpTo)}
+                  disabled={cmpFrom === cmpTo}>Compare</button>
+              </span>
+            )}
+          </div>
         </div>
       )
     })}
@@ -1781,8 +1879,13 @@ export function RuleSets() {
 
     {diff && (
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <h3>Diff — {diff.from_version} → {diff.to_version}</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h3>Version Comparison — v{diff.from_version} vs v{diff.to_version}</h3>
+            <span className="muted" style={{ fontSize: 11 }}>
+              checksum {diff.from_checksum?.slice(0, 12)} → {diff.to_checksum?.slice(0, 12)}
+            </span>
+          </div>
           <button className="btn sm sec" onClick={() => setDiff(null)}>✕</button>
         </div>
         <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 10 }}>
@@ -1790,9 +1893,12 @@ export function RuleSets() {
           <div className="stat-tile"><div className="num bad">{diff.removed?.length ?? 0}</div><div className="lbl">Removed rules</div></div>
           <div className="stat-tile"><div className="num warn">{diff.modified?.length ?? 0}</div><div className="lbl">Modified rules</div></div>
         </div>
-        {diff.added?.length > 0 && <div style={{ marginTop: 8 }}><h4>Added</h4>{diff.added.map((r: string) => <span key={r} className="tag">{r}</span>)}</div>}
-        {diff.removed?.length > 0 && <div style={{ marginTop: 8 }}><h4>Removed</h4>{diff.removed.map((r: string) => <span key={r} className="tag">{r}</span>)}</div>}
-        {diff.modified?.length > 0 && <div style={{ marginTop: 8 }}><h4>Modified</h4>{diff.modified?.map((m: any) => <span key={m.rule_id} className="tag">{m.rule_id}</span>)}</div>}
+        {diff.added?.length === 0 && diff.removed?.length === 0 && diff.modified?.length === 0 && (
+          <div className="muted" style={{ marginTop: 8 }}>No differences — both versions contain identical rules.</div>
+        )}
+        {diff.added?.length > 0 && <div style={{ marginTop: 8 }}><h4>Added in v{diff.to_version}</h4>{diff.added.map((r: string) => <span key={r} className="tag">{r}</span>)}</div>}
+        {diff.removed?.length > 0 && <div style={{ marginTop: 8 }}><h4>Removed in v{diff.to_version}</h4>{diff.removed.map((r: string) => <span key={r} className="tag" style={{ background: '#fee2e2', color: '#dc2626' }}>{r}</span>)}</div>}
+        {diff.modified?.length > 0 && <div style={{ marginTop: 8 }}><h4>Modified</h4>{diff.modified?.map((m: any) => <span key={m.rule_id} className="tag" style={{ background: '#fef9c3', color: '#92400e' }}>{m.rule_id}</span>)}</div>}
       </div>
     )}
 
