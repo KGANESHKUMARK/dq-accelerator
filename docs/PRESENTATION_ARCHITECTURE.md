@@ -829,4 +829,4 @@ The following existing docs were reviewed and are **correct and current**:
 
 ---
 
-**Branch:** `bronze-performance` | **Latest commit:** `349ff0a` | **Repo:** https://github.com/KGANESHKUMARK/dq-accelerator.git
+Branch and commit tracked via git. The presenting developer should use their own repo state.

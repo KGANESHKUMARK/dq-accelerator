@@ -349,4 +349,4 @@ graph TB
 
 ---
 
-**Branch:** `bronze-performance` | **Latest commit:** `349ff0a` | **Pushed:** https://github.com/KGANESHKUMARK/dq-accelerator.git
+Branch and commit tracked via git. The presenting developer should use their own repo state.
