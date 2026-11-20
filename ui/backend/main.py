@@ -708,14 +708,38 @@ def _profile_mode_for(src: Path, requested: str, engine=None) -> str:
     return requested.upper()
 
 
+def _sample_fraction_for(src: Path, engine=None) -> float | None:
+    """Adaptive sample fraction: smaller samples for very large files.
+    Returns None to use engine default. Targets ~100K rows regardless of file size."""
+    try:
+        size_mb = src.stat().st_size / (1024 * 1024)
+        # >500MB: use 1% (≈80K rows for 8M-row file) instead of default 5%
+        if size_mb > 500:
+            return 0.01
+        # >200MB: use 2%
+        if size_mb > 200:
+            return 0.02
+        # >100MB: use 3%
+        if size_mb > 100:
+            return 0.03
+    except OSError:
+        pass
+    return None  # use engine default
+
+
 def _do_profile(body: ProfileIn) -> dict[str, Any]:
     spark, engine = _spark_engine()
     src = ROOT / body.source
-    df = _read_source(spark, src)
     mode = _profile_mode_for(src, body.mode, engine)
     ds = body.dataset or src.stem
-    _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
-    rep = engine.profile(df, ds, mode=mode, on_phase=lambda m: _prog(f"phase=profile | {m}"))
+    sample_frac = _sample_fraction_for(src, engine)
+    df, parquet_tmp = _read_for_profiling(spark, body.source, "AUTO", ds)
+    _prog(f"phase=profile | profiling {ds} ({mode}{f', sample={sample_frac:.0%}' if sample_frac else ''}) — computing column statistics")
+    try:
+        rep = engine.profile(df, ds, mode=mode, sample_fraction=sample_frac,
+                             on_phase=lambda m: _prog(f"phase=profile | {m}"))
+    finally:
+        _cleanup_parquet_tmp(parquet_tmp)
     out = ROOT / "reports"
     out.mkdir(exist_ok=True)
     p = out / f"ui_profile_{src.stem}.json"
@@ -1939,6 +1963,37 @@ def _read_any_source(spark: Any, source: str, fmt: str):
     return _read_source(spark, src)  # AUTO — suffix inference
 
 
+def _read_for_profiling(spark: Any, source: str, source_format: str, dataset: str) -> tuple[Any, Path | None]:
+    """Read source for profiling. Large CSV → temp Parquet (10-50x faster columnar reads).
+    Returns (dataframe, parquet_tmp_path_or_None). Caller must clean up parquet_tmp."""
+    df = _read_any_source(spark, source, source_format)
+    src_path = (ROOT / source).resolve()
+    if not (src_path.suffix.lower() == ".csv" and src_path.exists()
+            and src_path.stat().st_size > _BIG_FILE):
+        return df, None
+    parquet_tmp = ROOT / ".tmp" / f"profile_{dataset}_{int(time.time())}.parquet"
+    parquet_tmp.parent.mkdir(parents=True, exist_ok=True)
+    _prog(f"phase=read | converting {src_path.name} ({src_path.stat().st_size / 1048576:.0f} MB CSV) "
+          f"to Parquet for fast profiling")
+    t0 = time.monotonic()
+    try:
+        df.write.mode("overwrite").parquet(str(parquet_tmp))
+        df = spark.read.parquet(str(parquet_tmp))
+        _prog(f"phase=read | Parquet ready in {time.monotonic() - t0:.1f}s — profiling columnar data")
+        return df, parquet_tmp
+    except Exception as exc:
+        _prog(f"phase=read | Parquet conversion failed ({exc}) — profiling CSV directly")
+        import shutil
+        shutil.rmtree(parquet_tmp, ignore_errors=True)
+        return _read_any_source(spark, source, source_format), None
+
+
+def _cleanup_parquet_tmp(parquet_tmp: Path | None) -> None:
+    if parquet_tmp and parquet_tmp.exists():
+        import shutil
+        shutil.rmtree(parquet_tmp, ignore_errors=True)
+
+
 def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     """Profile + candidate rules for the wizard — same path as `dqctl bootstrap`."""
     from dq_core.generation.generator import CandidateRuleGenerator
@@ -1946,9 +2001,15 @@ def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     ds = body.dataset or Path(body.source).stem
     src_path = (ROOT / body.source).resolve()
     mode = _profile_mode_for(src_path, "FULL", engine) if src_path.suffix and src_path.exists() else "SAMPLE"
-    df = _read_any_source(spark, body.source, body.source_format)
-    _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
-    rep = engine.profile(df, ds, mode=mode, on_phase=lambda m: _prog(f"phase=profile | {m}"))
+
+    df, parquet_tmp = _read_for_profiling(spark, body.source, body.source_format, ds)
+    sample_frac = _sample_fraction_for(src_path, engine)
+    _prog(f"phase=profile | profiling {ds} ({mode}{f', sample={sample_frac:.0%}' if sample_frac else ''}) — computing column statistics")
+    try:
+        rep = engine.profile(df, ds, mode=mode, sample_fraction=sample_frac,
+                             on_phase=lambda m: _prog(f"phase=profile | {m}"))
+    finally:
+        _cleanup_parquet_tmp(parquet_tmp)
     # drift vs last stored baseline profile (profiles collection — written at finalize)
     try:
         from dq_core.metadata import resolver as _res
