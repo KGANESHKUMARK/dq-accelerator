@@ -26,7 +26,9 @@ helpers round-trip any collection for review, diff and git-friendly artifacts.
 from __future__ import annotations
 
 import json
+import os
 import threading
+import time
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -57,9 +59,57 @@ class Collection:
 # --------------------------------------------------------------------------- TinyDB backend
 
 
+class AtomicJSONStorage:
+    """Drop-in TinyDB ``Storage`` with atomic writes and per-operation handles.
+
+    Stock ``JSONStorage`` keeps one shared ``_handle`` open on the DB file:
+    concurrent ``read()``/``write()`` calls interleave ``seek`` positions on
+    that handle, and in-place writes let readers observe partially-written
+    JSON — surfacing as sporadic ``JSONDecodeError`` 500s under FastAPI's
+    threadpool (observed on ``GET /api/pipelines`` during job writes).
+
+    This storage opens a fresh handle per operation and writes via
+    ``<path>.tmp`` + ``os.replace`` — atomic on Windows and POSIX — so
+    readers only ever see a complete file. Reads retry briefly on decode
+    errors to cover the replace-in-flight window on filesystems where the
+    rename is not perfectly atomic.
+    """
+
+    def __init__(self, path: str | Path, **json_kwargs: Any) -> None:
+        from tinydb.storages import touch
+        self.path = str(path)
+        self._json_kwargs = json_kwargs
+        touch(self.path, create_dirs=True)
+
+    def read(self):
+        for attempt in range(3):
+            try:
+                if not os.path.exists(self.path) or os.path.getsize(self.path) == 0:
+                    return None
+                with open(self.path, "r", encoding="utf-8") as fh:
+                    return json.load(fh)
+            except (json.JSONDecodeError, FileNotFoundError, OSError):
+                if attempt == 2:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
+        return None
+
+    def write(self, data: dict[str, dict[str, Any]]) -> None:
+        tmp = self.path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, **self._json_kwargs)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, self.path)
+
+    def close(self) -> None:
+        pass
+
+
 class TinyCollection(Collection):
-    def __init__(self, table: Any) -> None:
+    def __init__(self, table: Any, lock: threading.RLock) -> None:
         self._t = table
+        self._lock = lock
 
     @staticmethod
     def _cond(query: Mapping[str, Any]):
@@ -78,27 +128,32 @@ class TinyCollection(Collection):
         return self._t.search(cond) if cond is not None else []
 
     def insert_one(self, doc: Mapping[str, Any]) -> Any:
-        return self._t.insert(dict(doc))
+        with self._lock:
+            return self._t.insert(dict(doc))
 
     def replace_one(self, query: Mapping[str, Any], doc: Mapping[str, Any], upsert: bool = False) -> Any:
-        docs = self._search(query)
-        if docs:
-            return self._t.update(dict(doc), doc_ids=[d.doc_id for d in docs])
-        if upsert:
-            merged = {**dict(query), **dict(doc)}
-            return self._t.insert(merged)
-        return None
+        with self._lock:
+            docs = self._search(query)
+            if docs:
+                return self._t.update(dict(doc), doc_ids=[d.doc_id for d in docs])
+            if upsert:
+                merged = {**dict(query), **dict(doc)}
+                return self._t.insert(merged)
+            return None
 
     def find_one(self, query: Mapping[str, Any]) -> dict[str, Any] | None:
-        docs = self._search(query)
-        return dict(docs[0]) if docs else None
+        with self._lock:
+            docs = self._search(query)
+            return dict(docs[0]) if docs else None
 
     def find(self, query: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
-        return [dict(d) for d in self._search(query)]
+        with self._lock:
+            return [dict(d) for d in self._search(query)]
 
     def delete_one(self, query: Mapping[str, Any]) -> Any:
-        docs = self._search(query)
-        return self._t.remove(doc_ids=[d.doc_id for d in docs]) if docs else None
+        with self._lock:
+            docs = self._search(query)
+            return self._t.remove(doc_ids=[d.doc_id for d in docs]) if docs else None
 
     def count(self, query: Mapping[str, Any] | None = None) -> int:
         return len(self.find(query))
@@ -121,14 +176,14 @@ class TinyMetadataStore(MetadataStore):
 
     def __init__(self, db_path: str | Path) -> None:
         from tinydb import TinyDB
-        from tinydb.storages import JSONStorage
         self.path = str(db_path)
-        self._db = TinyDB(self.path, storage=JSONStorage)
+        self._lock = threading.RLock()
+        self._db = TinyDB(self.path, storage=AtomicJSONStorage)
         self._tables: dict[str, TinyCollection] = {}
 
     def collection(self, name: str) -> TinyCollection:
         if name not in self._tables:
-            self._tables[name] = TinyCollection(self._db.table(name))
+            self._tables[name] = TinyCollection(self._db.table(name), self._lock)
         return self._tables[name]
 
     def close(self) -> None:
