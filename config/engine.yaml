@@ -77,6 +77,22 @@ engine:
   # Local Spark runtime tuning (used by UI backend + CLI local harness).
   # On Databricks/Fabric/EMR these are ignored — the cluster provides Spark.
   # Override any value via env var: DQ_DRIVER_MEMORY, DQ_SPARK_MASTER, DQ_SHUFFLE_PARTITIONS
+  #
+  # local[N] explained:
+  #   local[1]  = 1 worker thread  — baseline, one task at a time
+  #   local[4]  = 4 worker threads — 4 tasks in parallel (current setting)
+  #   local[*]  = one thread per CPU core (auto-detect)
+  #
+  #   Each thread is a Spark "executor" in local mode — they share one JVM
+  #   and divide the driver_memory heap among themselves.
+  #
+  #   On a real cluster (Databricks/EMR):
+  #     spark.executor.cores   = CPU cores per executor JVM (e.g. 4)
+  #     spark.executor.memory  = heap per executor JVM     (e.g. 8g)
+  #     → 4 executor nodes × 4 cores × 8g = 16 parallel tasks, 32g total
+  #
+  #   Performance benchmark: .tmp/benchmark_spark.py
+  #   Test file generator:   .tmp/gen_1gb_csv.py
   runtime:
     spark_master: local[4]
     driver_memory: 2g

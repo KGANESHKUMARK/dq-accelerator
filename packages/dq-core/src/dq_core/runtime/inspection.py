@@ -12,7 +12,7 @@ from dq_core.version import __version__
 
 # Environment hints used for platform detection. Databricks sets DATABRICKS_RUNTIME_VERSION on
 # every cluster; the Dataproc / Fabric hints are documented assumptions verified only by contract
-# tests (see docs/pipeline_adapters.md).
+# tests (see docs/concepts/pipeline_adapters.md).
 PLATFORM_ENV_HINTS: dict[str, tuple[str, ...]] = {
     "DATABRICKS": ("DATABRICKS_RUNTIME_VERSION",),
     "DATAPROC": ("DATAPROC_IMAGE_VERSION", "DATAPROC_CLUSTER_NAME"),

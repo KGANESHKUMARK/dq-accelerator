@@ -155,6 +155,29 @@ def list_jobs(limit: int = 20) -> list[dict[str, Any]]:
     return out
 
 
+def active_job() -> str | None:
+    """job_id of the currently QUEUED/RUNNING job, or None."""
+    with _lock:
+        row = _conn.execute(
+            "SELECT job_id FROM jobs WHERE status IN ('QUEUED','RUNNING') "
+            "ORDER BY submitted_at DESC LIMIT 1").fetchone()
+    return row[0] if row else None
+
+
+def reset_jobs() -> int:
+    """Delete all job-history rows and clear in-memory SSE/progress state.
+    Keeps the SQLite file + open connection — an open handle cannot be
+    deleted on Windows, and the table is recreated by the next insert."""
+    with _lock:
+        n = _conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        _conn.execute("DELETE FROM jobs")
+        _conn.commit()
+    _events.clear()
+    _prog_hist.clear()
+    _cancel.clear()
+    return n
+
+
 def stream(job_id: str, timeout: float = 0.5) -> Iterator[str]:
     """Yield SSE events for a job; replays already-emitted events on subscribe."""
     seen = 0

@@ -21,7 +21,7 @@ export const api = {
   autoRun: (body: any) => fetch(`${B}/auto/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
   publishRuleset: (ruleset_yaml: string, activate = true) => fetch(`${B}/rulesets/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ruleset_yaml, activate }) }).then(j),
   rulesetAction: (id: string, action: string, version: string) => fetch(`${B}/rulesets/${id}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version }) }).then(j),
-  rulesetDiff: (id: string) => fetch(`${B}/rulesets/${id}/diff`).then(j),
+  rulesetDiff: (id: string, fromV?: string, toV?: string) => fetch(`${B}/rulesets/${id}/diff${fromV && toV ? `?from_=${encodeURIComponent(fromV)}&to=${encodeURIComponent(toV)}` : ''}`).then(j),
   rulesetRules: (id: string) => fetch(`${B}/rulesets/${id}/rules`).then(j),
   datasets: () => fetch(`${B}/datasets`).then(j),
   run: (body: any) => fetch(`${B}/dq/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(j),
@@ -60,5 +60,6 @@ export const api = {
   metricsRecent: (limit = 30, dataset?: string) => fetch(`${B}/metrics/recent?limit=${limit}${dataset ? `&dataset=${encodeURIComponent(dataset)}` : ''}`).then(j),
   dataAvailable: () => fetch(`${B}/data/available`).then(j),
   dataPreview: (dataset: string, stage: string, limit = 50) => fetch(`${B}/data/preview?dataset=${encodeURIComponent(dataset)}&stage=${stage}&limit=${limit}`).then(j),
+  adminReset: (confirm: string) => fetch(`${B}/admin/reset`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm }) }).then(j),
 }
 export type Job = { job_id: string; kind: string; status: string; progress?: string; result?: any; error?: string; submitted_at: string; started_at?: string; finished_at?: string }

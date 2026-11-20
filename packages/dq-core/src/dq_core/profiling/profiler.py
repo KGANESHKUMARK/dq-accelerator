@@ -51,6 +51,7 @@ class DataProfiler:
 
     def profile(self, df: DataFrame, dataset: str, *, mode: str | None = None,
                 sample_fraction: float | None = None,
+                limit_rows: int | None = None,
                 on_phase: Callable[[str], None] | None = None) -> ProfileReport:
         s = self.settings
         mode = (mode or s.mode).upper()
@@ -80,6 +81,12 @@ class DataProfiler:
                     source_rows = data.count()
                     jobs += 1
                 data = data.sample(withReplacement=False, fraction=fraction, seed=s.sample_seed)
+            # DQX-style row limit: cap the number of rows actually profiled.
+            # This keeps profiling fast even for very large files — we sample
+            # generously but only profile a bounded number of rows.
+            if limit_rows and limit_rows > 0:
+                _emit(f"spark job · row limit — capping profiled rows at {limit_rows:,}")
+                data = data.limit(limit_rows)
             approximate = mode == "APPROXIMATE"
             data = data.persist(StorageLevel.MEMORY_AND_DISK)
             columns = data.columns

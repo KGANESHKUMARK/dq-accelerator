@@ -480,7 +480,7 @@ def _do_run(body: RunIn) -> dict[str, Any]:
     from dq_core.context import PipelineContext
     t0 = time.monotonic()
     spark, engine = _spark_engine()
-    rs = engine.load_ruleset(str(ROOT / body.ruleset))
+    rs = engine.load_ruleset(_cfg(body.ruleset) or str(ROOT / body.ruleset))
     src = ROOT / body.source
     if (body.source_format or "AUTO").upper() in ("TABLE", "DELTA", "JSON") or not src.exists():
         df = _read_any_source(spark, body.source, body.source_format)
@@ -507,7 +507,7 @@ def _do_run(body: RunIn) -> dict[str, Any]:
         n_rules = len(getattr(rs, "rules", []) or [])
     sample_note = f" (sampled {file_size_mb:.0f}MB -> ~{target_rows:,} rows)" if sampled else ""
     _prog(f"phase=validate | validating {rs.ref} on {src.name}{sample_note} — mode={body.mode}, {n_rules} rules")
-    res = engine.run(df, rs, str(ROOT / body.policy) if body.policy else None, ctx, mode=body.mode,
+    res = engine.run(df, rs, _cfg(body.policy) or None, ctx, mode=body.mode,
                      on_phase=lambda k: _prog(_RUN_PHASE_LABELS.get(k, f"phase=validate | {k}")))
     _prog(f"phase=report | engine finished in {time.monotonic() - t0:.1f}s — writing report")
     out = ROOT / "reports"
@@ -696,26 +696,36 @@ _BIG_FILE = 50 * 1024 * 1024      # FULL profile above this risks OOM on the loc
 # Configurable via engine.yaml -> validation.large_file_threshold_mb
 
 
-def _profile_mode_for(src: Path, requested: str, engine=None) -> str:
+def _auto_profile_config(src: Path, engine=None) -> tuple[str, float | None, int | None]:
+    """DQX-style auto-detect: sample generously, limit rows actually profiled.
+    Mirrors databrickslabs/dqx which samples 30% then limits to 1000 records.
+    Returns (mode, sample_fraction, limit_rows)."""
     try:
-        threshold = _BIG_FILE
-        if engine is not None:
-            threshold = engine.config.validation.large_file_threshold_mb * 1024 * 1024
-        if requested.upper() == "FULL" and src.stat().st_size > threshold:
-            return "SAMPLE"
+        size_mb = src.stat().st_size / (1024 * 1024)
+        if size_mb > 500:      # >500MB — very large: sample 30%, profile ≤10K rows
+            return "APPROXIMATE", 0.30, 10_000
+        elif size_mb > 100:    # >100MB — large: sample 10%, profile ≤50K rows
+            return "SAMPLE", 0.10, 50_000
+        elif size_mb > 50:     # >50MB — medium: sample 5%, profile ≤100K rows
+            return "SAMPLE", 0.05, 100_000
     except OSError:
         pass
-    return requested.upper()
+    return "FULL", None, None   # <50MB — small: profile all rows, no limit
 
 
 def _do_profile(body: ProfileIn) -> dict[str, Any]:
     spark, engine = _spark_engine()
     src = ROOT / body.source
-    df = _read_source(spark, src)
-    mode = _profile_mode_for(src, body.mode, engine)
+    mode, sample_frac, limit_rows = _auto_profile_config(src, engine)
     ds = body.dataset or src.stem
-    _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
-    rep = engine.profile(df, ds, mode=mode, on_phase=lambda m: _prog(f"phase=profile | {m}"))
+    df, parquet_tmp = _read_for_profiling(spark, body.source, "AUTO", ds)
+    _prog(f"phase=profile | profiling {ds} ({mode}{f', sample={sample_frac:.0%}' if sample_frac else ''}, limit={limit_rows or 'none'}) — computing column statistics")
+    try:
+        rep = engine.profile(df, ds, mode=mode, sample_fraction=sample_frac,
+                             limit_rows=limit_rows,
+                             on_phase=lambda m: _prog(f"phase=profile | {m}"))
+    finally:
+        _cleanup_parquet_tmp(parquet_tmp)
     out = ROOT / "reports"
     out.mkdir(exist_ok=True)
     p = out / f"ui_profile_{src.stem}.json"
@@ -961,6 +971,139 @@ def metadata_switch(body: MetadataSwitchIn) -> dict[str, Any]:
     path.write_text(text, encoding="utf-8")
     return {"ok": True, "backend": backend, "engine": engine if backend == "nosql" else None,
             "note": "call /api/engine/reload (restart_spark=false) to apply"}
+
+
+# ------------------------------------------------------------------ factory reset
+class ResetIn(BaseModel):
+    confirm: str = ""
+
+
+@app.post("/api/admin/reset")
+def admin_reset(body: ResetIn) -> dict[str, Any]:
+    """Factory reset for demos: wipe ALL generated DQ state — metadata store,
+    job history, medallion outputs, reports, rulesets, manifests, approvals.
+    Keeps uploads, sample_data, policies, engine config, lookups, integrations."""
+    if body.confirm != "RESET":
+        raise HTTPException(400, 'confirmation required — send {"confirm": "RESET"}')
+    active = J.active_job()
+    if active:
+        raise HTTPException(409, f"job {active} is still active — wait for it to finish or cancel first")
+    summary = _do_factory_reset()
+    try:
+        J.reload_engine(restart_spark=False)   # drop cached store/registries → fresh empty state
+    except Exception:
+        pass
+    return {"ok": True, "engine_reloaded": True, **summary}
+
+
+def _do_factory_reset() -> dict[str, Any]:
+    """Delete all generated DQ state under ROOT. Fixed paths only — no user input."""
+    import shutil
+    summary: dict[str, Any] = {
+        "categories": {}, "bytes_freed": 0,
+        "kept": ["data/uploads", "sample_data", "config/policies", "config/engine*.yaml",
+                 "config/rules", "config/ai", "integrations", "docs", ".env"],
+    }
+
+    def _size(p: Path) -> int:
+        if p.is_file():
+            try:
+                return p.stat().st_size
+            except OSError:
+                return 0
+        total = 0
+        for f in p.rglob("*"):
+            try:
+                if f.is_file():
+                    total += f.stat().st_size
+            except OSError:
+                pass
+        return total
+
+    def _wipe_dir(path: Path, label: str) -> None:
+        """Delete all contents of a directory (the dir itself is kept)."""
+        n_files = n_bytes = 0
+        if not path.exists():
+            summary["categories"][label] = {"files": 0, "bytes": 0}
+            return
+        for child in path.iterdir():
+            try:
+                sz = _size(child)
+                if child.is_dir():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+                n_files += 1
+                n_bytes += sz
+            except OSError as exc:
+                summary["categories"].setdefault("_errors", []).append(f"{child}: {exc}")
+        summary["categories"][label] = {"files": n_files, "bytes": n_bytes}
+        summary["bytes_freed"] += n_bytes
+
+    def _wipe_glob(parent: Path, patterns: list[str], label: str) -> None:
+        n_files = n_bytes = 0
+        seen: set[Path] = set()
+        for pat in patterns:
+            for f in parent.glob(pat):
+                if f in seen:
+                    continue
+                seen.add(f)
+                try:
+                    n_bytes += _size(f)
+                    if f.is_dir():
+                        shutil.rmtree(f)
+                    else:
+                        f.unlink()
+                    n_files += 1
+                except OSError as exc:
+                    summary["categories"].setdefault("_errors", []).append(f"{f}: {exc}")
+        summary["categories"][label] = {"files": n_files, "bytes": n_bytes}
+        summary["bytes_freed"] += n_bytes
+
+    # 1. Metadata document store — pipelines, rulesets, jobs, profiles,
+    #    manifests, approvals, metrics (TinyDB read() treats a missing file as empty)
+    meta = ROOT / "data" / "metadata.nosql.json"
+    if meta.exists():
+        sz = meta.stat().st_size
+        meta.unlink()
+        summary["categories"]["metadata_store"] = {"files": 1, "bytes": sz}
+        summary["bytes_freed"] += sz
+    legacy = ROOT / "data" / "registry.nosql.json"
+    if legacy.exists():
+        legacy.unlink()
+
+    # 2. Job history — delete rows, keep the SQLite file (open handle on Windows)
+    summary["categories"]["job_history"] = {"files": 0, "bytes": 0, "rows": J.reset_jobs()}
+
+    # 3. Anomaly inbox — delete rows on the open connection (the file itself
+    #    can't be unlinked while _ano_conn holds it on Windows)
+    try:
+        summary["categories"]["anomalies_db"] = {"rows": reset_anomalies()}
+    except Exception as exc:
+        summary["categories"]["anomalies_db"] = {"skipped": str(exc)}
+
+    # 4. Medallion outputs — bronze/silver/gold raw+accepted+quarantine+audit
+    for d in ("bronze", "silver", "gold", "quarantine", "audit"):
+        _wipe_dir(ROOT / "data" / d, f"data/{d}")
+
+    # 5. Report JSONs
+    _wipe_glob(ROOT / "reports", ["*.json"], "reports")
+
+    # 6. Published ruleset + pipeline manifest YAMLs (git-tracked → restorable)
+    _wipe_glob(ROOT / "config" / "rulesets", ["*.yaml", "*.yml"], "config/rulesets")
+    _wipe_glob(ROOT / "config" / "pipelines", ["*.yaml", "*.yml"], "config/pipelines")
+
+    # 7. Human approval decisions → empty lists (keep file structure)
+    appr = ROOT / "config" / "approvals"
+    for name, key in (("approved_corrections.yaml", "approvals"),
+                      ("rejected_corrections.yaml", "rejections")):
+        f = appr / name
+        if f.exists():
+            sz = f.stat().st_size
+            f.write_text(f"{key}: []\n", encoding="utf-8")
+            summary["categories"][f"approvals/{name}"] = {"files": 1, "bytes": sz}
+
+    return summary
 
 
 # ------------------------------------------------------------------ health score
@@ -1306,6 +1449,16 @@ _ano_lock = __import__("threading").Lock()
 
 def _anomaly_conn():
     return _ano_conn
+
+
+def reset_anomalies() -> int:
+    """Delete all anomaly rows — keeps table + open connection (the file
+    can't be deleted while _ano_conn holds it on Windows)."""
+    with _ano_lock:
+        n = _ano_conn.execute("SELECT COUNT(*) FROM anomalies").fetchone()[0]
+        _ano_conn.execute("DELETE FROM anomalies")
+        _ano_conn.commit()
+    return n
 
 
 def _ingest_anomalies(job_result: dict[str, Any], pipeline_id: str) -> int:
@@ -1746,6 +1899,11 @@ class AutoIn(BaseModel):
     owner: str = "auto-e2e"
     mode: str = "REMEDIATE"
     approve_confidence: float = 0.0   # auto-approve candidates at/above this
+    # layers controls which medallion stages are processed.
+    # Default = ["BRONZE"] — profile + generate rules, no Silver/Gold DQ run.
+    # ["BRONZE","SILVER"] — full Silver DQ run after Bronze ingest.
+    # ["BRONZE","SILVER","GOLD"] — full three-layer pipeline (requires Gold ruleset).
+    layers: list[str] = ["BRONZE"]
 
 
 @app.post("/api/auto/run")
@@ -1795,15 +1953,66 @@ def _purge_pipeline_artifacts(ruleset_id: str, pipeline_id: str) -> None:
 
 
 def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
+    layers = [l.upper() for l in (body.layers or ["BRONZE"])]
+    run_silver = "SILVER" in layers
+    run_gold = "GOLD" in layers and run_silver
+
+    # ── STEP 1: Profile + generate candidate rules (always) ──────────────────
     _prog("phase=profile | auto-e2e: profiling source")
+    # Profile always targets the layer that will hold the data. Use SILVER as
+    # ruleset namespace only when Silver DQ will actually run; otherwise BRONZE.
+    profile_stage = body.stage if run_silver else "BRONZE"
     res = _do_bootstrap_preview(PreviewIn(source=body.source, dataset=body.dataset,
-                                        stage=body.stage, source_format=body.source_format))
+                                          stage=profile_stage, source_format=body.source_format))
     approved = [c["rule_id"] for c in res["candidates"]
                 if (c.get("confidence") or 0) >= body.approve_confidence]
     ds = body.dataset or res["dataset"]
     _prog(f"phase=profile | profiled {res.get('row_count') or '?'} rows · "
-          f"{len(res.get('anomalies') or [])} anomalies · {len(res.get('candidates') or [])} candidate rules · "
-          f"{len(approved)} auto-approved")
+          f"{len(res.get('anomalies') or [])} anomalies · "
+          f"{len(res.get('candidates') or [])} candidate rules · "
+          f"{len(approved)} auto-approved · layers={','.join(layers)}")
+
+    # ── BRONZE-ONLY: ingest + rules only, no Silver/Gold DQ run ──────────────
+    if not run_silver:
+        _prog("phase=validate | auto-e2e: Bronze-only mode — writing candidate ruleset (no Silver/Gold DQ run)")
+        _purge_pipeline_artifacts(res["ruleset_id"], body.pipeline_id.upper())
+        plat = body.platform.upper()
+        if plat in ("LOCAL", "LOCAL_SPARK", "SPARK"):
+            plat = "STANDALONE_SPARK"
+        fout = onboard_finalize(FinalizeIn(
+            preview_result=res, approved_rule_ids=approved, dataset=ds,
+            ruleset_id=res["ruleset_id"], pipeline_id=body.pipeline_id.upper(),
+            platform=plat, stage="BRONZE", dq_mode=body.mode,
+            policy=body.policy, owner=body.owner, source=body.source,
+            source_format=body.source_format, publish=True, onboard=True, force=True))
+        _prog(f"phase=done | Bronze ruleset {fout.get('ruleset')} written — "
+              f"add Silver/Gold layers when transformation pipeline is defined")
+        return {
+            "dataset": ds,
+            "ruleset": fout.get("ruleset"),
+            "rules_approved": len(approved),
+            "rules_rejected": fout.get("rules_rejected"),
+            "layers": layers,
+            "run": {
+                "pipeline_id": body.pipeline_id.upper(),
+                "dataset": ds,
+                "mode": "BRONZE_ONLY",
+                "stages": [{
+                    "stage": "BRONZE",
+                    "status": "PROFILED",
+                    "candidate_rules": len(approved),
+                    "row_count": res.get("row_count"),
+                    "anomalies": len(res.get("anomalies") or []),
+                }],
+            },
+            "input": res.get("row_count"),
+            "accepted": None,
+            "quarantined": None,
+            "gate_passed": None,
+            "report_path": "",
+        }
+
+    # ── SILVER (and optionally GOLD): full pipeline run ───────────────────────
     _purge_pipeline_artifacts(res["ruleset_id"], body.pipeline_id.upper())
     _prog(f"phase=validate | auto-e2e: {len(approved)}/{res['candidate_count']} rules approved — writing ruleset + manifest")
     plat = body.platform.upper()
@@ -1815,47 +2024,24 @@ def _do_auto_e2e(body: AutoIn) -> dict[str, Any]:
         platform=plat, stage=body.stage, dq_mode=body.mode,
         policy=body.policy, owner=body.owner, source=body.source,
         source_format=body.source_format, publish=True, onboard=True, force=True))
-    # ── Gold stage: stricter re-validation — full Bronze→Silver→Gold in one run ──
-    try:
-        _prog("phase=validate | auto-e2e: building GOLD ruleset (stricter re-check)")
-        import yaml as _yaml
-        from dq_core.metadata.models import RuleSet as _RS
-        from dq_core.metadata.serialization import dump_yaml as _dump
-        approved_set = set(approved)
-        gold_dict = {"ruleset_id": f"{ds}_gold", "version": "1.0", "stage": "GOLD",
-                     "dataset": ds, "rules": []}
-        for c in res["candidates"]:
-            if c["rule_id"] in approved_set and isinstance(c.get("raw"), dict):
-                raw = dict(c["raw"]); raw["stage"] = "GOLD"; raw["ruleset_id"] = f"{ds}_gold"
-                raw["status"] = "APPROVED"
-                gold_dict["rules"].append(raw)
-        if gold_dict["rules"]:
-            gold_rs = _RS.from_dict(gold_dict)
-            gpath = ROOT / "config" / "rulesets" / f"{ds}_gold_v1.yaml"
-            from dq_core.metadata.serialization import save_ruleset as _sv
-            _sv(gold_rs, gpath)
-            _registry("rulesets").publish(gold_rs, published_by=body.owner or "auto-e2e", activate=True)
-            mpath = ROOT / "config" / "pipelines" / f"{body.pipeline_id.upper()}.yaml"
-            m = _yaml.safe_load(mpath.read_text(encoding="utf-8"))
-            rel = os.path.relpath(gpath, mpath.parent).replace("\\", "/")
-            m["pipeline"]["datasets"][0]["rulesets"]["GOLD"] = rel
-            if "GOLD" not in m["pipeline"]["datasets"][0].get("stages", []):
-                m["pipeline"]["datasets"][0].setdefault("stages", []).append("GOLD")
-            _dump(m, mpath)
-            fout["gold_ruleset"] = f"{ds}_gold@1.0"
-    except Exception as exc:
-        print(f"[auto-e2e] gold setup failed (silver still runs): {exc}")
+
+    # Gold stage only if explicitly requested via layers=["BRONZE","SILVER","GOLD"]
+    # NOTE: Gold rules must reflect actual Gold-layer transformations — we do NOT
+    # copy Silver rules to Gold because the data is not transformed between layers.
+    # Gold rulesets should be provided separately by the pipeline owner.
+    if run_gold:
+        _prog("phase=validate | auto-e2e: Gold layer requested — Gold ruleset must be provided separately")
+
     _prog(f"phase=validate | ruleset {fout.get('ruleset')} + manifest written · "
-          f"pipeline {body.pipeline_id.upper()} registered · gold ruleset "
-          f"{fout.get('gold_ruleset') or 'n/a'}")
-    _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()} (bronze→silver→gold)")
+          f"pipeline {body.pipeline_id.upper()} registered")
+    _prog(f"phase=read | auto-e2e: running governed pipeline {body.pipeline_id.upper()} (bronze→silver)")
     run = _do_pipeline_run(body.pipeline_id.upper(), PipelineRunIn(dataset_id=ds, mode=body.mode))
     stages = run.get("stages") or []
     silver = next((s for s in stages if s.get("stage") == "SILVER"), {})
     import glob as _g
     reps = sorted(_g.glob(str(ROOT / "reports" / f"{ds}*silver*.json")), key=os.path.getmtime)
     return {"dataset": ds, "ruleset": fout.get("ruleset"), "rules_approved": len(approved),
-            "rules_rejected": fout.get("rules_rejected"), "run": run,
+            "rules_rejected": fout.get("rules_rejected"), "layers": layers, "run": run,
             "input": silver.get("input") or silver.get("input_rows"),
             "accepted": silver.get("accepted"), "quarantined": silver.get("quarantined"),
             "gate_passed": run.get("gate_passed"),
@@ -1906,16 +2092,53 @@ def _read_any_source(spark: Any, source: str, fmt: str):
     return _read_source(spark, src)  # AUTO — suffix inference
 
 
+def _read_for_profiling(spark: Any, source: str, source_format: str, dataset: str) -> tuple[Any, Path | None]:
+    """Read source for profiling. Large CSV → temp Parquet (10-50x faster columnar reads).
+    Returns (dataframe, parquet_tmp_path_or_None). Caller must clean up parquet_tmp."""
+    df = _read_any_source(spark, source, source_format)
+    src_path = (ROOT / source).resolve()
+    if not (src_path.suffix.lower() == ".csv" and src_path.exists()
+            and src_path.stat().st_size > _BIG_FILE):
+        return df, None
+    parquet_tmp = ROOT / ".tmp" / f"profile_{dataset}_{int(time.time())}.parquet"
+    parquet_tmp.parent.mkdir(parents=True, exist_ok=True)
+    _prog(f"phase=read | converting {src_path.name} ({src_path.stat().st_size / 1048576:.0f} MB CSV) "
+          f"to Parquet for fast profiling")
+    t0 = time.monotonic()
+    try:
+        df.write.mode("overwrite").parquet(str(parquet_tmp))
+        df = spark.read.parquet(str(parquet_tmp))
+        _prog(f"phase=read | Parquet ready in {time.monotonic() - t0:.1f}s — profiling columnar data")
+        return df, parquet_tmp
+    except Exception as exc:
+        _prog(f"phase=read | Parquet conversion failed ({exc}) — profiling CSV directly")
+        import shutil
+        shutil.rmtree(parquet_tmp, ignore_errors=True)
+        return _read_any_source(spark, source, source_format), None
+
+
+def _cleanup_parquet_tmp(parquet_tmp: Path | None) -> None:
+    if parquet_tmp and parquet_tmp.exists():
+        import shutil
+        shutil.rmtree(parquet_tmp, ignore_errors=True)
+
+
 def _do_bootstrap_preview(body: PreviewIn) -> dict[str, Any]:
     """Profile + candidate rules for the wizard — same path as `dqctl bootstrap`."""
     from dq_core.generation.generator import CandidateRuleGenerator
     spark, engine = _spark_engine()
     ds = body.dataset or Path(body.source).stem
     src_path = (ROOT / body.source).resolve()
-    mode = _profile_mode_for(src_path, "FULL", engine) if src_path.suffix and src_path.exists() else "SAMPLE"
-    df = _read_any_source(spark, body.source, body.source_format)
-    _prog(f"phase=profile | profiling {ds} ({mode}) — computing column statistics")
-    rep = engine.profile(df, ds, mode=mode, on_phase=lambda m: _prog(f"phase=profile | {m}"))
+    mode, sample_frac, limit_rows = _auto_profile_config(src_path, engine)
+
+    df, parquet_tmp = _read_for_profiling(spark, body.source, body.source_format, ds)
+    _prog(f"phase=profile | profiling {ds} ({mode}{f', sample={sample_frac:.0%}' if sample_frac else ''}, limit={limit_rows or 'none'}) — computing column statistics")
+    try:
+        rep = engine.profile(df, ds, mode=mode, sample_fraction=sample_frac,
+                             limit_rows=limit_rows,
+                             on_phase=lambda m: _prog(f"phase=profile | {m}"))
+    finally:
+        _cleanup_parquet_tmp(parquet_tmp)
     # drift vs last stored baseline profile (profiles collection — written at finalize)
     try:
         from dq_core.metadata import resolver as _res

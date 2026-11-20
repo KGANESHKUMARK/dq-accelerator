@@ -41,7 +41,7 @@ Last updated: 2026-07-14
   bank_loans 60K, airline 80K, retail 120K, ecommerce 300K (9,510 quar),
   telco 1M (CSV+parquet, SAMPLE profiling, 25,286 quar), mongo_claims 20K
   JSON docs (MongoDB-style `_id`+nested — NoSQL-data-via-JSON proof).
-- **Sample manifest:** `docs/sample_pipeline_manifest.yaml` — manual YAML
+- **Sample manifest:** `docs/reference/sample_pipeline_manifest.yaml` — manual YAML
   onboarding reference (platform labels, dq_mode, rulesets, test_data).
 - **P0–P3 complete and verified** on `sample_data/minimal/patients_minimal.csv`:
   physical medallion persistence (`MedallionRunner` + `/api/pipelines/{id}/run`),
@@ -60,9 +60,9 @@ Last updated: 2026-07-14
   DOB blocked-sensitive; dedupe deterministic; unfixables quarantined.
   Gold ruleset + breed lookup `config/rules/lookups/goat_breeds.yaml`.
   Best run: Silver 54 acc/6 quar (99.66), Gold 53/54 (99.69), gate PASS.
-- Client-facing demo/onboarding walkthrough: `docs/ui_demo_guide.md`.
+- Client-facing demo/onboarding walkthrough: `docs/guides/ui_demo_guide.md`.
 - Fresh-machine → live demo runbook (prereqs, assets, ordered demo acts,
-  verified numbers, honest boundaries): `docs/end_to_end_demo.md`.
+  verified numbers, honest boundaries): `docs/presentation/end_to_end_demo.md`.
 - Approvals inbox fixed: reject persists to `config/approvals/rejected_corrections.yaml`,
   pending inbox filters actioned rows, `GET /api/quarantine/decisions` audit trail,
   Reports viewer shows quality_pillars + outcome_audit sections.
@@ -86,11 +86,11 @@ Last updated: 2026-07-14
 - Do not begin auth, scheduling, orchestration adapters, alerting, or
   Kubernetes while P0–P4 is open.
 - Authoritative documents:
-  - `docs/POC.md`
-  - `docs/POC_CONTEXT.md`
+  - `docs/poc/POC.md`
+  - `docs/poc/POC_CONTEXT.md`
   - `ROADMAP.md`
-  - `docs/architecture.md`
-  - `docs/DEVELOPER_GUIDE.md` (build phases + release process)
+  - `docs/architecture/architecture.md`
+  - `docs/guides/DEVELOPER_GUIDE.md` (build phases + release process)
 
 ## Active implementation plan
 

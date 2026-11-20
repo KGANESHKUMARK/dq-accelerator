@@ -1,0 +1,20 @@
+pipeline:
+  pipeline_id: FINANCIAL_TXN_1GB_PIPELINE
+  pipeline_name: Financial Txn 1Gb Pipeline
+  platform: STANDALONE_SPARK
+  runtime: PYSPARK
+  integration_mode: INLINE
+  dq_mode: REMEDIATE
+  owner: auto-e2e
+  description: Onboarded via UI wizard from financial_txn_1gb.csv (10000 rows profiled)
+  policy: config/policies/default.yaml
+  datasets:
+  - dataset_id: financial_txn_1gb
+    format: CSV
+    stages:
+    - BRONZE
+    - BRONZE
+    rulesets:
+      BRONZE: ../rulesets/financial_txn_1gb_v1.yaml
+    test_data: ../../data/uploads/financial_txn_1gb.csv
+    test_data_format: CSV
